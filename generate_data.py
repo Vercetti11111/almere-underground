@@ -174,49 +174,13 @@ def fetch_day_data(token, date):
     booking_names = fetch_booking_names(token, date)
     return build_day_stats(date, rev_entries, payments, booking_names)
 
-def main():
-    print('=== Roller Analytics Data Generator ===')
-    print('Getting token...')
-    token = get_token()
-    print('Token OK')
-
-    # Determine "today" in Amsterdam time
-    now_utc = datetime.now(timezone.utc)
-    now_ams = now_utc + AMSTERDAM_OFFSET
-    today = now_ams.strftime('%Y-%m-%d')
-    print(f'Today (Amsterdam): {today}')
-
-    data_dir = Path('data')
-    data_dir.mkdir(exist_ok=True)
-
-    # ── Individual day files ──────────────────────────────────────────────────
-    # Generate last 30 days + today; skip if file exists for older days
-    days_to_generate = [add_days(today, -i) for i in range(30)]
-
-    for date in days_to_generate:
-        out_file = data_dir / f'day-{date}.json'
-        # Always regenerate today and yesterday
-        if out_file.exists() and date not in (today, add_days(today, -1)):
-            print(f'  Skip {date} (exists)')
-            continue
-        print(f'  Generating day {date}...')
-        try:
-            day_data = fetch_day_data(token, date)
-            with open(out_file, 'w') as f:
-                json.dump(day_data, f)
-            print(f'    → {out_file} (rev={day_data["visit"]["netRevenue"]}, visitors={day_data["visit"]["visitors"]})')
-        except Exception as e:
-            print(f'    ERROR: {e}')
-
-    # ── Week files ────────────────────────────────────────────────────────────
-    # Generate week files by reusing individual day data (API max = 1 day range)
-    # Generate weeks: current week + 3 previous weeks
+def rebuild_week_files(today, data_dir, token):
+    """Rebuild week JSON files from already-fetched day files."""
     for week_offset in range(4):
         week_end = add_days(today, -week_offset * 7)
         week_start = add_days(week_end, -6)
         out_file = data_dir / f'week-{week_end}.json'
 
-        # Skip older weeks if already generated
         if out_file.exists() and week_offset >= 2:
             print(f'  Skip week ending {week_end} (exists)')
             continue
@@ -225,15 +189,12 @@ def main():
         try:
             dates_in_week = [add_days(week_start, i) for i in range(7)]
             days_data = []
-
             for d in dates_in_week:
                 day_file = data_dir / f'day-{d}.json'
                 if day_file.exists():
-                    # Re-use already-fetched day data
                     with open(day_file) as f:
                         days_data.append(json.load(f))
                 else:
-                    # Fetch fresh
                     print(f'    Fetching {d}...')
                     stats = fetch_day_data(token, d)
                     days_data.append(stats)
@@ -246,15 +207,62 @@ def main():
                 'generatedAt': datetime.now(timezone.utc).isoformat(),
                 'days': days_data,
             }
-
             with open(out_file, 'w') as f:
                 json.dump(week_data, f)
             total_rev = sum(d['visit']['netRevenue'] for d in days_data)
             print(f'    → {out_file} (week total rev={round(total_rev, 2)})')
-
         except Exception as e:
             print(f'    ERROR generating week {week_end}: {e}')
             import traceback; traceback.print_exc()
+
+
+def main():
+    today_only = '--today-only' in sys.argv
+    print('=== Roller Analytics Data Generator ===')
+    print(f'Mode: {"today only" if today_only else "full refresh"}')
+    print('Getting token...')
+    token = get_token()
+    print('Token OK')
+
+    now_utc = datetime.now(timezone.utc)
+    now_ams = now_utc + AMSTERDAM_OFFSET
+    today = now_ams.strftime('%Y-%m-%d')
+    print(f'Today (Amsterdam): {today}')
+
+    data_dir = Path('data')
+    data_dir.mkdir(exist_ok=True)
+
+    if today_only:
+        # Only refresh today (and yesterday to catch late entries)
+        for date in [today, add_days(today, -1)]:
+            out_file = data_dir / f'day-{date}.json'
+            print(f'  Refreshing {date}...')
+            try:
+                day_data = fetch_day_data(token, date)
+                with open(out_file, 'w') as f:
+                    json.dump(day_data, f)
+                print(f'    → rev={day_data["visit"]["netRevenue"]}, visitors={day_data["visit"]["visitors"]}')
+            except Exception as e:
+                print(f'    ERROR: {e}')
+        # Also rebuild current week file so it reflects today's fresh data
+        rebuild_week_files(today, data_dir, token)
+    else:
+        # Full refresh: last 30 days
+        days_to_generate = [add_days(today, -i) for i in range(30)]
+        for date in days_to_generate:
+            out_file = data_dir / f'day-{date}.json'
+            if out_file.exists() and date not in (today, add_days(today, -1)):
+                print(f'  Skip {date} (exists)')
+                continue
+            print(f'  Generating day {date}...')
+            try:
+                day_data = fetch_day_data(token, date)
+                with open(out_file, 'w') as f:
+                    json.dump(day_data, f)
+                print(f'    → rev={day_data["visit"]["netRevenue"]}, visitors={day_data["visit"]["visitors"]}')
+            except Exception as e:
+                print(f'    ERROR: {e}')
+        rebuild_week_files(today, data_dir, token)
 
     print('=== Done! ===')
 

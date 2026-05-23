@@ -2,8 +2,16 @@ name: Update Dashboard Data
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # Every 3 hours: refresh today only (~5 API calls)
+    - cron: '0 */3 * * *'
+    # Once per day at 03:00 UTC: full refresh of all 30 days
+    - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      full_refresh:
+        description: 'Full refresh (all 30 days)?'
+        required: false
+        default: 'false'
 
 jobs:
   update:
@@ -12,21 +20,31 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      
+
       - name: Install dependencies
         run: pip install requests
-      
+
       - name: Generate data
         env:
           ROLLER_CLIENT_ID: ROLLER_CLIENT_ID
           ROLLER_CLIENT_SECRET: ROLLER_CLIENT_SECRET
-        run: python generate_data.py
-      
+        run: |
+          # Full refresh at 03:00 UTC or when manually requested
+          HOUR=$(date -u +%H)
+          FULL_INPUT="${{ github.event.inputs.full_refresh }}"
+          if [ "$HOUR" = "03" ] || [ "$FULL_INPUT" = "true" ]; then
+            echo "Running full refresh..."
+            python generate_data.py
+          else
+            echo "Running today-only refresh..."
+            python generate_data.py --today-only
+          fi
+
       - name: Commit and push
         run: |
           git config user.name "Dashboard Bot"
