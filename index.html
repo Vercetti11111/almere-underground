@@ -105,8 +105,9 @@
       <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Almere Underground</div>
       <div style="font-size:20px;font-weight:800;">Analytics</div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
       <div id="live-dot" style="width:8px;height:8px;border-radius:50%;background:#10b981;" title="Live data"></div>
+      <button id="refresh-btn" onclick="refreshAll()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
     </div>
   </div>
 
@@ -174,15 +175,28 @@ if (accessCode) {
 // ── API ───────────────────────────────────────────────────────────────────────
 const cache = {};
 
-async function api(path) {
-  if (cache[path]) return cache[path];
-  const r = await fetch(`${WORKER}${path}`, { headers: { 'X-Access-Code': accessCode } });
+async function api(path, forceRefresh = false) {
+  const key = path;
+  if (!forceRefresh && cache[key]) return cache[key];
+  const sep = path.includes('?') ? '&' : '?';
+  const url = forceRefresh ? `${WORKER}${path}${sep}refresh=1` : `${WORKER}${path}`;
+  const r = await fetch(url, { headers: { 'X-Access-Code': accessCode } });
   const data = await r.json();
   if (data.error) throw new Error(data.error);
-  cache[path] = data;
-  // Auto-expire cache after 5 min
-  setTimeout(() => delete cache[path], 5 * 60 * 1000);
+  cache[key] = data;
+  if (!forceRefresh) setTimeout(() => delete cache[key], 5 * 60 * 1000);
   return data;
+}
+
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  Object.keys(cache).forEach(k => delete cache[k]);
+  try {
+    await renderCurrentTab(true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄'; }
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -243,10 +257,22 @@ const CHANNEL_META = {
 };
 
 // ── WEEK VIEW ─────────────────────────────────────────────────────────────────
-async function renderWeek() {
+function cacheLabel(data) {
+  if (!data) return '';
+  const at = data._cachedAt || data.generatedAt;
+  const fromCache = data._cached;
+  const age = data._cacheAge;
+  const timeStr = at ? new Date(at).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const ageStr = age != null ? (age < 60 ? `${age}s geleden` : `${Math.floor(age/60)}m geleden`) : '';
+  const icon = fromCache ? '📦' : '⚡';
+  const label = fromCache ? `Uit cache · ${ageStr}` : 'Live data';
+  return `<div style="font-size:10px;color:#444;text-align:center;margin-top:12px;">${icon} ${label}${timeStr ? ` · ${timeStr}` : ''}</div>`;
+}
+
+async function renderWeek(forceRefresh = false) {
   setContent(spinner());
   try {
-    const data = await api(`/api/week?offset=${weekOffset}`);
+    const data = await api(`/api/week?offset=${weekOffset}`, forceRefresh);
     const days = data.days || [];
     const today = todayStr();
     const maxRev = Math.max(...days.map(d => d.visit?.netRevenue || 0), 1);
@@ -279,7 +305,6 @@ async function renderWeek() {
         </div>`;
     }
 
-    const genAt = data.generatedAt ? `<div style="font-size:10px;color:#444;text-align:center;margin-top:8px;">🔄 ${new Date(data.generatedAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>` : '';
 
     setContent(`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -299,16 +324,16 @@ async function renderWeek() {
       </div>
       <div class="section-title">Per dag — tik voor details</div>
       ${dayRows}
-      ${genAt}
+      ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
 // ── BEZOEK VIEW ───────────────────────────────────────────────────────────────
-async function renderBezoek() {
+async function renderBezoek(forceRefresh = false) {
   setContent(spinner());
   try {
-    const data = await api(`/api/day?date=${selectedDate}`);
+    const data = await api(`/api/day?date=${selectedDate}`, forceRefresh);
     const { visit } = data;
     const avg = visit.visitors > 0 ? visit.netRevenue / visit.visitors : 0;
 
@@ -356,7 +381,6 @@ async function renderBezoek() {
         </div>`;
     }
 
-    const genAt = data.generatedAt ? `<div style="font-size:10px;color:#444;text-align:center;margin-top:16px;">🔄 ${new Date(data.generatedAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>` : '';
 
     setContent(`
       ${dateNav()}
@@ -368,16 +392,16 @@ async function renderBezoek() {
       </div>
       ${cats.length ? `<div class="card">${'<div class="section-title">Per categorie</div>'}${catRows}</div>` : ''}
       ${ptEntries.length ? `<div class="card"><div class="section-title">Per producttype</div>${ptRows}</div>` : ''}
-      ${genAt}
+      ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
 // ── VERKOOP VIEW ──────────────────────────────────────────────────────────────
-async function renderVerkoop() {
+async function renderVerkoop(forceRefresh = false) {
   setContent(spinner());
   try {
-    const data = await api(`/api/day?date=${selectedDate}`);
+    const data = await api(`/api/day?date=${selectedDate}`, forceRefresh);
     const { sales } = data;
     const avg = sales.transactionCount > 0 ? sales.fundsReceived / sales.transactionCount : 0;
     const total = sales.fundsReceived || 1;
@@ -401,7 +425,6 @@ async function renderVerkoop() {
         </div>`;
     }
 
-    const genAt = data.generatedAt ? `<div style="font-size:10px;color:#444;text-align:center;margin-top:16px;">🔄 ${new Date(data.generatedAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>` : '';
 
     setContent(`
       ${dateNav()}
@@ -412,16 +435,16 @@ async function renderVerkoop() {
         <div class="kpi-card"><div class="kpi-label">Gem./trans.</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
       ${chEntries.length ? `<div class="card"><div class="section-title">Sales channel</div>${chRows}</div>` : ''}
-      ${genAt}
+      ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
 // ── RUNSHEET VIEW ─────────────────────────────────────────────────────────────
-async function renderRunsheet() {
+async function renderRunsheet(forceRefresh = false) {
   setContent(spinner());
   try {
-    const data = await api(`/api/runsheet?date=${rsDate}`);
+    const data = await api(`/api/runsheet?date=${rsDate}`, forceRefresh);
 
     function renderBooking(b) {
       const payClass = b.paymentStatus === 'paid' ? 'pay-paid' : 'pay-unpaid';
@@ -478,7 +501,6 @@ async function renderRunsheet() {
     const empty = (!data.kf?.length && !data.bf?.length) ?
       `<div class="rs-empty">Geen KF/BF boekingen voor ${fmtDate(rsDate)}</div>` : '';
 
-    const genAt = data.generatedAt ? `<div style="font-size:10px;color:#444;text-align:center;margin-top:8px;">🔄 ${new Date(data.generatedAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>` : '';
 
     setContent(`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -487,7 +509,7 @@ async function renderRunsheet() {
         <button class="nav-btn" onclick="shiftRs(1)">›</button>
       </div>
       ${kfSection}${bfSection}${empty}
-      ${genAt}
+      ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
 }
@@ -521,10 +543,15 @@ function switchTab(tab) {
 
 function render() {
   if (!accessCode) return;
-  if (currentTab === 'week')      renderWeek();
-  else if (currentTab === 'bezoek')   renderBezoek();
-  else if (currentTab === 'verkoop')  renderVerkoop();
-  else if (currentTab === 'runsheet') renderRunsheet();
+  renderCurrentTab(false);
+}
+
+async function renderCurrentTab(forceRefresh = false) {
+  if (!accessCode) return;
+  if (currentTab === 'week')      await renderWeek(forceRefresh);
+  else if (currentTab === 'bezoek')   await renderBezoek(forceRefresh);
+  else if (currentTab === 'verkoop')  await renderVerkoop(forceRefresh);
+  else if (currentTab === 'runsheet') await renderRunsheet(forceRefresh);
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
