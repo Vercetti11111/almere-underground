@@ -81,9 +81,7 @@
 
   <script>
   // ── Config ────────────────────────────────────────────────────────────────
-  const CLIENT_ID = 'ROLLER_CLIENT_ID';
-  const CLIENT_SECRET = 'ROLLER_CLIENT_SECRET';
-  const BASE_URL = 'https://api.roller.app';
+  // Data served as static JSON, auto-updated every 15 min via GitHub Actions
 
   // ── State ─────────────────────────────────────────────────────────────────
   let currentTab = 'week';
@@ -124,57 +122,8 @@
     return { text: s, positive: d >= 0 };
   }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  async function getToken() {
-    const cached = sessionStorage.getItem('roller_token');
-    if (cached) {
-      const { token, expiresAt } = JSON.parse(cached);
-      if (Date.now() / 1000 < expiresAt - 300) return token;
-    }
-    const resp = await fetch(`${BASE_URL}/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET })
-    });
-    if (!resp.ok) throw new Error('Auth failed: ' + resp.status);
-    const data = await resp.json();
-    const expiresAt = Math.floor(Date.now() / 1000) + (data.expires_in ?? 86400);
-    sessionStorage.setItem('roller_token', JSON.stringify({ token: data.access_token, expiresAt }));
-    return data.access_token;
-  }
-
-  // ── API ───────────────────────────────────────────────────────────────────
-  async function apiGet(token, path) {
-    const resp = await fetch(`${BASE_URL}${path}`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-    });
-    if (!resp.ok) throw new Error(`API ${path} → ${resp.status}`);
-    return resp.json();
-  }
-
-  async function fetchAllPages(token, path, maxPages = 20) {
-    const all = [];
-    let page = 1;
-    let totalPages = 1;
-    const sep = path.includes('?') ? '&' : '?';
-    do {
-      const data = await apiGet(token, `${path}${sep}pageNumber=${page}&pageSize=200`);
-      if (!data) break;
-      all.push(...(data.items ?? []));
-      totalPages = data.totalPages ?? 1;
-      page++;
-    } while (page <= totalPages && page <= maxPages);
-    return all;
-  }
-
-  async function fetchBookingNames(token, date) {
-    const data = await apiGet(token, `/bookings?date=${date}&pageSize=200`);
-    const map = {};
-    for (const b of (data?.bookings ?? [])) {
-      if (b.bookingReference && b.name) map[b.bookingReference] = b.name;
-    }
-    return map;
-  }
+  // ── Data fetching (static JSON files) ────────────────────────────────────
+  // Data files are auto-generated every 15 min by GitHub Actions
 
   // ── Data processing ───────────────────────────────────────────────────────
   const CAT_ORDER = ['Kinderfeestjes', 'Bedrijfsfeesten', 'Box office', 'Online', 'Venue Manager', 'Overig'];
@@ -253,18 +202,9 @@
   async function fetchDayData(date) {
     const cacheKey = `day:${date}`;
     if (cache[cacheKey]) return cache[cacheKey];
-
-    const token = await getToken();
-    const end = addDays(date, 1);
-    const qs = `startDate=${date}&endDate=${end}`;
-
-    const [revEntries, payments, bookingNameMap] = await Promise.all([
-      fetchAllPages(token, `/reporting/revenue-entries?${qs}`, 10),
-      fetchAllPages(token, `/data/bookingpayments?${qs}`, 5),
-      fetchBookingNames(token, date),
-    ]);
-
-    const result = buildDayStats(date, revEntries, payments, bookingNameMap);
+    const resp = await fetch(`data/day-${date}.json`);
+    if (!resp.ok) throw new Error(`Geen data beschikbaar voor ${date}`);
+    const result = await resp.json();
     cache[cacheKey] = result;
     return result;
   }
@@ -272,37 +212,10 @@
   async function fetchWeekData(endDate) {
     const cacheKey = `week:${endDate}`;
     if (cache[cacheKey]) return cache[cacheKey];
-
-    const token = await getToken();
-    const startDate = addDays(endDate, -6);
-    const endExclusive = addDays(endDate, 1);
-    const qs = `startDate=${startDate}&endDate=${endExclusive}`;
-
-    const [allRev, allPay] = await Promise.all([
-      fetchAllPages(token, `/reporting/revenue-entries?${qs}`, 30),
-      fetchAllPages(token, `/data/bookingpayments?${qs}`, 20),
-    ]);
-
-    const revByDate = {}, payByDate = {};
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(startDate, i);
-      revByDate[d] = []; payByDate[d] = [];
-    }
-
-    for (const e of allRev) {
-      const raw = e.recordDate || e.transactionDate || '';
-      const d = raw ? new Date(raw).toLocaleDateString('sv-SE') : '';
-      if (revByDate[d] !== undefined) revByDate[d].push(e);
-    }
-    for (const p of allPay) {
-      const raw = p.createdDate || '';
-      const d = raw ? new Date(raw).toLocaleDateString('sv-SE') : '';
-      if (payByDate[d] !== undefined) payByDate[d].push(p);
-    }
-
-    const result = Object.keys(revByDate).sort().map(date =>
-      buildDayStats(date, revByDate[date], payByDate[date])
-    );
+    const resp = await fetch(`data/week-${endDate}.json`);
+    if (!resp.ok) throw new Error(`Geen weekdata beschikbaar voor week eindigend ${endDate}`);
+    const data = await resp.json();
+    const result = data.days;
     cache[cacheKey] = result;
     return result;
   }
@@ -324,7 +237,9 @@
   async function renderWeek() {
     setContent(spinner());
     try {
-      const days = await fetchWeekData(weekEndDate);
+      const weekResult = await fetch(`data/week-${weekEndDate}.json`).then(r => r.ok ? r.json() : null);
+      const days = weekResult?.days ?? await fetchWeekData(weekEndDate);
+      const generatedAt = weekResult?.generatedAt ?? null;
       const today = toLocalDateStr(new Date());
 
       const startDate = days[0]?.date ?? addDays(weekEndDate, -6);
@@ -379,6 +294,7 @@
         <div class="section-title">Per dag</div>
         ${dayRows}
         <div style="font-size:11px;color:#555;text-align:center;margin-top:16px;">Tik op een dag voor details</div>
+        ${generatedAt ? `<div style="font-size:10px;color:#444;text-align:center;margin-top:6px;">🔄 Bijgewerkt: ${new Date(generatedAt).toLocaleString('nl-NL', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
       `);
     } catch (e) {
       setContent(errorMsg('Fout bij laden: ' + e.message));
