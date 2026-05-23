@@ -62,6 +62,23 @@
     /* Runsheet */
     .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; }
     .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
+
+  @media print {
+    body { background:#fff !important; color:#000 !important; font-size:11pt; }
+    #login-screen, .tab-bar, .nav-btn, #refresh-btn, .cache-label, .no-print { display:none !important; }
+    #app-screen { padding:0 !important; max-width:100% !important; }
+    .rs-section { border:1px solid #ccc !important; border-radius:4px !important; break-inside:avoid; margin-bottom:12pt; }
+    .rs-section-header { -webkit-print-color-adjust:exact; print-color-adjust:exact; padding:8px 12px !important; }
+    .rs-booking { border-bottom:1px solid #eee !important; padding:8px 12px !important; break-inside:avoid; }
+    .rs-table { font-size:9pt !important; }
+    .pay-badge { border:1px solid #888 !important; color:#000 !important; background:#fff !important; }
+    .pay-paid { background:#d4edda !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .pay-unpaid { background:#f8d7da !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .rs-kf { background:#7c3aed !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .rs-bf { background:#1d4ed8 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    h2, .date-label { color:#000 !important; }
+    * { box-shadow:none !important; }
+  }
     .rs-kf { background:#7c1a1a; }
     .rs-bf { background:#1a3060; }
     .rs-booking { background:#1a1a24; margin-bottom:1px; padding:14px 16px; }
@@ -455,7 +472,7 @@ async function renderRunsheet(forceRefresh = false) {
         const locs = act.locations?.length ? act.locations.join(', ') : '—';
         actRows += `
           <tr>
-            <td>${act.name || '—'}</td>
+            <td>${act.mainActivity || '—'}</td>
             <td>${act.subtype || '—'}</td>
             <td>${fmtTime(act.startTime)}${act.endTime ? '–'+fmtTime(act.endTime) : ''}</td>
             <td>${act.quantity || '—'}</td>
@@ -475,7 +492,7 @@ async function renderRunsheet(forceRefresh = false) {
           ${actRows ? `
           <table class="rs-table">
             <tr>
-              <th>Activiteit</th><th>Type</th><th>Tijd</th><th>Pers.</th><th>Locatie</th>
+              <th>Activiteit</th><th>Subtype</th><th>Tijd</th><th>Pers.</th><th>Locatie</th>
             </tr>
             ${actRows}
           </table>` : ''}
@@ -501,17 +518,41 @@ async function renderRunsheet(forceRefresh = false) {
     const empty = (!data.kf?.length && !data.bf?.length) ?
       `<div class="rs-empty">Geen KF/BF boekingen voor ${fmtDate(rsDate)}</div>` : '';
 
-
     setContent(`
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" class="no-print">
         <button class="nav-btn" onclick="shiftRs(-1)">‹</button>
         <div class="date-label" style="font-size:14px;">${fmtDateLong(rsDate)}</div>
         <button class="nav-btn" onclick="shiftRs(1)">›</button>
+      </div>
+      <div style="text-align:right;margin-bottom:14px;" class="no-print">
+        <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">📄 Download PDF</button>
+      </div>
+      <div id="rs-print-header" style="display:none;margin-bottom:16px;">
+        <div style="font-size:18pt;font-weight:800;">Almere Underground — Run Sheet</div>
+        <div style="font-size:12pt;color:#555;">${fmtDateLong(rsDate)}</div>
       </div>
       ${kfSection}${bfSection}${empty}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
+}
+
+function downloadRunsheetPDF(date) {
+  // Show print header, hide nav elements, then print
+  const hdr = document.getElementById('rs-print-header');
+  if (hdr) hdr.style.display = 'block';
+  
+  // Set print title
+  const origTitle = document.title;
+  document.title = `Run Sheet - Almere Underground - ${date}`;
+  
+  window.print();
+  
+  // Restore after print dialog closes
+  setTimeout(() => {
+    document.title = origTitle;
+    if (hdr) hdr.style.display = 'none';
+  }, 1000);
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
