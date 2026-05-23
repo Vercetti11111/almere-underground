@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Almere Underground – Analytics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#7c3aed',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .card { background: #1a1a24; border-radius: 16px; padding: 16px; }
+    .card-sm { background: #1a1a24; border-radius: 12px; padding: 12px; }
+    .tab-bar { background: #1a1a24; border-radius: 12px; padding: 4px; display: flex; gap: 4px; }
+    .tab-btn { flex: 1; padding: 8px 4px; border-radius: 8px; font-size: 13px; font-weight: 600; text-align: center; cursor: pointer; border: none; background: transparent; color: #888; transition: all 0.2s; }
+    .tab-btn.active { background: #7c3aed; color: white; }
+    .bar-bg { background: #2a2a38; border-radius: 999px; height: 6px; }
+    .bar-fill { border-radius: 999px; height: 6px; transition: width 0.4s ease; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .kpi-card { background: #1a1a24; border-radius: 12px; padding: 12px 8px; text-align: center; }
+    .kpi-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .kpi-value { font-size: 17px; font-weight: 700; }
+    .kpi-diff { font-size: 11px; margin-top: 2px; }
+    .section-title { font-size: 13px; font-weight: 700; color: #aaa; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .day-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2a2a38; }
+    .day-row:last-child { border-bottom: none; }
+    .day-row.today { color: #7c3aed; }
+    .day-row.today .day-label { font-weight: 700; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #2a2a38; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 40px auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .nav-btn { background: #1a1a24; border: none; color: #aaa; border-radius: 10px; padding: 8px 14px; font-size: 18px; cursor: pointer; }
+    .nav-btn:active { background: #2a2a38; }
+    .date-label { font-size: 16px; font-weight: 700; text-align: center; flex: 1; }
+    .info-banner { background: #1a1a2480; border: 1px solid #3333; border-radius: 10px; padding: 10px 12px; font-size: 12px; color: #888; margin-bottom: 12px; }
+    .cat-row { display: flex; flex-direction: column; margin-bottom: 14px; }
+    .cat-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .cat-name { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+    .cat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .cat-amount { font-size: 14px; font-weight: 700; }
+    .cat-sub { display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    ::-webkit-scrollbar { display: none; }
+    * { -webkit-tap-highlight-color: transparent; }
+    select { background: #1a1a24; color: #f1f1f5; border: 1px solid #3a3a4a; border-radius: 8px; padding: 6px 10px; font-size: 14px; cursor: pointer; }
+    .week-day-card { background: #1a1a24; border-radius: 12px; padding: 12px; cursor: pointer; transition: background 0.15s; }
+    .week-day-card:active { background: #2a2a38; }
+    .week-day-card.today { border: 2px solid #7c3aed; }
+    .week-day-card.today .wd-name { color: #7c3aed; }
+  </style>
+</head>
+<body>
+  <div id="app" style="max-width: 480px; margin: 0 auto; padding: 16px 12px 80px;">
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+      <div>
+        <div style="font-size:12px; color:#888; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Almere Underground</div>
+        <div style="font-size:20px; font-weight:800;">Analytics</div>
+      </div>
+      <div id="live-dot" style="width:8px;height:8px;border-radius:50%;background:#10b981;" title="Live"></div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar" style="margin-bottom:20px;">
+      <button class="tab-btn active" onclick="switchTab('week')" id="tab-week">📅 Week</button>
+      <button class="tab-btn" onclick="switchTab('bezoek')" id="tab-bezoek">🏟️ Bezoek</button>
+      <button class="tab-btn" onclick="switchTab('verkoop')" id="tab-verkoop">💳 Verkoop</button>
+    </div>
+
+    <!-- Content -->
+    <div id="content"></div>
+  </div>
+
+  <script>
+  // ── Config ────────────────────────────────────────────────────────────────
+  const CLIENT_ID = 'ROLLER_CLIENT_ID';
+  const CLIENT_SECRET = 'ROLLER_CLIENT_SECRET';
+  const BASE_URL = 'https://api.roller.app';
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let currentTab = 'week';
+  let selectedDate = toLocalDateStr(new Date());
+  let weekEndDate = toLocalDateStr(new Date()); // last day of shown week (today)
+  const cache = {}; // key → data
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function toLocalDateStr(d) {
+    return d.toLocaleDateString('sv-SE'); // YYYY-MM-DD in local time
+  }
+
+  function addDays(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return toLocalDateStr(d);
+  }
+
+  function formatEuro(val) {
+    if (!val && val !== 0) return '—';
+    return '€\u00a0' + val.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
+  function fmtDateLong(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
+  function pctDiff(current, prev) {
+    if (!prev || prev === 0) return null;
+    const d = ((current - prev) / Math.abs(prev)) * 100;
+    const s = (d >= 0 ? '+' : '') + d.toFixed(1) + '%';
+    return { text: s, positive: d >= 0 };
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  async function getToken() {
+    const cached = sessionStorage.getItem('roller_token');
+    if (cached) {
+      const { token, expiresAt } = JSON.parse(cached);
+      if (Date.now() / 1000 < expiresAt - 300) return token;
+    }
+    const resp = await fetch(`${BASE_URL}/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET })
+    });
+    if (!resp.ok) throw new Error('Auth failed: ' + resp.status);
+    const data = await resp.json();
+    const expiresAt = Math.floor(Date.now() / 1000) + (data.expires_in ?? 86400);
+    sessionStorage.setItem('roller_token', JSON.stringify({ token: data.access_token, expiresAt }));
+    return data.access_token;
+  }
+
+  // ── API ───────────────────────────────────────────────────────────────────
+  async function apiGet(token, path) {
+    const resp = await fetch(`${BASE_URL}${path}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error(`API ${path} → ${resp.status}`);
+    return resp.json();
+  }
+
+  async function fetchAllPages(token, path, maxPages = 20) {
+    const all = [];
+    let page = 1;
+    let totalPages = 1;
+    const sep = path.includes('?') ? '&' : '?';
+    do {
+      const data = await apiGet(token, `${path}${sep}pageNumber=${page}&pageSize=200`);
+      if (!data) break;
+      all.push(...(data.items ?? []));
+      totalPages = data.totalPages ?? 1;
+      page++;
+    } while (page <= totalPages && page <= maxPages);
+    return all;
+  }
+
+  async function fetchBookingNames(token, date) {
+    const data = await apiGet(token, `/bookings?date=${date}&pageSize=200`);
+    const map = {};
+    for (const b of (data?.bookings ?? [])) {
+      if (b.bookingReference && b.name) map[b.bookingReference] = b.name;
+    }
+    return map;
+  }
+
+  // ── Data processing ───────────────────────────────────────────────────────
+  const CAT_ORDER = ['Kinderfeestjes', 'Bedrijfsfeesten', 'Box office', 'Online', 'Venue Manager', 'Overig'];
+  const CAT_COLORS = {
+    'Kinderfeestjes': '#ef4444',
+    'Bedrijfsfeesten': '#3b82f6',
+    'Box office': '#f59e0b',
+    'Online': '#8b5cf6',
+    'Venue Manager': '#10b981',
+    'Overig': '#6b7280',
+  };
+
+  function categorizeEntry(e, bookingNameMap) {
+    const name = bookingNameMap[e.bookingReference ?? ''] ?? '';
+    if (/^KF\b/.test(name)) return 'Kinderfeestjes';
+    if (/^BF\b/.test(name)) return 'Bedrijfsfeesten';
+    const loc = (e.transactionLocation ?? '').toLowerCase();
+    if (loc === 'pos') return 'Box office';
+    if (loc.includes('online')) return 'Online';
+    if (loc.includes('venue')) return 'Venue Manager';
+    return 'Overig';
+  }
+
+  function buildDayStats(date, revEntries, payments, bookingNameMap = {}) {
+    const recognition = revEntries.filter(e => e.entryType === 'Recognition');
+    const transactions = revEntries.filter(e => e.entryType === 'Transaction');
+
+    // Visit
+    const byProductType = {};
+    const byCategory = {};
+    let totalRevenue = 0, totalVisitors = 0;
+
+    for (const e of recognition) {
+      const cat = categorizeEntry(e, bookingNameMap);
+      byCategory[cat] = byCategory[cat] ?? { revenue: 0, visitors: 0 };
+      byCategory[cat].revenue += e.netRevenue ?? 0;
+      byCategory[cat].visitors += e.redeemedQuantity ?? 0;
+
+      const pt = e.productType || 'Overig';
+      byProductType[pt] = byProductType[pt] ?? { revenue: 0, visitors: 0 };
+      byProductType[pt].revenue += e.netRevenue ?? 0;
+      byProductType[pt].visitors += e.redeemedQuantity ?? 0;
+
+      totalRevenue += e.netRevenue ?? 0;
+      totalVisitors += e.redeemedQuantity ?? 0;
+    }
+
+    // Sales
+    const byChannel = {};
+    let totalFunds = 0;
+    for (const e of transactions) {
+      const key = e.transactionLocation || 'Onbekend';
+      byChannel[key] = byChannel[key] ?? { revenue: 0, count: 0 };
+      byChannel[key].revenue += e.fundsReceived ?? 0;
+      byChannel[key].count += 1;
+      totalFunds += e.fundsReceived ?? 0;
+    }
+
+    const byPaymentMethod = {};
+    const byDevice = {};
+    for (const p of payments) {
+      const key = p.paymentMethodVariant || p.paymentMethod || 'Onbekend';
+      byPaymentMethod[key] = (byPaymentMethod[key] ?? 0) + (p.total ?? 0);
+      if (p.deviceId && p.deviceId !== '0' && p.deviceId !== '') {
+        const dk = `Kassa ${p.deviceId}`;
+        byDevice[dk] = (byDevice[dk] ?? 0) + (p.total ?? 0);
+      }
+    }
+
+    return {
+      date, visit: { netRevenue: totalRevenue, visitors: totalVisitors, byCategory, byProductType },
+      sales: { fundsReceived: totalFunds, transactionCount: payments.length, byChannel, byPaymentMethod, byDevice }
+    };
+  }
+
+  async function fetchDayData(date) {
+    const cacheKey = `day:${date}`;
+    if (cache[cacheKey]) return cache[cacheKey];
+
+    const token = await getToken();
+    const end = addDays(date, 1);
+    const qs = `startDate=${date}&endDate=${end}`;
+
+    const [revEntries, payments, bookingNameMap] = await Promise.all([
+      fetchAllPages(token, `/reporting/revenue-entries?${qs}`, 10),
+      fetchAllPages(token, `/data/bookingpayments?${qs}`, 5),
+      fetchBookingNames(token, date),
+    ]);
+
+    const result = buildDayStats(date, revEntries, payments, bookingNameMap);
+    cache[cacheKey] = result;
+    return result;
+  }
+
+  async function fetchWeekData(endDate) {
+    const cacheKey = `week:${endDate}`;
+    if (cache[cacheKey]) return cache[cacheKey];
+
+    const token = await getToken();
+    const startDate = addDays(endDate, -6);
+    const endExclusive = addDays(endDate, 1);
+    const qs = `startDate=${startDate}&endDate=${endExclusive}`;
+
+    const [allRev, allPay] = await Promise.all([
+      fetchAllPages(token, `/reporting/revenue-entries?${qs}`, 30),
+      fetchAllPages(token, `/data/bookingpayments?${qs}`, 20),
+    ]);
+
+    const revByDate = {}, payByDate = {};
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(startDate, i);
+      revByDate[d] = []; payByDate[d] = [];
+    }
+
+    for (const e of allRev) {
+      const raw = e.recordDate || e.transactionDate || '';
+      const d = raw ? new Date(raw).toLocaleDateString('sv-SE') : '';
+      if (revByDate[d] !== undefined) revByDate[d].push(e);
+    }
+    for (const p of allPay) {
+      const raw = p.createdDate || '';
+      const d = raw ? new Date(raw).toLocaleDateString('sv-SE') : '';
+      if (payByDate[d] !== undefined) payByDate[d].push(p);
+    }
+
+    const result = Object.keys(revByDate).sort().map(date =>
+      buildDayStats(date, revByDate[date], payByDate[date])
+    );
+    cache[cacheKey] = result;
+    return result;
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────
+  function setContent(html) {
+    document.getElementById('content').innerHTML = html;
+  }
+
+  function spinner() {
+    return '<div class="spinner"></div>';
+  }
+
+  function errorMsg(msg) {
+    return `<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">${msg}</div>`;
+  }
+
+  // Week view
+  async function renderWeek() {
+    setContent(spinner());
+    try {
+      const days = await fetchWeekData(weekEndDate);
+      const today = toLocalDateStr(new Date());
+
+      const startDate = days[0]?.date ?? addDays(weekEndDate, -6);
+      const endDate = days[days.length - 1]?.date ?? weekEndDate;
+      const startLabel = new Date(startDate + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+      const endLabel = new Date(endDate + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+
+      const maxRev = Math.max(...days.map(d => d.visit.netRevenue), 1);
+
+      const weekTotal = days.reduce((s, d) => s + d.visit.netRevenue, 0);
+      const weekVisitors = days.reduce((s, d) => s + d.visit.visitors, 0);
+
+      let dayRows = '';
+      for (const day of days) {
+        const isToday = day.date === today;
+        const barW = Math.round((day.visit.netRevenue / maxRev) * 100);
+        const dayName = new Date(day.date + 'T00:00:00').toLocaleDateString('nl-NL', { weekday: 'short' });
+        const dayNum = new Date(day.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+        dayRows += `
+          <div class="week-day-card ${isToday ? 'today' : ''}" onclick="goToDay('${day.date}')" style="margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="wd-name" style="font-size:13px;font-weight:700;min-width:28px;">${dayName}</div>
+                <div style="font-size:12px;color:#888;">${dayNum}</div>
+                ${isToday ? '<span class="badge" style="background:#7c3aed22;color:#7c3aed;">vandaag</span>' : ''}
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:14px;font-weight:700;">${formatEuro(day.visit.netRevenue)}</div>
+                <div style="font-size:11px;color:#888;">${day.visit.visitors} bezoekers</div>
+              </div>
+            </div>
+            <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:#7c3aed;"></div></div>
+          </div>`;
+      }
+
+      setContent(`
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="shiftWeek(-1)">‹</button>
+          <div class="date-label">${startLabel} – ${endLabel}</div>
+          <button class="nav-btn" onclick="shiftWeek(1)">›</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">Omzet (bezoek)</div>
+            <div class="kpi-value" style="font-size:15px;">${formatEuro(weekTotal)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Bezoekers</div>
+            <div class="kpi-value" style="font-size:15px;">${weekVisitors.toLocaleString('nl-NL')}</div>
+          </div>
+        </div>
+        <div class="section-title">Per dag</div>
+        ${dayRows}
+        <div style="font-size:11px;color:#555;text-align:center;margin-top:16px;">Tik op een dag voor details</div>
+      `);
+    } catch (e) {
+      setContent(errorMsg('Fout bij laden: ' + e.message));
+    }
+  }
+
+  // Bezoek (visit) view
+  async function renderBezoek() {
+    setContent(spinner());
+    try {
+      const data = await fetchDayData(selectedDate);
+      const { visit } = data;
+
+      const avg = visit.visitors > 0 ? visit.netRevenue / visit.visitors : 0;
+
+      // Categories
+      const cats = CAT_ORDER.filter(c => visit.byCategory[c]);
+      let catRows = '';
+      for (const cat of cats) {
+        const d = visit.byCategory[cat];
+        const pct = visit.netRevenue > 0 ? Math.round((d.revenue / visit.netRevenue) * 100) : 0;
+        const catAvg = d.visitors > 0 ? d.revenue / d.visitors : 0;
+        const color = CAT_COLORS[cat] ?? '#6b7280';
+        catRows += `
+          <div class="cat-row">
+            <div class="cat-top">
+              <div class="cat-name">
+                <div class="cat-dot" style="background:${color};"></div>
+                ${cat}
+              </div>
+              <div>
+                <span class="cat-amount">${formatEuro(d.revenue)}</span>
+                <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+              </div>
+            </div>
+            <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+            <div class="cat-sub">
+              <span>${d.visitors} bezoekers</span>
+              <span>gem. ${formatEuro(catAvg)}/pers.</span>
+            </div>
+          </div>`;
+      }
+
+      // Product types
+      const ptEntries = Object.entries(visit.byProductType).sort((a, b) => b[1].revenue - a[1].revenue);
+      let ptRows = '';
+      for (const [pt, d] of ptEntries) {
+        const pct = visit.netRevenue > 0 ? Math.round((d.revenue / visit.netRevenue) * 100) : 0;
+        ptRows += `
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:13px;font-weight:600;">${pt}</span>
+              <div>
+                <span style="font-size:13px;font-weight:700;">${formatEuro(d.revenue)}</span>
+                <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+              </div>
+            </div>
+            <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#7c3aed;"></div></div>
+            <div style="font-size:11px;color:#888;margin-top:2px;">${d.visitors} bezoekers</div>
+          </div>`;
+      }
+
+      setContent(`
+        ${dateNav()}
+        <div class="info-banner">🏟️ Omzet — geld erkend bij daadwerkelijk bezoek (Recognition)</div>
+        <div class="kpi-grid" style="margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">Omzet</div>
+            <div class="kpi-value">${formatEuro(visit.netRevenue)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Bezoekers</div>
+            <div class="kpi-value">${visit.visitors.toLocaleString('nl-NL')}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Gem./pers.</div>
+            <div class="kpi-value">${formatEuro(avg)}</div>
+          </div>
+        </div>
+        ${cats.length > 0 ? `
+        <div class="card" style="margin-bottom:12px;">
+          <div class="section-title">Per categorie</div>
+          ${catRows}
+        </div>` : ''}
+        ${ptEntries.length > 0 ? `
+        <div class="card">
+          <div class="section-title">Per producttype</div>
+          ${ptRows}
+        </div>` : ''}
+      `);
+    } catch (e) {
+      setContent(errorMsg('Fout bij laden: ' + e.message));
+    }
+  }
+
+  // Verkoop (sales) view
+  async function renderVerkoop() {
+    setContent(spinner());
+    try {
+      const data = await fetchDayData(selectedDate);
+      const { sales } = data;
+
+      const avg = sales.transactionCount > 0 ? sales.fundsReceived / sales.transactionCount : 0;
+
+      const CHANNEL_LABELS = {
+        'Online checkout': { label: 'Online', color: '#6366f1' },
+        'POS': { label: 'Kassa (POS)', color: '#10b981' },
+        'Venue manager': { label: 'Venue Manager', color: '#f59e0b' },
+      };
+      const PAYMENT_COLORS = {
+        'iDEAL': '#6366f1', 'Mastercard': '#ef4444', 'Visa': '#3b82f6',
+        'Cash': '#10b981', 'Bancontact': '#f59e0b', 'American Express': '#8b5cf6',
+      };
+
+      const channelEntries = Object.entries(sales.byChannel).sort((a, b) => b[1].revenue - a[1].revenue);
+      const payEntries = Object.entries(sales.byPaymentMethod).sort((a, b) => b[1] - a[1]);
+      const deviceEntries = Object.entries(sales.byDevice).sort((a, b) => b[1] - a[1]);
+      const totalFunds = sales.fundsReceived || 1;
+      const totalPay = payEntries.reduce((s, [, v]) => s + v, 0) || 1;
+
+      let chRows = '';
+      for (const [ch, d] of channelEntries) {
+        const info = CHANNEL_LABELS[ch] ?? { label: ch, color: '#6b7280' };
+        const pct = Math.round((d.revenue / totalFunds) * 100);
+        chRows += `
+          <div style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+              <span style="font-size:13px;font-weight:600;color:${info.color};">${info.label}</span>
+              <div>
+                <span style="font-size:13px;font-weight:700;">${formatEuro(d.revenue)}</span>
+                <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+              </div>
+            </div>
+            <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${info.color};"></div></div>
+            <div style="font-size:11px;color:#888;margin-top:2px;">${d.count} transacties</div>
+          </div>`;
+      }
+
+      let pmRows = '';
+      for (const [pm, amount] of payEntries) {
+        const color = PAYMENT_COLORS[pm] ?? '#6b7280';
+        const pct = Math.round((amount / totalPay) * 100);
+        pmRows += `
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+                <span style="font-size:13px;font-weight:600;">${pm}</span>
+              </div>
+              <div>
+                <span style="font-size:13px;font-weight:700;">${formatEuro(amount)}</span>
+                <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+              </div>
+            </div>
+            <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+          </div>`;
+      }
+
+      let devRows = '';
+      for (const [dev, amount] of deviceEntries) {
+        devRows += `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a38;">
+            <span style="font-size:13px;">${dev}</span>
+            <span style="font-size:13px;font-weight:700;">${formatEuro(amount)}</span>
+          </div>`;
+      }
+
+      setContent(`
+        ${dateNav()}
+        <div class="info-banner">💳 Verkopen — geld ontvangen op deze dag, ongeacht bezoekdatum</div>
+        <div class="kpi-grid" style="margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">Ontvangen</div>
+            <div class="kpi-value">${formatEuro(sales.fundsReceived)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Transacties</div>
+            <div class="kpi-value">${sales.transactionCount.toLocaleString('nl-NL')}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Gem./trans.</div>
+            <div class="kpi-value">${formatEuro(avg)}</div>
+          </div>
+        </div>
+        ${channelEntries.length > 0 ? `
+        <div class="card" style="margin-bottom:12px;">
+          <div class="section-title">Sales channel</div>
+          ${chRows}
+        </div>` : ''}
+        ${payEntries.length > 0 ? `
+        <div class="card" style="margin-bottom:12px;">
+          <div class="section-title">Betaalmethode</div>
+          ${pmRows}
+        </div>` : ''}
+        ${deviceEntries.length > 0 ? `
+        <div class="card">
+          <div class="section-title">Per kassa (device)</div>
+          ${devRows}
+        </div>` : ''}
+      `);
+    } catch (e) {
+      setContent(errorMsg('Fout bij laden: ' + e.message));
+    }
+  }
+
+  // ── Navigation helpers ────────────────────────────────────────────────────
+  function dateNav() {
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <button class="nav-btn" onclick="shiftDay(-1)">‹</button>
+        <div class="date-label" style="font-size:15px;">${fmtDateLong(selectedDate)}</div>
+        <button class="nav-btn" onclick="shiftDay(1)">›</button>
+      </div>`;
+  }
+
+  function shiftDay(n) {
+    selectedDate = addDays(selectedDate, n);
+    render();
+  }
+
+  function shiftWeek(n) {
+    weekEndDate = addDays(weekEndDate, n * 7);
+    renderWeek();
+  }
+
+  function goToDay(date) {
+    selectedDate = date;
+    switchTab('bezoek');
+  }
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    currentTab = tab;
+    ['week', 'bezoek', 'verkoop'].forEach(t => {
+      document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+    });
+    render();
+  }
+
+  function render() {
+    if (currentTab === 'week') renderWeek();
+    else if (currentTab === 'bezoek') renderBezoek();
+    else renderVerkoop();
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  render();
+  </script>
+</body>
+</html>
