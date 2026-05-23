@@ -1,0 +1,36 @@
+name: Update Dashboard Data
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: pip install requests
+      
+      - name: Generate data
+        env:
+          ROLLER_CLIENT_ID: ROLLER_CLIENT_ID
+          ROLLER_CLIENT_SECRET: ROLLER_CLIENT_SECRET
+        run: python generate_data.py
+      
+      - name: Commit and push
+        run: |
+          git config user.name "Dashboard Bot"
+          git config user.email "bot@almere-underground.nl"
+          git add data/
+          git diff --cached --quiet || git commit -m "Auto-update data $(date -u '+%Y-%m-%d %H:%M')"
+          git push
