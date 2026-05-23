@@ -380,24 +380,56 @@ async function renderBezoek(forceRefresh = false) {
         </div>`;
     }
 
-    const ptEntries = Object.entries(visit.byProductType || {}).sort((a,b) => b[1].revenue - a[1].revenue);
-    let ptRows = '';
-    for (const [pt, d] of ptEntries) {
-      const pct = visit.netRevenue > 0 ? Math.round((d.revenue / visit.netRevenue) * 100) : 0;
-      ptRows += `
-        <div style="margin-bottom:10px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="font-size:13px;font-weight:600;">${pt}</span>
+    // Reporting category breakdown (category + subcategory)
+    const rcData = visit.byReportingCategory || {};
+    const rcEntries = Object.entries(rcData).sort((a,b) => b[1].revenue - a[1].revenue);
+    let rcRows = '';
+    // Category colors cycle
+    const RC_COLORS = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
+    rcEntries.forEach(([catName, catData], ci) => {
+      if (catData.revenue === 0) return;
+      const color = RC_COLORS[ci % RC_COLORS.length];
+      const pct = visit.netRevenue > 0 ? (catData.revenue / visit.netRevenue * 100).toFixed(1) : 0;
+      const catAvg = catData.visitors > 0 ? catData.revenue / catData.visitors : 0;
+      const subEntries = Object.entries(catData.subcategories || {}).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,s]) => s.revenue > 0);
+
+      // Subcategory rows (indented)
+      let subRows = '';
+      for (const [subName, subData] of subEntries) {
+        const subPct = catData.revenue > 0 ? (subData.revenue / catData.revenue * 100).toFixed(0) : 0;
+        const subAvg = subData.visitors > 0 ? (subData.revenue / subData.visitors).toFixed(2) : 0;
+        subRows += `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0 5px 14px;border-left:2px solid ${color}30;margin-left:4px;">
+            <div style="flex:1;">
+              <div style="font-size:12px;color:#ccc;">${subName}</div>
+              <div style="font-size:11px;color:#888;">${subData.visitors.toLocaleString('nl-NL')} bezoekers · gem. ${fmtEur(parseFloat(subAvg))}/pers.</div>
+            </div>
+            <div style="text-align:right;margin-left:8px;">
+              <div style="font-size:12px;font-weight:600;">${fmtEur(subData.revenue)}</div>
+              <div style="font-size:10px;color:#888;">${subPct}% van cat.</div>
+            </div>
+          </div>`;
+      }
+
+      rcRows += `
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
             <div>
-              <span style="font-size:13px;font-weight:700;">${fmtEur(d.revenue)}</span>
+              <span style="font-size:14px;font-weight:700;">${catName}</span>
+              ${subEntries.length > 0 ? `<span style="font-size:10px;color:#888;margin-left:6px;">${subEntries.length} subcategorieën</span>` : ''}
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:14px;font-weight:700;">${fmtEur(catData.revenue)}</span>
               <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
             </div>
           </div>
-          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#7c3aed;"></div></div>
-          <div style="font-size:11px;color:#888;margin-top:2px;">${d.visitors.toLocaleString('nl-NL')} bezoekers</div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:3px;margin-bottom:${subEntries.length ? '8px' : '0'};">
+            ${catData.visitors.toLocaleString('nl-NL')} bezoekers · gem. ${fmtEur(catAvg)}/pers.
+          </div>
+          ${subRows}
         </div>`;
-    }
-
+    });
 
     setContent(`
       ${dateNav()}
@@ -407,8 +439,8 @@ async function renderBezoek(forceRefresh = false) {
         <div class="kpi-card"><div class="kpi-label">Bezoekers</div><div class="kpi-value">${visit.visitors.toLocaleString('nl-NL')}</div></div>
         <div class="kpi-card"><div class="kpi-label">Gem./pers.</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
-      ${cats.length ? `<div class="card">${'<div class="section-title">Per categorie</div>'}${catRows}</div>` : ''}
-      ${ptEntries.length ? `<div class="card"><div class="section-title">Per producttype</div>${ptRows}</div>` : ''}
+      ${cats.length ? `<div class="card"><div class="section-title">Per categorie</div>${catRows}</div>` : ''}
+      ${rcEntries.length ? `<div class="card"><div class="section-title">Per reporting categorie</div>${rcRows}</div>` : ''}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
