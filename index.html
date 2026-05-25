@@ -141,6 +141,7 @@
     <button class="tab-btn" onclick="switchTab('bezoek')" id="tab-bezoek">🏟️ Bezoek</button>
     <button class="tab-btn" onclick="switchTab('verkoop')" id="tab-verkoop">💳 Verkoop</button>
     <button class="tab-btn" onclick="switchTab('runsheet')" id="tab-runsheet">📋 Run</button>
+    <button class="tab-btn" onclick="switchTab('personeel')" id="tab-personeel">👥 Personeel</button>
   </div>
 
   <div id="content"></div>
@@ -205,6 +206,22 @@ const TRANSLATIONS = {
     loginBtn: 'Inloggen →',
     invalidCode: 'Ongeldige toegangscode',
     connError: 'Verbindingsfout – probeer opnieuw',
+    // Personeel tab
+    tabPersoneel: '👥 Personeel',
+    tabPersoneelEn: '👥 Staff',
+    staffDate: 'Datum',
+    staffDept: 'Afdeling',
+    staffPlanned: 'Gepland',
+    staffClocked: 'Geklokt',
+    staffHours: 'Uren',
+    staffCost: 'Kosten',
+    staffName: 'Naam',
+    staffStart: 'Aanvang',
+    staffEnd: 'Einde',
+    staffVsClocked: 'Gepland vs Geklokt',
+    staffTotals: 'Totaal',
+    staffNoData: 'Geen planning of uren beschikbaar voor deze datum.',
+    staffBack: '← Terug naar overzicht',
     // Cache
     fromCache: 'Uit cache',
     liveData: 'Live data',
@@ -257,6 +274,22 @@ const TRANSLATIONS = {
     loginBtn: 'Log in →',
     invalidCode: 'Invalid access code',
     connError: 'Connection error – please try again',
+    // Personeel tab
+    tabPersoneel: '👥 Staff',
+    tabPersoneelEn: '👥 Staff',
+    staffDate: 'Date',
+    staffDept: 'Department',
+    staffPlanned: 'Planned',
+    staffClocked: 'Clocked',
+    staffHours: 'Hours',
+    staffCost: 'Cost',
+    staffName: 'Name',
+    staffStart: 'Start',
+    staffEnd: 'End',
+    staffVsClocked: 'Planned vs Clocked',
+    staffTotals: 'Total',
+    staffNoData: 'No planning or hours available for this date.',
+    staffBack: '← Back to overview',
     fromCache: 'From cache',
     liveData: 'Live data',
     agoSec: 's ago',
@@ -289,10 +322,12 @@ function applyLang() {
   const tb = document.getElementById('tab-bezoek');
   const tv = document.getElementById('tab-verkoop');
   const tr = document.getElementById('tab-runsheet');
+  const tp = document.getElementById('tab-personeel');
   if (tw) tw.textContent = t('tabWeek');
   if (tb) tb.textContent = t('tabBezoek');
   if (tv) tv.textContent = t('tabVerkoop');
   if (tr) tr.textContent = t('tabRun');
+  if (tp) tp.textContent = t('tabPersoneel');
   // Login screen
   const ll = document.getElementById('login-label');
   const lb = document.getElementById('login-btn');
@@ -409,6 +444,8 @@ let currentTab = 'week';
 let selectedDate = todayStr();
 let weekOffset = 0;
 let rsDate = todayStr();
+let persDate = todayStr();
+let expandedDept = null;
 
 // ── Category colors ───────────────────────────────────────────────────────────
 const CAT_COLORS = {
@@ -763,9 +800,10 @@ function goToDay(date) {
 
 function switchTab(tab) {
   currentTab = tab;
-  ['week','bezoek','verkoop','runsheet'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
-  });
+  expandedDept = null;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('tab-' + tab);
+  if (el) el.classList.add('active');
   render();
 }
 
@@ -780,6 +818,140 @@ async function renderCurrentTab(forceRefresh = false) {
   else if (currentTab === 'bezoek')   await renderBezoek(forceRefresh);
   else if (currentTab === 'verkoop')  await renderVerkoop(forceRefresh);
   else if (currentTab === 'runsheet') await renderRunsheet(forceRefresh);
+  else if (currentTab === 'personeel') await renderPersoneel(forceRefresh);
+}
+
+// ── PERSONEEL VIEW ────────────────────────────────────────────────────────────
+
+async function renderPersoneel(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    const data = await api(`/api/personeel?date=${persDate}`, forceRefresh);
+    const depts = data.departments || [];
+    const totals = data.totals || {};
+
+    // If a department is expanded, show drill-down view
+    if (expandedDept !== null) {
+      const dept = depts.find(d => d.deptId === expandedDept);
+      if (!dept) { expandedDept = null; return renderPersoneel(forceRefresh); }
+      const people = dept.people || [];
+      let rows = '';
+      for (const p of people) {
+        const hasPlanned = p.plannedH > 0;
+        const hasClocked = p.clockedH > 0;
+        rows += `
+          <div style="background:#12121c;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#e0e0f0;margin-bottom:10px;">${p.name}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">📅 ${t('staffPlanned')}</div>
+                ${hasPlanned ? `
+                  <div style="font-size:13px;font-weight:700;color:#7c3aed;">${p.plannedH.toFixed(1)}u</div>
+                  <div style="font-size:12px;color:#aaa;">${fmtEur(p.plannedCost)}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.plannedStart || '—'} – ${p.plannedEnd || '—'}</div>
+                ` : `<div style="font-size:12px;color:#555;">—</div>`}
+              </div>
+              <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">🕐 ${t('staffClocked')}</div>
+                ${hasClocked ? `
+                  <div style="font-size:13px;font-weight:700;color:#10b981;">${p.clockedH.toFixed(2)}u</div>
+                  <div style="font-size:12px;color:#aaa;">${fmtEur(p.clockedCost)}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.clockedEnter || '—'} – ${p.clockedExit || '—'}</div>
+                ` : `<div style="font-size:12px;color:#555;">—</div>`}
+              </div>
+            </div>
+          </div>`;
+      }
+      setContent(`
+        <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+          <button onclick="expandedDept=null;renderPersoneel()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;">${t('staffBack')}</button>
+          <div style="font-size:16px;font-weight:800;color:#e0e0f0;">${dept.deptName}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">📅 ${t('staffPlanned')}</div>
+            <div class="kpi-value" style="font-size:14px;">${dept.plannedH.toFixed(1)}u</div>
+            <div style="font-size:12px;color:#888;">${fmtEur(dept.plannedCost)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">🕐 ${t('staffClocked')}</div>
+            <div class="kpi-value" style="font-size:14px;">${dept.clockedH.toFixed(2)}u</div>
+            <div style="font-size:12px;color:#888;">${fmtEur(dept.clockedCost)}</div>
+          </div>
+        </div>
+        <div class="section-title">${t('staffName')}</div>
+        ${rows || `<div style="color:#666;text-align:center;padding:20px;">${t('staffNoData')}</div>`}
+        ${cacheLabel(data)}
+      `);
+      return;
+    }
+
+    // Overview: date selector + department table
+    const hasPlanData = depts.some(d => d.plannedH > 0);
+    const hasClockData = depts.some(d => d.clockedH > 0);
+
+    let deptCards = '';
+    for (const dept of depts) {
+      const hasPlan = dept.plannedH > 0;
+      const hasClock = dept.clockedH > 0;
+      if (!hasPlan && !hasClock) continue;
+
+      const diffH = dept.clockedH - dept.plannedH;
+      const diffSign = diffH > 0 ? '+' : '';
+      const diffColor = Math.abs(diffH) < 0.5 ? '#10b981' : diffH > 0 ? '#f59e0b' : '#6b7280';
+
+      deptCards += `
+        <div onclick="expandedDept='${dept.deptId}';renderPersoneel()" style="background:#12121c;border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;border:1px solid #1e1e2a;transition:border-color .2s;" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#1e1e2a'">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#e0e0f0;">${dept.deptName}</div>
+            <div style="font-size:11px;color:#666;">${dept.people.length} pers. ›</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:#888;margin-bottom:3px;">📅 Gepland</div>
+              <div style="font-size:13px;font-weight:700;color:#7c3aed;">${hasPlan ? dept.plannedH.toFixed(1)+'u' : '—'}</div>
+              <div style="font-size:11px;color:#888;">${hasPlan ? fmtEur(dept.plannedCost) : ''}</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:#888;margin-bottom:3px;">🕐 Geklokt</div>
+              <div style="font-size:13px;font-weight:700;color:#10b981;">${hasClock ? dept.clockedH.toFixed(1)+'u' : '—'}</div>
+              <div style="font-size:11px;color:#888;">${hasClock ? fmtEur(dept.clockedCost) : ''}</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:#888;margin-bottom:3px;">Δ Verschil</div>
+              <div style="font-size:13px;font-weight:700;color:${diffColor};">${hasPlan && hasClock ? diffSign+diffH.toFixed(1)+'u' : '—'}</div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    if (!deptCards) {
+      deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('staffNoData')}</div>`;
+    }
+
+    setContent(`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+        <button class="nav-btn" onclick="persDate=addDays(persDate,-1);expandedDept=null;renderPersoneel()">‹</button>
+        <input type="date" value="${persDate}" onchange="persDate=this.value;expandedDept=null;renderPersoneel()" style="flex:1;background:#1a1a24;border:1px solid #2a2a38;color:#e0e0f0;border-radius:8px;padding:8px 12px;font-size:14px;text-align:center;">
+        <button class="nav-btn" onclick="persDate=addDays(persDate,1);expandedDept=null;renderPersoneel()">›</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        <div class="kpi-card">
+          <div class="kpi-label">📅 Gepland totaal</div>
+          <div class="kpi-value" style="font-size:14px;">${totals.plannedH?.toFixed(1) || '0'}u</div>
+          <div style="font-size:12px;color:#888;">${fmtEur(totals.plannedCost)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">🕐 Geklokt totaal</div>
+          <div class="kpi-value" style="font-size:14px;">${totals.clockedH?.toFixed(1) || '0'}u</div>
+          <div style="font-size:12px;color:#888;">${fmtEur(totals.clockedCost)}</div>
+        </div>
+      </div>
+      <div class="section-title">Per afdeling — tik voor details</div>
+      ${deptCards}
+      ${cacheLabel(data)}
+    `);
+  } catch (e) { setContent(errMsg(e.message)); }
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
