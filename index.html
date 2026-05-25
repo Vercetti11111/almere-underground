@@ -180,6 +180,11 @@ const TRANSLATIONS = {
     avgTrans: 'Gem./trans.',
     salesChannel: 'Sales channel',
     bannerVerkoop: '💳 Verkopen — geld ontvangen op deze dag (ongeacht bezoekdatum)',
+    myposTitle: '🎮 Speelgoed Automaat (MyPOS)',
+    myposSales: 'Verkopen incl. BTW',
+    myposRevenue: 'Omzet excl. BTW',
+    myposVat: 'BTW (21%)',
+    myposTrans: 'Betalingen',
     // Run sheet
     kfTitle: 'Kinderfeestjes (KF)',
     bfTitle: 'Bedrijfsfeesten (BF)',
@@ -250,6 +255,11 @@ const TRANSLATIONS = {
     avgTrans: 'Avg./trans.',
     salesChannel: 'Sales channel',
     bannerVerkoop: '💳 Sales — funds received on this day (regardless of visit date)',
+    myposTitle: '🎮 Toy Machine (MyPOS)',
+    myposSales: 'Sales incl. VAT',
+    myposRevenue: 'Revenue excl. VAT',
+    myposVat: 'VAT (21%)',
+    myposTrans: 'Payments',
     kfTitle: 'Birthday Parties (KF)',
     bfTitle: 'Corporate Events (BF)',
     booking: 'booking',
@@ -640,7 +650,10 @@ async function renderBezoek(forceRefresh = false) {
 async function renderVerkoop(forceRefresh = false) {
   setContent(spinner());
   try {
-    const data = await api(`/api/day?date=${selectedDate}`, forceRefresh);
+    const [data, mypos] = await Promise.all([
+      api(`/api/day?date=${selectedDate}`, forceRefresh),
+      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null)
+    ]);
     const { sales } = data;
     const avg = sales.transactionCount > 0 ? sales.fundsReceived / sales.transactionCount : 0;
     const total = sales.fundsReceived || 1;
@@ -664,6 +677,34 @@ async function renderVerkoop(forceRefresh = false) {
         </div>`;
     }
 
+    // MyPOS card
+    let myposCard = '';
+    if (mypos) {
+      // Hour sparkline
+      const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2,'0'));
+      const maxVal = Math.max(...hours.map(h => mypos.byHour[h] || 0), 1);
+      const bars = hours.map(h => {
+        const v = mypos.byHour[h] || 0;
+        const pct = Math.round((v / maxVal) * 100);
+        return `<div title="${h}:00 · ${fmtEur(v)}" style="flex:1;background:${v > 0 ? '#7c3aed' : '#e5e7eb'};height:${Math.max(pct,2)}%;border-radius:2px 2px 0 0;"></div>`;
+      }).join('');
+
+      myposCard = `
+        <div class="card" style="margin-top:16px;">
+          <div class="section-title">${t('myposTitle')}</div>
+          <div class="kpi-grid" style="margin-bottom:12px;">
+            <div class="kpi-card"><div class="kpi-label">${t('myposSales')}</div><div class="kpi-value">${fmtEur(mypos.totalInclBtw)}</div></div>
+            <div class="kpi-card"><div class="kpi-label">${t('myposRevenue')}</div><div class="kpi-value">${fmtEur(mypos.omzetExclBtw)}</div></div>
+            <div class="kpi-card"><div class="kpi-label">${t('myposTrans')}</div><div class="kpi-value">${mypos.transactions}</div></div>
+            <div class="kpi-card"><div class="kpi-label">${t('myposVat')}</div><div class="kpi-value">${fmtEur(mypos.btwBedrag)}</div></div>
+          </div>
+          <div style="display:flex;align-items:flex-end;height:48px;gap:2px;padding:4px 0;">
+            ${bars}
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-top:2px;"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>
+        </div>`;
+    }
+
     setContent(`
       ${dateNav()}
       <div class="info-banner">${t('bannerVerkoop')}</div>
@@ -673,6 +714,7 @@ async function renderVerkoop(forceRefresh = false) {
         <div class="kpi-card"><div class="kpi-label">${t('avgTrans')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
       ${chEntries.length ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
+      ${myposCard}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
