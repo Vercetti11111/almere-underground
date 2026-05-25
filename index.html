@@ -595,9 +595,8 @@ function hourlyBarChart(byHour, color = '#2563eb') {
     `;
   }).join('');
 
-  // X-axis hour labels (every 2 hours)
+  // X-axis hour labels (every hour)
   const labelsSVG = hours.map((h, i) => {
-    if (i % 2 !== 0) return '';
     return `<text x="${x(i).toFixed(1)}" y="${(H - 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="#888">${parseInt(h)}</text>`;
   }).join('');
 
