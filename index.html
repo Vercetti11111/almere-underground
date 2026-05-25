@@ -548,6 +548,33 @@ async function renderWeek(forceRefresh = false) {
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
+
+// ── Hourly bar chart ──────────────────────────────────────────────────────────
+function hourlyBarChart(byHour, color = '#2563eb') {
+  // Show hours 09–01 (CEST business day)
+  const hours = [];
+  for (let i = 9; i <= 23; i++) hours.push(String(i).padStart(2, '0'));
+  hours.push('00', '01');
+
+  const vals = hours.map(h => byHour[h] || 0);
+  const max = Math.max(...vals, 0.01);
+
+  const bars = hours.map((h, i) => {
+    const v = vals[i];
+    const pct = Math.round((v / max) * 100);
+    const tip = v > 0 ? fmtEur(v) : '';
+    return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px;">
+      <div style="font-size:9px;color:#888;min-height:14px;text-align:center;">${tip}</div>
+      <div style="flex:1;display:flex;align-items:flex-end;width:100%;">
+        <div style="width:100%;background:${color};border-radius:2px 2px 0 0;height:${pct}%;min-height:${v>0?'3px':'0'};opacity:0.85;"></div>
+      </div>
+      <div style="font-size:9px;color:#666;">${parseInt(h)}</div>
+    </div>`;
+  }).join('');
+
+  return `<div style="display:flex;align-items:flex-end;height:90px;gap:1px;padding-top:16px;">${bars}</div>`;
+}
+
 // ── BEZOEK VIEW ───────────────────────────────────────────────────────────────
 async function renderBezoek(forceRefresh = false) {
   setContent(spinner());
@@ -642,6 +669,13 @@ async function renderBezoek(forceRefresh = false) {
         </div>`;
     });
 
+    // Combine Roller + MyPOS hourly data (both excl BTW)
+    const visitByHourCombined = Object.assign({}, visit.byHour || {});
+    for (const [h, v] of Object.entries(mypos?.byHour || {})) {
+      visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
+    }
+    const hasHourData = Object.keys(visitByHourCombined).length > 0;
+
     setContent(`
       ${dateNav()}
       <div class="info-banner">${t('bannerBezoek')}</div>
@@ -650,6 +684,7 @@ async function renderBezoek(forceRefresh = false) {
         <div class="kpi-card"><div class="kpi-label">${t('visitors')}</div><div class="kpi-value">${visit.visitors.toLocaleString(locale())}</div></div>
         <div class="kpi-card"><div class="kpi-label">${t('avgPer')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
+      ${hasHourData ? `<div class="card"><div class="section-title">📈 Omzet per uur</div>${hourlyBarChart(visitByHourCombined, '#2563eb')}</div>` : ''}
       ${cats.length ? `<div class="card"><div class="section-title">${t('perCategory')}</div>${catRows}</div>` : ''}
       ${rcEntries.length ? `<div class="card"><div class="section-title">${t('perReportingCat')}</div>${rcRows}</div>` : ''}
       ${cacheLabel(data)}
@@ -666,8 +701,9 @@ async function renderVerkoop(forceRefresh = false) {
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null)
     ]);
     const { sales } = data;
+    const myposSalesAmount = mypos?.totalInclBtw || 0;
     const myposRev = mypos?.omzetExclBtw || 0;
-    const grandTotal = (sales.fundsReceived || 0) + myposRev;
+    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount;
     const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0);
     const avg = totalTrans > 0 ? grandTotal / totalTrans : 0;
 
@@ -689,21 +725,28 @@ async function renderVerkoop(forceRefresh = false) {
           <div style="font-size:11px;color:#888;margin-top:2px;">${d.count} ${t('transactions')}</div>
         </div>`;
     }
-    if (myposRev > 0) {
-      const pct = grandTotal > 0 ? Math.round((myposRev / grandTotal) * 100) : 0;
+    if (myposSalesAmount > 0) {
+      const pct = grandTotal > 0 ? Math.round((myposSalesAmount / grandTotal) * 100) : 0;
       chRows += `
         <div style="margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
             <span style="font-size:13px;font-weight:600;color:#7c3aed;">🎮 Speelgoed automaat (MyPOS)</span>
             <div>
-              <span style="font-size:13px;font-weight:700;">${fmtEur(myposRev)}</span>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(myposSalesAmount)}</span>
               <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
             </div>
           </div>
           <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#7c3aed;"></div></div>
-          <div style="font-size:11px;color:#888;margin-top:2px;">${mypos.transactions} ${t('transactions')} · excl. BTW</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${mypos.transactions} ${t('transactions')} · incl. BTW</div>
         </div>`;
     }
+
+    // Combine Roller + MyPOS hourly data (both incl BTW for payments)
+    const salesByHourCombined = Object.assign({}, sales.byHour || {});
+    for (const [h, v] of Object.entries(mypos?.byHour || {})) {
+      salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
+    }
+    const hasSalesHourData = Object.keys(salesByHourCombined).length > 0;
 
     setContent(`
       ${dateNav()}
@@ -713,7 +756,8 @@ async function renderVerkoop(forceRefresh = false) {
         <div class="kpi-card"><div class="kpi-label">${t('transCount')}</div><div class="kpi-value">${totalTrans.toLocaleString(locale())}</div></div>
         <div class="kpi-card"><div class="kpi-label">${t('avgTrans')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
-      ${chEntries.length || myposRev > 0 ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
+      ${hasSalesHourData ? `<div class="card"><div class="section-title">💳 Betalingen per uur</div>${hourlyBarChart(salesByHourCombined, '#059669')}</div>` : ''}
+      ${chEntries.length || myposSalesAmount > 0 ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
