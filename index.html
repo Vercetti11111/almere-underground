@@ -59,13 +59,16 @@
     .week-day-card.today .wd-name { color:#7c3aed; }
     .err-msg { text-align:center; padding:40px 20px; color:#ef4444; font-size:13px; line-height:1.6; }
 
+    /* Language switcher */
+    #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+
     /* Runsheet */
     .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; }
     .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
 
   @media print {
     body { background:#fff !important; color:#000 !important; font-size:11pt; }
-    #login-screen, .tab-bar, .nav-btn, #refresh-btn, .cache-label, .no-print { display:none !important; }
+    #login-screen, .tab-bar, .nav-btn, #refresh-btn, #lang-select, .cache-label, .no-print { display:none !important; }
     #app-screen { padding:0 !important; max-width:100% !important; }
     .rs-section { border:1px solid #ccc !important; border-radius:4px !important; break-inside:avoid; margin-bottom:12pt; }
     .rs-section-header { -webkit-print-color-adjust:exact; print-color-adjust:exact; padding:8px 12px !important; }
@@ -105,11 +108,11 @@
   <div class="login-title">Almere Underground</div>
   <div class="login-sub">Analytics Dashboard</div>
   <div class="login-card">
-    <div class="login-label">Toegangscode</div>
+    <div class="login-label" id="login-label">Toegangscode</div>
     <input class="login-input" type="password" id="code-input" placeholder="••••••••"
       autocomplete="off" autocorrect="off" autocapitalize="none"
       onkeydown="if(event.key==='Enter')doLogin()" />
-    <button class="login-btn" onclick="doLogin()">Inloggen →</button>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Inloggen →</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -122,7 +125,11 @@
       <div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Almere Underground</div>
       <div style="font-size:20px;font-weight:800;">Analytics</div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
       <div id="live-dot" style="width:8px;height:8px;border-radius:50%;background:#10b981;" title="Live data"></div>
       <button id="refresh-btn" onclick="refreshAll()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
     </div>
@@ -143,6 +150,156 @@
 // ── Config ────────────────────────────────────────────────────────────────────
 const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
 
+// ── Translations ──────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  nl: {
+    // Tabs
+    tabWeek: '📅 Week',
+    tabBezoek: '🏟️ Bezoek',
+    tabVerkoop: '💳 Verkoop',
+    tabRun: '📋 Run',
+    // General
+    today: 'vandaag',
+    visitors: 'bezoekers',
+    transactions: 'transacties',
+    // Week view
+    revenueVisit: 'Omzet (bezoek)',
+    perDayTap: 'Per dag — tik voor details',
+    // Bezoek view
+    revenue: 'Omzet',
+    avgPer: 'Gem./pers.',
+    perCategory: 'Per categorie',
+    perReportingCat: 'Per reporting categorie',
+    subcategories: 'subcategorieën',
+    ofCat: 'van cat.',
+    bannerBezoek: '🏟️ Omzet — erkend bij daadwerkelijk bezoek (Recognition)',
+    // Verkoop view
+    received: 'Ontvangen',
+    transCount: 'Transacties',
+    avgTrans: 'Gem./trans.',
+    salesChannel: 'Sales channel',
+    bannerVerkoop: '💳 Verkopen — geld ontvangen op deze dag (ongeacht bezoekdatum)',
+    // Run sheet
+    kfTitle: 'Kinderfeestjes (KF)',
+    bfTitle: 'Bedrijfsfeesten (BF)',
+    booking: 'boeking',
+    bookings: 'boekingen',
+    bookingNr: 'Boeking #',
+    pers: 'pers.',
+    activity: 'Activiteit',
+    subtype: 'Subtype',
+    time: 'Tijd',
+    persons: 'Pers.',
+    location: 'Locatie',
+    notes: 'Opmerkingen',
+    noNotes: 'geen',
+    paid: 'Betaald',
+    outstanding: 'Openstaand',
+    paidWord: 'betaald',
+    openWord: 'open',
+    downloadPdf: '📄 Download PDF',
+    noBookings: 'Geen KF/BF boekingen voor',
+    runsheetTitle: 'Almere Underground — Run Sheet',
+    // Login
+    accessCode: 'Toegangscode',
+    loginBtn: 'Inloggen →',
+    invalidCode: 'Ongeldige toegangscode',
+    connError: 'Verbindingsfout – probeer opnieuw',
+    // Cache
+    fromCache: 'Uit cache',
+    liveData: 'Live data',
+    agoSec: 's geleden',
+    agoMin: 'm geleden',
+  },
+  en: {
+    tabWeek: '📅 Week',
+    tabBezoek: '🏟️ Visit',
+    tabVerkoop: '💳 Sales',
+    tabRun: '📋 Run',
+    today: 'today',
+    visitors: 'visitors',
+    transactions: 'transactions',
+    revenueVisit: 'Revenue (visit)',
+    perDayTap: 'Per day — tap for details',
+    revenue: 'Revenue',
+    avgPer: 'Avg./pers.',
+    perCategory: 'Per category',
+    perReportingCat: 'Per reporting category',
+    subcategories: 'subcategories',
+    ofCat: 'of cat.',
+    bannerBezoek: '🏟️ Revenue — recognised at actual visit (Recognition)',
+    received: 'Received',
+    transCount: 'Transactions',
+    avgTrans: 'Avg./trans.',
+    salesChannel: 'Sales channel',
+    bannerVerkoop: '💳 Sales — funds received on this day (regardless of visit date)',
+    kfTitle: 'Birthday Parties (KF)',
+    bfTitle: 'Corporate Events (BF)',
+    booking: 'booking',
+    bookings: 'bookings',
+    bookingNr: 'Booking #',
+    pers: 'pers.',
+    activity: 'Activity',
+    subtype: 'Subtype',
+    time: 'Time',
+    persons: 'Pers.',
+    location: 'Location',
+    notes: 'Notes',
+    noNotes: 'none',
+    paid: 'Paid',
+    outstanding: 'Outstanding',
+    paidWord: 'paid',
+    openWord: 'due',
+    downloadPdf: '📄 Download PDF',
+    noBookings: 'No KF/BF bookings for',
+    runsheetTitle: 'Almere Underground — Run Sheet',
+    accessCode: 'Access code',
+    loginBtn: 'Log in →',
+    invalidCode: 'Invalid access code',
+    connError: 'Connection error – please try again',
+    fromCache: 'From cache',
+    liveData: 'Live data',
+    agoSec: 's ago',
+    agoMin: 'm ago',
+  }
+};
+
+let lang = localStorage.getItem('au_lang') || 'nl';
+
+function t(key) {
+  return (TRANSLATIONS[lang] || TRANSLATIONS.nl)[key] || TRANSLATIONS.nl[key] || key;
+}
+
+function locale() {
+  return lang === 'en' ? 'en-GB' : 'nl-NL';
+}
+
+function setLang(newLang) {
+  lang = newLang;
+  localStorage.setItem('au_lang', lang);
+  applyLang();
+  render();
+}
+
+function applyLang() {
+  const sel = document.getElementById('lang-select');
+  if (sel) sel.value = lang;
+  // Tabs
+  const tw = document.getElementById('tab-week');
+  const tb = document.getElementById('tab-bezoek');
+  const tv = document.getElementById('tab-verkoop');
+  const tr = document.getElementById('tab-runsheet');
+  if (tw) tw.textContent = t('tabWeek');
+  if (tb) tb.textContent = t('tabBezoek');
+  if (tv) tv.textContent = t('tabVerkoop');
+  if (tr) tr.textContent = t('tabRun');
+  // Login screen
+  const ll = document.getElementById('login-label');
+  const lb = document.getElementById('login-btn');
+  if (ll) ll.textContent = t('accessCode');
+  if (lb) lb.textContent = t('loginBtn');
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 let accessCode = sessionStorage.getItem('au_code') || '';
 
@@ -156,8 +313,6 @@ async function doLogin() {
   input.disabled = true;
 
   try {
-    const r = await fetch(`${WORKER}/health`, { headers: { 'X-Access-Code': code } });
-    // health returns {ok:true} without auth check, so just check the access code against /api/day
     const test = await fetch(`${WORKER}/api/day?date=${todayStr()}`, {
       headers: { 'X-Access-Code': code }
     });
@@ -166,7 +321,7 @@ async function doLogin() {
     if (data.error && data.error.includes('Ongeldig')) {
       input.classList.add('error');
       setTimeout(() => input.classList.remove('error'), 600);
-      errEl.textContent = 'Ongeldige toegangscode';
+      errEl.textContent = t('invalidCode');
       input.disabled = false;
       input.focus();
       return;
@@ -178,7 +333,7 @@ async function doLogin() {
     document.getElementById('app-screen').style.display = 'block';
     render();
   } catch (e) {
-    errEl.textContent = 'Verbindingsfout – probeer opnieuw';
+    errEl.textContent = t('connError');
     input.disabled = false;
   }
 }
@@ -229,15 +384,15 @@ function addDays(s, n) {
 
 function fmtEur(v) {
   if (v == null || isNaN(v)) return '—';
-  return '€\u00a0' + v.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return '€\u00a0' + v.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtDate(s) {
-  return new Date(s + 'T00:00:00').toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' });
+  return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 function fmtDateLong(s) {
-  return new Date(s + 'T00:00:00').toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
+  return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 function fmtTime(t) {
@@ -250,7 +405,7 @@ function spinner() { return '<div class="spinner"></div>'; }
 function errMsg(m) { return `<div class="err-msg">⚠️ ${m}</div>`; }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentTab = accessCode ? 'week' : 'week';
+let currentTab = 'week';
 let selectedDate = todayStr();
 let weekOffset = 0;
 let rsDate = todayStr();
@@ -273,19 +428,20 @@ const CHANNEL_META = {
   'Venue manager':  { label: 'Venue Manager', color: '#f59e0b' },
 };
 
-// ── WEEK VIEW ─────────────────────────────────────────────────────────────────
+// ── Cache label ───────────────────────────────────────────────────────────────
 function cacheLabel(data) {
   if (!data) return '';
   const at = data._cachedAt || data.generatedAt;
   const fromCache = data._cached;
   const age = data._cacheAge;
-  const timeStr = at ? new Date(at).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
-  const ageStr = age != null ? (age < 60 ? `${age}s geleden` : `${Math.floor(age/60)}m geleden`) : '';
+  const timeStr = at ? new Date(at).toLocaleString(locale(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const ageStr = age != null ? (age < 60 ? `${age}${t('agoSec')}` : `${Math.floor(age/60)}${t('agoMin')}`) : '';
   const icon = fromCache ? '📦' : '⚡';
-  const label = fromCache ? `Uit cache · ${ageStr}` : 'Live data';
+  const label = fromCache ? `${t('fromCache')} · ${ageStr}` : t('liveData');
   return `<div style="font-size:10px;color:#444;text-align:center;margin-top:12px;">${icon} ${label}${timeStr ? ` · ${timeStr}` : ''}</div>`;
 }
 
+// ── WEEK VIEW ─────────────────────────────────────────────────────────────────
 async function renderWeek(forceRefresh = false) {
   setContent(spinner());
   try {
@@ -294,8 +450,8 @@ async function renderWeek(forceRefresh = false) {
     const today = todayStr();
     const maxRev = Math.max(...days.map(d => d.visit?.netRevenue || 0), 1);
 
-    const startLabel = new Date(days[0]?.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
-    const endLabel   = new Date(days[6]?.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+    const startLabel = new Date(days[0]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+    const endLabel   = new Date(days[6]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 
     let dayRows = '';
     for (const day of days) {
@@ -303,25 +459,24 @@ async function renderWeek(forceRefresh = false) {
       const rev = day.visit?.netRevenue || 0;
       const vis = day.visit?.visitors || 0;
       const barW = Math.round((rev / maxRev) * 100);
-      const dayName = new Date(day.date + 'T00:00:00').toLocaleDateString('nl-NL', { weekday: 'short' });
-      const dayNum  = new Date(day.date + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+      const dayName = new Date(day.date + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'short' });
+      const dayNum  = new Date(day.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
       dayRows += `
         <div class="week-day-card ${isToday ? 'today' : ''}" onclick="goToDay('${day.date}')">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <div class="wd-name" style="font-size:13px;font-weight:700;min-width:28px;">${dayName}</div>
               <div style="font-size:12px;color:#888;">${dayNum}</div>
-              ${isToday ? '<span class="badge" style="background:#7c3aed22;color:#7c3aed;">vandaag</span>' : ''}
+              ${isToday ? `<span class="badge" style="background:#7c3aed22;color:#7c3aed;">${t('today')}</span>` : ''}
             </div>
             <div style="text-align:right;">
               <div style="font-size:14px;font-weight:700;">${fmtEur(rev)}</div>
-              <div style="font-size:11px;color:#888;">${vis.toLocaleString('nl-NL')} bezoekers</div>
+              <div style="font-size:11px;color:#888;">${vis.toLocaleString(locale())} ${t('visitors')}</div>
             </div>
           </div>
           <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:#7c3aed;"></div></div>
         </div>`;
     }
-
 
     setContent(`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -331,15 +486,15 @@ async function renderWeek(forceRefresh = false) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
         <div class="kpi-card">
-          <div class="kpi-label">Omzet (bezoek)</div>
+          <div class="kpi-label">${t('revenueVisit')}</div>
           <div class="kpi-value" style="font-size:14px;">${fmtEur(data.totals?.netRevenue)}</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Bezoekers</div>
-          <div class="kpi-value" style="font-size:14px;">${(data.totals?.visitors||0).toLocaleString('nl-NL')}</div>
+          <div class="kpi-label">${t('visitors')}</div>
+          <div class="kpi-value" style="font-size:14px;">${(data.totals?.visitors||0).toLocaleString(locale())}</div>
         </div>
       </div>
-      <div class="section-title">Per dag — tik voor details</div>
+      <div class="section-title">${t('perDayTap')}</div>
       ${dayRows}
       ${cacheLabel(data)}
     `);
@@ -374,17 +529,16 @@ async function renderBezoek(forceRefresh = false) {
           </div>
           <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
           <div class="cat-sub">
-            <span>${d.visitors.toLocaleString('nl-NL')} bezoekers</span>
-            <span>gem. ${fmtEur(catAvg)}/pers.</span>
+            <span>${d.visitors.toLocaleString(locale())} ${t('visitors')}</span>
+            <span>${t('avgPer').replace('Gem.','gem.')} ${fmtEur(catAvg)}/pers.</span>
           </div>
         </div>`;
     }
 
-    // Reporting category breakdown (category + subcategory)
+    // Reporting category breakdown
     const rcData = visit.byReportingCategory || {};
     const rcEntries = Object.entries(rcData).sort((a,b) => b[1].revenue - a[1].revenue);
     let rcRows = '';
-    // Category colors cycle
     const RC_COLORS = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
     rcEntries.forEach(([catName, catData], ci) => {
       if (catData.revenue === 0) return;
@@ -393,7 +547,6 @@ async function renderBezoek(forceRefresh = false) {
       const catAvg = catData.visitors > 0 ? catData.revenue / catData.visitors : 0;
       const subEntries = Object.entries(catData.subcategories || {}).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,s]) => s.revenue > 0);
 
-      // Subcategory rows (indented)
       let subRows = '';
       for (const [subName, subData] of subEntries) {
         const subPct = catData.revenue > 0 ? (subData.revenue / catData.revenue * 100).toFixed(0) : 0;
@@ -402,11 +555,11 @@ async function renderBezoek(forceRefresh = false) {
           <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0 5px 14px;border-left:2px solid ${color}30;margin-left:4px;">
             <div style="flex:1;">
               <div style="font-size:12px;color:#ccc;">${subName}</div>
-              <div style="font-size:11px;color:#888;">${subData.visitors.toLocaleString('nl-NL')} bezoekers · gem. ${fmtEur(parseFloat(subAvg))}/pers.</div>
+              <div style="font-size:11px;color:#888;">${subData.visitors.toLocaleString(locale())} ${t('visitors')} · gem. ${fmtEur(parseFloat(subAvg))}/pers.</div>
             </div>
             <div style="text-align:right;margin-left:8px;">
               <div style="font-size:12px;font-weight:600;">${fmtEur(subData.revenue)}</div>
-              <div style="font-size:10px;color:#888;">${subPct}% van cat.</div>
+              <div style="font-size:10px;color:#888;">${subPct}% ${t('ofCat')}</div>
             </div>
           </div>`;
       }
@@ -416,7 +569,7 @@ async function renderBezoek(forceRefresh = false) {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
             <div>
               <span style="font-size:14px;font-weight:700;">${catName}</span>
-              ${subEntries.length > 0 ? `<span style="font-size:10px;color:#888;margin-left:6px;">${subEntries.length} subcategorieën</span>` : ''}
+              ${subEntries.length > 0 ? `<span style="font-size:10px;color:#888;margin-left:6px;">${subEntries.length} ${t('subcategories')}</span>` : ''}
             </div>
             <div style="text-align:right;">
               <span style="font-size:14px;font-weight:700;">${fmtEur(catData.revenue)}</span>
@@ -425,7 +578,7 @@ async function renderBezoek(forceRefresh = false) {
           </div>
           <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
           <div style="font-size:11px;color:#888;margin-top:3px;margin-bottom:${subEntries.length ? '8px' : '0'};">
-            ${catData.visitors.toLocaleString('nl-NL')} bezoekers · gem. ${fmtEur(catAvg)}/pers.
+            ${catData.visitors.toLocaleString(locale())} ${t('visitors')} · gem. ${fmtEur(catAvg)}/pers.
           </div>
           ${subRows}
         </div>`;
@@ -433,14 +586,14 @@ async function renderBezoek(forceRefresh = false) {
 
     setContent(`
       ${dateNav()}
-      <div class="info-banner">🏟️ Omzet — erkend bij daadwerkelijk bezoek (Recognition)</div>
+      <div class="info-banner">${t('bannerBezoek')}</div>
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-label">Omzet</div><div class="kpi-value">${fmtEur(visit.netRevenue)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Bezoekers</div><div class="kpi-value">${visit.visitors.toLocaleString('nl-NL')}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Gem./pers.</div><div class="kpi-value">${fmtEur(avg)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('revenue')}</div><div class="kpi-value">${fmtEur(visit.netRevenue)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('visitors')}</div><div class="kpi-value">${visit.visitors.toLocaleString(locale())}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('avgPer')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
-      ${cats.length ? `<div class="card"><div class="section-title">Per categorie</div>${catRows}</div>` : ''}
-      ${rcEntries.length ? `<div class="card"><div class="section-title">Per reporting categorie</div>${rcRows}</div>` : ''}
+      ${cats.length ? `<div class="card"><div class="section-title">${t('perCategory')}</div>${catRows}</div>` : ''}
+      ${rcEntries.length ? `<div class="card"><div class="section-title">${t('perReportingCat')}</div>${rcRows}</div>` : ''}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
@@ -470,20 +623,19 @@ async function renderVerkoop(forceRefresh = false) {
             </div>
           </div>
           <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${meta.color};"></div></div>
-          <div style="font-size:11px;color:#888;margin-top:2px;">${d.count} transacties</div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${d.count} ${t('transactions')}</div>
         </div>`;
     }
 
-
     setContent(`
       ${dateNav()}
-      <div class="info-banner">💳 Verkopen — geld ontvangen op deze dag (ongeacht bezoekdatum)</div>
+      <div class="info-banner">${t('bannerVerkoop')}</div>
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-label">Ontvangen</div><div class="kpi-value">${fmtEur(sales.fundsReceived)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Transacties</div><div class="kpi-value">${sales.transactionCount.toLocaleString('nl-NL')}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Gem./trans.</div><div class="kpi-value">${fmtEur(avg)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('received')}</div><div class="kpi-value">${fmtEur(sales.fundsReceived)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('transCount')}</div><div class="kpi-value">${sales.transactionCount.toLocaleString(locale())}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('avgTrans')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
-      ${chEntries.length ? `<div class="card"><div class="section-title">Sales channel</div>${chRows}</div>` : ''}
+      ${chEntries.length ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
@@ -498,11 +650,11 @@ async function renderRunsheet(forceRefresh = false) {
     function renderBooking(b) {
       const isPaid = b.paymentStatus === 'paid';
       const payClass = isPaid ? 'pay-paid' : 'pay-unpaid';
-      const fmtEur = v => '€' + (v || 0).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
+      const fmtE = v => '€' + (v || 0).toLocaleString(locale(), {minimumFractionDigits:2, maximumFractionDigits:2});
       const amountPaid = (b.total || 0) - (b.amountOwing || 0);
       const payLabel = isPaid
-        ? `Betaald · ${fmtEur(b.total)}`
-        : `Openstaand · ${fmtEur(amountPaid)} betaald / ${fmtEur(b.amountOwing)} open`;
+        ? `${t('paid')} · ${fmtE(b.total)}`
+        : `${t('outstanding')} · ${fmtE(amountPaid)} ${t('paidWord')} / ${fmtE(b.amountOwing)} ${t('openWord')}`;
 
       let actRows = '';
       for (const act of (b.activities || [])) {
@@ -517,7 +669,7 @@ async function renderRunsheet(forceRefresh = false) {
           </tr>`;
       }
 
-      const notes = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ') || 'geen';
+      const notes = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ') || t('noNotes');
 
       return `
         <div class="rs-booking">
@@ -525,35 +677,39 @@ async function renderRunsheet(forceRefresh = false) {
             <div class="rs-booking-name">${b.name}</div>
             <span class="pay-badge ${payClass}">${payLabel}</span>
           </div>
-          <div class="rs-booking-id">Boeking #${b.id}${b.totalGuests ? ` · ${b.totalGuests} pers.` : ''}</div>
+          <div class="rs-booking-id">${t('bookingNr')}${b.id}${b.totalGuests ? ` · ${b.totalGuests} ${t('pers')}` : ''}</div>
           ${actRows ? `
           <table class="rs-table">
             <tr>
-              <th>Activiteit</th><th>Subtype</th><th>Tijd</th><th>Pers.</th><th>Locatie</th>
+              <th>${t('activity')}</th><th>${t('subtype')}</th><th>${t('time')}</th><th>${t('persons')}</th><th>${t('location')}</th>
             </tr>
             ${actRows}
           </table>` : ''}
           <div class="rs-notes">
-            <div class="rs-notes-label">Opmerkingen</div>
+            <div class="rs-notes-label">${t('notes')}</div>
             ${notes}
           </div>
         </div>`;
     }
 
+    function bookingCount(n) {
+      return n === 1 ? `1 ${t('booking')}` : `${n} ${t('bookings')}`;
+    }
+
     const kfSection = data.kf?.length ? `
       <div class="rs-section">
-        <div class="rs-section-header rs-kf">🎂 Kinderfeestjes (KF) — ${data.kf.length} boeking${data.kf.length !== 1 ? 'en' : ''}</div>
+        <div class="rs-section-header rs-kf">🎂 ${t('kfTitle')} — ${bookingCount(data.kf.length)}</div>
         ${data.kf.map(renderBooking).join('')}
       </div>` : '';
 
     const bfSection = data.bf?.length ? `
       <div class="rs-section">
-        <div class="rs-section-header rs-bf">🏢 Bedrijfsfeesten (BF) — ${data.bf.length} boeking${data.bf.length !== 1 ? 'en' : ''}</div>
+        <div class="rs-section-header rs-bf">🏢 ${t('bfTitle')} — ${bookingCount(data.bf.length)}</div>
         ${data.bf.map(renderBooking).join('')}
       </div>` : '';
 
     const empty = (!data.kf?.length && !data.bf?.length) ?
-      `<div class="rs-empty">Geen KF/BF boekingen voor ${fmtDate(rsDate)}</div>` : '';
+      `<div class="rs-empty">${t('noBookings')} ${fmtDate(rsDate)}</div>` : '';
 
     setContent(`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" class="no-print">
@@ -562,10 +718,10 @@ async function renderRunsheet(forceRefresh = false) {
         <button class="nav-btn" onclick="shiftRs(1)">›</button>
       </div>
       <div style="text-align:right;margin-bottom:14px;" class="no-print">
-        <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">📄 Download PDF</button>
+        <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">${t('downloadPdf')}</button>
       </div>
       <div id="rs-print-header" style="display:none;margin-bottom:16px;">
-        <div style="font-size:18pt;font-weight:800;">Almere Underground — Run Sheet</div>
+        <div style="font-size:18pt;font-weight:800;">${t('runsheetTitle')}</div>
         <div style="font-size:12pt;color:#555;">${fmtDateLong(rsDate)}</div>
       </div>
       ${kfSection}${bfSection}${empty}
@@ -575,17 +731,11 @@ async function renderRunsheet(forceRefresh = false) {
 }
 
 function downloadRunsheetPDF(date) {
-  // Show print header, hide nav elements, then print
   const hdr = document.getElementById('rs-print-header');
   if (hdr) hdr.style.display = 'block';
-  
-  // Set print title
   const origTitle = document.title;
   document.title = `Run Sheet - Almere Underground - ${date}`;
-  
   window.print();
-  
-  // Restore after print dialog closes
   setTimeout(() => {
     document.title = origTitle;
     if (hdr) hdr.style.display = 'none';
@@ -633,6 +783,7 @@ async function renderCurrentTab(forceRefresh = false) {
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+applyLang();
 if (accessCode) render();
 </script>
 </body>
