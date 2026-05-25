@@ -11,8 +11,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-CLIENT_ID = os.environ.get('ROLLER_CLIENT_ID', 'ROLLER_CLIENT_ID')
-CLIENT_SECRET = os.environ.get('ROLLER_CLIENT_SECRET', 'ROLLER_CLIENT_SECRET')
+CLIENT_ID = os.environ.get('ROLLER_CLIENT_ID')
+CLIENT_SECRET = os.environ.get('ROLLER_CLIENT_SECRET')
 BASE_URL = 'https://api.roller.app'
 
 # Amsterdam time offset (CEST = UTC+2 in summer, CET = UTC+1 in winter)
