@@ -73,7 +73,7 @@
     .rs-table { font-size:9pt !important; }
     .pay-badge { border:1px solid #888 !important; color:#000 !important; background:#fff !important; }
     .pay-paid { background:#d4edda !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    .pay-unpaid { background:#f8d7da !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .pay-unpaid { background:#fff3cd !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .rs-kf { background:#7c3aed !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .rs-bf { background:#1d4ed8 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     h2, .date-label { color:#000 !important; }
@@ -93,7 +93,7 @@
     .rs-notes-label { font-size:10px; color:#666; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
     .pay-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; color:white; }
     .pay-paid { background:#166534; }
-    .pay-unpaid { background:#991b1b; }
+    .pay-unpaid { background:#92400e; }
     .rs-empty { text-align:center; padding:32px; color:#555; font-size:13px; background:#1a1a24; border-radius:12px; }
   </style>
 </head>
@@ -496,8 +496,13 @@ async function renderRunsheet(forceRefresh = false) {
     const data = await api(`/api/runsheet?date=${rsDate}`, forceRefresh);
 
     function renderBooking(b) {
-      const payClass = b.paymentStatus === 'paid' ? 'pay-paid' : 'pay-unpaid';
-      const payLabel = b.paymentStatus === 'paid' ? 'Betaald' : 'Onbetaald';
+      const isPaid = b.paymentStatus === 'paid';
+      const payClass = isPaid ? 'pay-paid' : 'pay-unpaid';
+      const fmtEur = v => '€' + (v || 0).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
+      const amountPaid = (b.total || 0) - (b.amountOwing || 0);
+      const payLabel = isPaid
+        ? `Betaald · ${fmtEur(b.total)}`
+        : `Openstaand · ${fmtEur(amountPaid)} betaald / ${fmtEur(b.amountOwing)} open`;
 
       let actRows = '';
       for (const act of (b.activities || [])) {
