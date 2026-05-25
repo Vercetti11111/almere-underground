@@ -583,15 +583,15 @@ function hourlyBarChart(byHour, color = '#2563eb') {
     vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ') +
     ` ${x(n-1).toFixed(1)},${(padT + chartH).toFixed(1)}`;
 
-  // Dots + labels every 2 hours
+  // Dots + labels every hour
   const dotsSVG = hours.map((h, i) => {
     const v = vals[i];
     const cx = x(i).toFixed(1), cy = y(v).toFixed(1);
-    const showLabel = i % 2 === 0 && v > 0;
+    const showLabel = v > 0;
     const labelY = (parseFloat(cy) - 5 < padT + 4) ? parseFloat(cy) + 12 : parseFloat(cy) - 5;
     return `
       <circle cx="${cx}" cy="${cy}" r="${v > 0 ? 2.5 : 1.5}" fill="${v > 0 ? color : '#ccc'}" />
-      ${showLabel ? `<text x="${cx}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="9" fill="white" font-weight="700" stroke="rgba(0,0,0,0.35)" stroke-width="2.5" paint-order="stroke">${fmtVal(v)}</text>` : ''}
+      ${showLabel ? `<text x="${cx}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="11" fill="white" font-weight="800" stroke="rgba(0,0,0,0.55)" stroke-width="3" paint-order="stroke">${fmtVal(v)}</text>` : ''}
     `;
   }).join('');
 
