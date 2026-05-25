@@ -552,15 +552,20 @@ async function renderWeek(forceRefresh = false) {
 async function renderBezoek(forceRefresh = false) {
   setContent(spinner());
   try {
-    const data = await api(`/api/day?date=${selectedDate}`, forceRefresh);
+    const [data, mypos] = await Promise.all([
+      api(`/api/day?date=${selectedDate}`, forceRefresh),
+      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null)
+    ]);
     const { visit } = data;
-    const avg = visit.visitors > 0 ? visit.netRevenue / visit.visitors : 0;
+    const myposRev = mypos?.omzetExclBtw || 0;
+    const totalRev = visit.netRevenue + myposRev;
+    const avg = visit.visitors > 0 ? totalRev / visit.visitors : 0;
 
     const cats = CAT_ORDER.filter(c => visit.byCategory?.[c]);
     let catRows = '';
     for (const cat of cats) {
       const d = visit.byCategory[cat];
-      const pct = visit.netRevenue > 0 ? Math.round((d.revenue / visit.netRevenue) * 100) : 0;
+      const pct = totalRev > 0 ? Math.round((d.revenue / totalRev) * 100) : 0;
       const catAvg = d.visitors > 0 ? d.revenue / d.visitors : 0;
       const color = CAT_COLORS[cat] || '#6b7280';
       catRows += `
@@ -582,15 +587,21 @@ async function renderBezoek(forceRefresh = false) {
         </div>`;
     }
 
-    // Reporting category breakdown
-    const rcData = visit.byReportingCategory || {};
+    // Reporting category breakdown — include MyPOS under Overig
+    const rcData = JSON.parse(JSON.stringify(visit.byReportingCategory || {}));
+    if (myposRev > 0) {
+      if (!rcData['Overig']) rcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+      rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + myposRev;
+      if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
+      rcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'] = { revenue: myposRev, visitors: mypos.transactions || 0 };
+    }
     const rcEntries = Object.entries(rcData).sort((a,b) => b[1].revenue - a[1].revenue);
     let rcRows = '';
     const RC_COLORS = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
     rcEntries.forEach(([catName, catData], ci) => {
       if (catData.revenue === 0) return;
       const color = RC_COLORS[ci % RC_COLORS.length];
-      const pct = visit.netRevenue > 0 ? (catData.revenue / visit.netRevenue * 100).toFixed(1) : 0;
+      const pct = totalRev > 0 ? (catData.revenue / totalRev * 100).toFixed(1) : 0;
       const catAvg = catData.visitors > 0 ? catData.revenue / catData.visitors : 0;
       const subEntries = Object.entries(catData.subcategories || {}).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,s]) => s.revenue > 0);
 
@@ -635,7 +646,7 @@ async function renderBezoek(forceRefresh = false) {
       ${dateNav()}
       <div class="info-banner">${t('bannerBezoek')}</div>
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-label">${t('revenue')}</div><div class="kpi-value">${fmtEur(visit.netRevenue)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('revenue')}</div><div class="kpi-value">${fmtEur(totalRev)}</div></div>
         <div class="kpi-card"><div class="kpi-label">${t('visitors')}</div><div class="kpi-value">${visit.visitors.toLocaleString(locale())}</div></div>
         <div class="kpi-card"><div class="kpi-label">${t('avgPer')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
@@ -655,14 +666,16 @@ async function renderVerkoop(forceRefresh = false) {
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null)
     ]);
     const { sales } = data;
-    const avg = sales.transactionCount > 0 ? sales.fundsReceived / sales.transactionCount : 0;
-    const total = sales.fundsReceived || 1;
+    const myposRev = mypos?.omzetExclBtw || 0;
+    const grandTotal = (sales.fundsReceived || 0) + myposRev;
+    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0);
+    const avg = totalTrans > 0 ? grandTotal / totalTrans : 0;
 
     const chEntries = Object.entries(sales.byChannel || {}).sort((a,b) => b[1].revenue - a[1].revenue);
     let chRows = '';
     for (const [ch, d] of chEntries) {
       const meta = CHANNEL_META[ch] || { label: ch, color: '#6b7280' };
-      const pct = Math.round((d.revenue / total) * 100);
+      const pct = grandTotal > 0 ? Math.round((d.revenue / grandTotal) * 100) : 0;
       chRows += `
         <div style="margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
@@ -676,32 +689,19 @@ async function renderVerkoop(forceRefresh = false) {
           <div style="font-size:11px;color:#888;margin-top:2px;">${d.count} ${t('transactions')}</div>
         </div>`;
     }
-
-    // MyPOS card
-    let myposCard = '';
-    if (mypos) {
-      // Hour sparkline
-      const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2,'0'));
-      const maxVal = Math.max(...hours.map(h => mypos.byHour[h] || 0), 1);
-      const bars = hours.map(h => {
-        const v = mypos.byHour[h] || 0;
-        const pct = Math.round((v / maxVal) * 100);
-        return `<div title="${h}:00 · ${fmtEur(v)}" style="flex:1;background:${v > 0 ? '#7c3aed' : '#e5e7eb'};height:${Math.max(pct,2)}%;border-radius:2px 2px 0 0;"></div>`;
-      }).join('');
-
-      myposCard = `
-        <div class="card" style="margin-top:16px;">
-          <div class="section-title">${t('myposTitle')}</div>
-          <div class="kpi-grid" style="margin-bottom:12px;">
-            <div class="kpi-card"><div class="kpi-label">${t('myposSales')}</div><div class="kpi-value">${fmtEur(mypos.totalInclBtw)}</div></div>
-            <div class="kpi-card"><div class="kpi-label">${t('myposRevenue')}</div><div class="kpi-value">${fmtEur(mypos.omzetExclBtw)}</div></div>
-            <div class="kpi-card"><div class="kpi-label">${t('myposTrans')}</div><div class="kpi-value">${mypos.transactions}</div></div>
-            <div class="kpi-card"><div class="kpi-label">${t('myposVat')}</div><div class="kpi-value">${fmtEur(mypos.btwBedrag)}</div></div>
+    if (myposRev > 0) {
+      const pct = grandTotal > 0 ? Math.round((myposRev / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#7c3aed;">🎮 Speelgoed automaat (MyPOS)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(myposRev)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
           </div>
-          <div style="display:flex;align-items:flex-end;height:48px;gap:2px;padding:4px 0;">
-            ${bars}
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-top:2px;"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#7c3aed;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${mypos.transactions} ${t('transactions')} · excl. BTW</div>
         </div>`;
     }
 
@@ -709,12 +709,11 @@ async function renderVerkoop(forceRefresh = false) {
       ${dateNav()}
       <div class="info-banner">${t('bannerVerkoop')}</div>
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-label">${t('received')}</div><div class="kpi-value">${fmtEur(sales.fundsReceived)}</div></div>
-        <div class="kpi-card"><div class="kpi-label">${t('transCount')}</div><div class="kpi-value">${sales.transactionCount.toLocaleString(locale())}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('received')}</div><div class="kpi-value">${fmtEur(grandTotal)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('transCount')}</div><div class="kpi-value">${totalTrans.toLocaleString(locale())}</div></div>
         <div class="kpi-card"><div class="kpi-label">${t('avgTrans')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
-      ${chEntries.length ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
-      ${myposCard}
+      ${chEntries.length || myposRev > 0 ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
@@ -791,11 +790,7 @@ async function renderRunsheet(forceRefresh = false) {
       `<div class="rs-empty">${t('noBookings')} ${fmtDate(rsDate)}</div>` : '';
 
     setContent(`
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" class="no-print">
-        <button class="nav-btn" onclick="shiftRs(-1)">‹</button>
-        <div class="date-label" style="font-size:14px;">${fmtDateLong(rsDate)}</div>
-        <button class="nav-btn" onclick="shiftRs(1)">›</button>
-      </div>
+      ${dateNav('runsheet', true)}
       <div style="text-align:right;margin-bottom:14px;" class="no-print">
         <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">${t('downloadPdf')}</button>
       </div>
@@ -822,18 +817,33 @@ function downloadRunsheetPDF(date) {
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
-function dateNav() {
+function dateNav(mode = 'day', noPrint = false) {
+  const dateStr = mode === 'day' ? selectedDate : (mode === 'runsheet' ? rsDate : persDate);
+  const shiftFn = mode === 'day' ? 'shiftDay' : (mode === 'runsheet' ? 'shiftRs' : 'shiftPers');
+  const changeFn = mode === 'day' ? 'onDayDateChange' : (mode === 'runsheet' ? 'onRsDateChange' : 'onPersDateChange');
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <button class="nav-btn" onclick="shiftDay(-1)">‹</button>
-      <div class="date-label">${fmtDateLong(selectedDate)}</div>
-      <button class="nav-btn" onclick="shiftDay(1)">›</button>
+    <div ${noPrint ? 'class="no-print"' : ''} style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <button class="nav-btn" onclick="${shiftFn}(-1)">‹</button>
+      <div style="flex:1;text-align:center;position:relative;" onclick="triggerDatePicker('dp-${mode}')">
+        <div class="date-label" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">${fmtDateLong(dateStr)}</div>
+        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;opacity:0;width:0;height:0;top:0;left:50%;pointer-events:none;">
+      </div>
+      <button class="nav-btn" onclick="${shiftFn}(1)">›</button>
     </div>`;
 }
 
+function triggerDatePicker(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  try { if (el.showPicker) el.showPicker(); else el.click(); } catch(e) { el.click(); }
+}
+function onDayDateChange(val) { selectedDate = val; render(); }
+function onRsDateChange(val) { rsDate = val; render(); }
+function onPersDateChange(val) { persDate = val; expandedDept = null; render(); }
 function shiftDay(n) { selectedDate = addDays(selectedDate, n); render(); }
 function shiftWeek(n) { weekOffset += n; render(); }
 function shiftRs(n) { rsDate = addDays(rsDate, n); render(); }
+function shiftPers(n) { persDate = addDays(persDate, n); expandedDept = null; render(); }
 
 function goToDay(date) {
   selectedDate = date;
@@ -972,11 +982,7 @@ async function renderPersoneel(forceRefresh = false) {
     }
 
     setContent(`
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
-        <button class="nav-btn" onclick="persDate=addDays(persDate,-1);expandedDept=null;renderPersoneel()">‹</button>
-        <input type="date" value="${persDate}" onchange="persDate=this.value;expandedDept=null;renderPersoneel()" style="flex:1;background:#1a1a24;border:1px solid #2a2a38;color:#e0e0f0;border-radius:8px;padding:8px 12px;font-size:14px;text-align:center;">
-        <button class="nav-btn" onclick="persDate=addDays(persDate,1);expandedDept=null;renderPersoneel()">›</button>
-      </div>
+      ${dateNav('personeel')}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
         <div class="kpi-card">
           <div class="kpi-label">📅 Gepland totaal</div>
