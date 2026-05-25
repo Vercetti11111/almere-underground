@@ -549,7 +549,7 @@ async function renderWeek(forceRefresh = false) {
 }
 
 
-// ── Hourly bar chart ──────────────────────────────────────────────────────────
+// ── Hourly line chart ─────────────────────────────────────────────────────────
 function hourlyBarChart(byHour, color = '#2563eb') {
   // Show hours 09–01 (CEST business day)
   const hours = [];
@@ -557,22 +557,68 @@ function hourlyBarChart(byHour, color = '#2563eb') {
   hours.push('00', '01');
 
   const vals = hours.map(h => byHour[h] || 0);
-  const max = Math.max(...vals, 0.01);
+  const max = Math.max(...vals, 1);
 
-  const bars = hours.map((h, i) => {
+  // SVG dimensions
+  const W = 600, H = 90, padL = 0, padR = 8, padT = 20, padB = 22;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const n = hours.length;
+
+  // Format value without currency: e.g. 1234 → "1234", 12345 → "12k"
+  function fmtVal(v) {
+    if (v >= 1000) return Math.round(v / 1000 * 10) / 10 + 'k';
+    return Math.round(v).toString();
+  }
+
+  // X/Y helpers
+  const x = i => padL + (i / (n - 1)) * chartW;
+  const y = v => padT + chartH - (v / max) * chartH;
+
+  // Build polyline points
+  const points = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+
+  // Fill area under line
+  const fillPts = `${x(0).toFixed(1)},${(padT + chartH).toFixed(1)} ` +
+    vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ') +
+    ` ${x(n-1).toFixed(1)},${(padT + chartH).toFixed(1)}`;
+
+  // Dots + labels every 2 hours
+  const dotsSVG = hours.map((h, i) => {
     const v = vals[i];
-    const pct = Math.round((v / max) * 100);
-    const tip = v > 0 ? fmtEur(v) : '';
-    return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px;">
-      <div style="font-size:9px;color:#888;min-height:14px;text-align:center;">${tip}</div>
-      <div style="flex:1;display:flex;align-items:flex-end;width:100%;">
-        <div style="width:100%;background:${color};border-radius:2px 2px 0 0;height:${pct}%;min-height:${v>0?'3px':'0'};opacity:0.85;"></div>
-      </div>
-      <div style="font-size:9px;color:#666;">${parseInt(h)}</div>
-    </div>`;
+    const cx = x(i).toFixed(1), cy = y(v).toFixed(1);
+    const showLabel = i % 2 === 0 && v > 0;
+    const labelY = (parseFloat(cy) - 5 < padT + 4) ? parseFloat(cy) + 12 : parseFloat(cy) - 5;
+    return `
+      <circle cx="${cx}" cy="${cy}" r="${v > 0 ? 2.5 : 1.5}" fill="${v > 0 ? color : '#ccc'}" />
+      ${showLabel ? `<text x="${cx}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="9" fill="${color}" font-weight="600">${fmtVal(v)}</text>` : ''}
+    `;
   }).join('');
 
-  return `<div style="display:flex;align-items:flex-end;height:90px;gap:1px;padding-top:16px;">${bars}</div>`;
+  // X-axis hour labels (every 2 hours)
+  const labelsSVG = hours.map((h, i) => {
+    if (i % 2 !== 0) return '';
+    return `<text x="${x(i).toFixed(1)}" y="${(H - 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="#888">${parseInt(h)}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible;" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="lg${color.replace('#','')}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0.01"/>
+      </linearGradient>
+    </defs>
+    <!-- fill area -->
+    <polygon points="${fillPts}" fill="url(#lg${color.replace('#','')})" />
+    <!-- baseline -->
+    <line x1="${padL}" y1="${padT + chartH}" x2="${W - padR}" y2="${padT + chartH}" stroke="#e5e7eb" stroke-width="1"/>
+    <!-- line -->
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- dots + value labels -->
+    ${dotsSVG}
+    <!-- hour labels -->
+    ${labelsSVG}
+  </svg>`;
 }
 
 // ── BEZOEK VIEW ───────────────────────────────────────────────────────────────
