@@ -591,7 +591,7 @@ function hourlyBarChart(byHour, color = '#2563eb') {
     const labelY = (parseFloat(cy) - 5 < padT + 4) ? parseFloat(cy) + 12 : parseFloat(cy) - 5;
     return `
       <circle cx="${cx}" cy="${cy}" r="${v > 0 ? 2.5 : 1.5}" fill="${v > 0 ? color : '#ccc'}" />
-      ${showLabel ? `<text x="${cx}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="9" fill="${color}" font-weight="600">${fmtVal(v)}</text>` : ''}
+      ${showLabel ? `<text x="${cx}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="9" fill="white" font-weight="700" stroke="rgba(0,0,0,0.35)" stroke-width="2.5" paint-order="stroke">${fmtVal(v)}</text>` : ''}
     `;
   }).join('');
 
