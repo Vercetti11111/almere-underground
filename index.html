@@ -264,7 +264,8 @@ const TRANSLATIONS = {
     kpiTotaalBoekingen: 'Totaal boekingen',
     kpiKostenPerBoeking: 'Kosten/boeking',
     kpiActRevLabel: 'Activiteiten omzet',
-    kpiSalesRevLabel: 'KF + BF omzet',
+    kpiSalesRevLabel: 'Bedrijfsarr. omzet',
+    kpiFbRevLabel: 'F&B omzet (gesplitst binnenkort)',
     kpiNoData: 'Geen personeelsdata beschikbaar',
   },
   en: {
@@ -366,7 +367,8 @@ const TRANSLATIONS = {
     kpiTotaalBoekingen: 'Total bookings',
     kpiKostenPerBoeking: 'Cost/booking',
     kpiActRevLabel: 'Activities revenue',
-    kpiSalesRevLabel: 'KF + BF revenue',
+    kpiSalesRevLabel: 'Corporate arr. revenue',
+    kpiFbRevLabel: 'F&B revenue (split coming soon)',
     kpiNoData: 'No staff data available',
   }
 };
@@ -1267,26 +1269,34 @@ async function renderPersoneel(forceRefresh = false) {
 
 // Department → revenue & KPI config
 const DEPT_KPI = {
+  // Roller reporting categories (actual names from API):
+  //   'Activiteiten', 'Bedrijfsarrangementen', 'F&B', 'Overig', 'Aanpassingen'
   'Activiteiten': {
     icon: '🎳', color: '#7c3aed',
-    revCats: ['Kinderfeestjes', 'Bedrijfsfeesten', 'Box office', 'Online', 'Venue Manager'],
+    // Activiteiten + Bedrijfsarrangementen = all activity-based revenue
+    revCats: ['Activiteiten', 'Bedrijfsarrangementen'],
     revLabelKey: 'kpiActRevLabel'
   },
   'Sales & Event': {
     icon: '🎉', color: '#2563eb',
-    revCats: ['Kinderfeestjes', 'Bedrijfsfeesten'],
+    // Primarily corporate arrangements (KF + BF bookings)
+    revCats: ['Bedrijfsarrangementen'],
     revLabelKey: 'kpiSalesRevLabel'
   },
   'Front-Office': {
     icon: '🎫', color: '#059669',
+    // Uses booking channel count, not direct revenue
     metric: 'bookings'
   },
   'Horeca': {
     icon: '🍺', color: '#d97706',
-    fbComing: true
+    // F&B revenue (food+drink combined until product-level split available)
+    revCats: ['F&B'],
+    revLabelKey: 'kpiFbRevLabel'
   },
   'Keuken': {
     icon: '🍽️', color: '#dc2626',
+    // F&B food split not yet available at product level
     fbComing: true
   },
   'Facilitair': {
