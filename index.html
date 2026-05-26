@@ -1026,10 +1026,10 @@ function dateNav(mode = 'day', noPrint = false) {
   return `
     <div ${noPrint ? 'class="no-print"' : ''} style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <button class="nav-btn" onclick="${shiftFn}(-1)">‹</button>
-      <label style="flex:1;text-align:center;cursor:pointer;display:block;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;">
-        <div class="date-label" style="pointer-events:none;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">${fmtDateLong(dateStr)}</div>
-        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="opacity:0;position:absolute;top:0;left:0;width:100%;height:100%;cursor:pointer;border:none;">
-      </label>
+      <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-${mode}')">
+        <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(dateStr)}</div>
+        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" onclick="event.stopPropagation()" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
+      </div>
       <button class="nav-btn" onclick="${shiftFn}(1)">›</button>
     </div>`;
 }
