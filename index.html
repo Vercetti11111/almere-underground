@@ -513,6 +513,52 @@ async function renderWeek(forceRefresh = false) {
     const startLabel = new Date(days[0]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
     const endLabel   = new Date(days[6]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 
+    // ── Cumulative week category breakdown ────────────────────────────────────
+    const weekRcData = {};
+    let weekTotalRev = 0;
+    let weekTotalVis = 0;
+    for (const day of days) {
+      const rc = day.visit?.byReportingCategory || {};
+      weekTotalRev += day.visit?.netRevenue || 0;
+      weekTotalVis += day.visit?.visitors || 0;
+      for (const [catName, catData] of Object.entries(rc)) {
+        if (!weekRcData[catName]) weekRcData[catName] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData[catName].revenue += catData.revenue || 0;
+        weekRcData[catName].visitors += catData.visitors || 0;
+        for (const [subName, subData] of Object.entries(catData.subcategories || {})) {
+          if (!weekRcData[catName].subcategories[subName]) weekRcData[catName].subcategories[subName] = { revenue: 0, visitors: 0 };
+          weekRcData[catName].subcategories[subName].revenue += subData.revenue || 0;
+          weekRcData[catName].subcategories[subName].visitors += subData.visitors || 0;
+        }
+      }
+    }
+    const RC_COLORS_W = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
+    const weekRcEntries = Object.entries(weekRcData).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,d]) => d.revenue > 0);
+    let weekCatRows = '';
+    weekRcEntries.forEach(([catName, catData], ci) => {
+      const color = RC_COLORS_W[ci % RC_COLORS_W.length];
+      const pct = weekTotalRev > 0 ? (catData.revenue / weekTotalRev * 100).toFixed(1) : 0;
+      const catAvg = catData.visitors > 0 ? catData.revenue / catData.visitors : 0;
+      const subEntries = Object.entries(catData.subcategories || {}).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,s]) => s.revenue > 0);
+      let subRows = '';
+      for (const [subName, subData] of subEntries) {
+        const subPct = catData.revenue > 0 ? (subData.revenue / catData.revenue * 100).toFixed(0) : 0;
+        const subAvg = subData.visitors > 0 ? (subData.revenue / subData.visitors).toFixed(2) : 0;
+        subRows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0 5px 14px;border-left:2px solid ${color}30;margin-left:4px;">
+            <div style="flex:1;"><div style="font-size:12px;color:#ccc;">${subName}</div><div style="font-size:11px;color:#888;">${subData.visitors.toLocaleString(locale())} ${t('visitors')} · gem. ${fmtEur(parseFloat(subAvg))}/pers.</div></div>
+            <div style="text-align:right;margin-left:8px;"><div style="font-size:12px;font-weight:600;">${fmtEur(subData.revenue)}</div><div style="font-size:10px;color:#888;">${subPct}% ${t('ofCat')}</div></div>
+          </div>`;
+      }
+      weekCatRows += `<div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <div><span style="font-size:14px;font-weight:700;">${catName}</span>${subEntries.length > 0 ? `<span style="font-size:10px;color:#888;margin-left:6px;">${subEntries.length} ${t('subcategories')}</span>` : ''}</div>
+            <div style="text-align:right;"><div style="font-size:14px;font-weight:700;">${fmtEur(catData.revenue)}</div><div style="font-size:11px;color:#888;">${pct}% · ${catData.visitors.toLocaleString(locale())} ${t('visitors')} · ${fmtEur(catAvg)}/pers.</div></div>
+          </div>
+          <div style="height:4px;border-radius:999px;background:${color};width:${pct}%;margin-bottom:${subEntries.length > 0 ? 6 : 0}px;"></div>
+          ${subRows}
+        </div>`;
+    });
+
     let dayRows = '';
     for (const day of days) {
       const isToday = day.date === today;
@@ -554,6 +600,11 @@ async function renderWeek(forceRefresh = false) {
           <div class="kpi-value" style="font-size:14px;">${(data.totals?.visitors||0).toLocaleString(locale())}</div>
         </div>
       </div>
+      ${weekCatRows.length > 0 ? `
+      <div class="section-title">📊 ${t('perReportingCat')}</div>
+      <div style="background:#1a1a24;border-radius:14px;padding:14px;margin-bottom:16px;">
+        ${weekCatRows}
+      </div>` : ''}
       <div class="section-title">${t('perDayTap')}</div>
       ${dayRows}
       ${cacheLabel(data)}
@@ -957,10 +1008,10 @@ function dateNav(mode = 'day', noPrint = false) {
   return `
     <div ${noPrint ? 'class="no-print"' : ''} style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <button class="nav-btn" onclick="${shiftFn}(-1)">‹</button>
-      <div style="flex:1;text-align:center;position:relative;">
-        <div class="date-label" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">${fmtDateLong(dateStr)}</div>
-        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;opacity:0;top:0;left:0;width:100%;height:100%;cursor:pointer;">
-      </div>
+      <label style="flex:1;text-align:center;cursor:pointer;display:block;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;">
+        <div class="date-label" style="pointer-events:none;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">${fmtDateLong(dateStr)}</div>
+        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="opacity:0;position:absolute;top:0;left:0;width:100%;height:100%;cursor:pointer;border:none;">
+      </label>
       <button class="nav-btn" onclick="${shiftFn}(1)">›</button>
     </div>`;
 }
