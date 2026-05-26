@@ -145,6 +145,7 @@
     <button class="tab-btn" onclick="switchTab('verkoop')" id="tab-verkoop">💳 Verkoop</button>
     <button class="tab-btn" onclick="switchTab('runsheet')" id="tab-runsheet">📋 Run</button>
     <button class="tab-btn" onclick="switchTab('personeel')" id="tab-personeel">👥 Personeel</button>
+    <button class="tab-btn" onclick="switchTab('kpi')" id="tab-kpi">📊 KPI</button>
   </div>
 
   <div id="content"></div>
@@ -240,6 +241,31 @@ const TRANSLATIONS = {
     liveData: 'Live data',
     agoSec: 's geleden',
     agoMin: 'm geleden',
+    // KPI tab
+    tabKpi: '📊 KPI',
+    kpiTitle: 'KPI Dashboard',
+    kpiDag: '📅 Dag',
+    kpiWeek: '📆 Week',
+    kpiMaand: '📅 Maand',
+    kpiMaandSoon: 'Maand (binnenkort)',
+    kpiOmzet: '💰 Omzet',
+    kpiPlannedPct: '📅 Gepland %',
+    kpiClockedPct: '🕐 Geklokt %',
+    kpiPerDept: '🏢 Per afdeling',
+    kpiPerDeptWeek: '🏢 Per afdeling — week',
+    kpiPlanned: '📅 Gepland',
+    kpiClocked: '🕐 Geklokt',
+    kpiLaborPct: 'loonkosten',
+    kpiOmzetWeek: '💰 Omzet week',
+    kpiFbComing: 'F&B koppeling binnenkort',
+    kpiOverhead: 'Overhead',
+    kpiVanTotaal: 'van totaal',
+    kpiVmBoekingen: 'VM boekingen',
+    kpiTotaalBoekingen: 'Totaal boekingen',
+    kpiKostenPerBoeking: 'Kosten/boeking',
+    kpiActRevLabel: 'Activiteiten omzet',
+    kpiSalesRevLabel: 'KF + BF omzet',
+    kpiNoData: 'Geen personeelsdata beschikbaar',
   },
   en: {
     tabWeek: '📅 Week',
@@ -317,6 +343,31 @@ const TRANSLATIONS = {
     liveData: 'Live data',
     agoSec: 's ago',
     agoMin: 'm ago',
+    // KPI tab
+    tabKpi: '📊 KPI',
+    kpiTitle: 'KPI Dashboard',
+    kpiDag: '📅 Day',
+    kpiWeek: '📆 Week',
+    kpiMaand: '📅 Month',
+    kpiMaandSoon: 'Month (coming soon)',
+    kpiOmzet: '💰 Revenue',
+    kpiPlannedPct: '📅 Planned %',
+    kpiClockedPct: '🕐 Clocked %',
+    kpiPerDept: '🏢 Per department',
+    kpiPerDeptWeek: '🏢 Per department — week',
+    kpiPlanned: '📅 Planned',
+    kpiClocked: '🕐 Clocked',
+    kpiLaborPct: 'labor cost',
+    kpiOmzetWeek: '💰 Weekly revenue',
+    kpiFbComing: 'F&B link coming soon',
+    kpiOverhead: 'Overhead',
+    kpiVanTotaal: 'of total',
+    kpiVmBoekingen: 'VM bookings',
+    kpiTotaalBoekingen: 'Total bookings',
+    kpiKostenPerBoeking: 'Cost/booking',
+    kpiActRevLabel: 'Activities revenue',
+    kpiSalesRevLabel: 'KF + BF revenue',
+    kpiNoData: 'No staff data available',
   }
 };
 
@@ -346,11 +397,13 @@ function applyLang() {
   const tv = document.getElementById('tab-verkoop');
   const tr = document.getElementById('tab-runsheet');
   const tp = document.getElementById('tab-personeel');
+  const tk = document.getElementById('tab-kpi');
   if (tw) tw.textContent = t('tabWeek');
   if (tb) tb.textContent = t('tabBezoek');
   if (tv) tv.textContent = t('tabVerkoop');
   if (tr) tr.textContent = t('tabRun');
   if (tp) tp.textContent = t('tabPersoneel');
+  if (tk) tk.textContent = t('tabKpi');
   // Login screen
   const ll = document.getElementById('login-label');
   const lb = document.getElementById('login-btn');
@@ -469,6 +522,11 @@ let weekOffset = 0;
 let rsDate = todayStr();
 let persDate = todayStr();
 let expandedDept = null;
+
+// KPI tab state
+let kpiPeriod = 'dag'; // 'dag' | 'week'
+let kpiDate = todayStr();
+let kpiWeekOffset = 0;
 
 // ── Category colors ───────────────────────────────────────────────────────────
 const CAT_COLORS = {
@@ -1073,6 +1131,7 @@ async function renderCurrentTab(forceRefresh = false) {
   else if (currentTab === 'verkoop')  await renderVerkoop(forceRefresh);
   else if (currentTab === 'runsheet') await renderRunsheet(forceRefresh);
   else if (currentTab === 'personeel') await renderPersoneel(forceRefresh);
+  else if (currentTab === 'kpi')       await renderKpi(forceRefresh);
 }
 
 // ── PERSONEEL VIEW ────────────────────────────────────────────────────────────
@@ -1201,6 +1260,260 @@ async function renderPersoneel(forceRefresh = false) {
       ${deptCards}
       ${cacheLabel(data)}
     `);
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+// ── KPI VIEW ──────────────────────────────────────────────────────────────────
+
+// Department → revenue & KPI config
+const DEPT_KPI = {
+  'Activiteiten': {
+    icon: '🎳', color: '#7c3aed',
+    revCats: ['Kinderfeestjes', 'Bedrijfsfeesten', 'Box office', 'Online', 'Venue Manager'],
+    revLabelKey: 'kpiActRevLabel'
+  },
+  'Sales & Event': {
+    icon: '🎉', color: '#2563eb',
+    revCats: ['Kinderfeestjes', 'Bedrijfsfeesten'],
+    revLabelKey: 'kpiSalesRevLabel'
+  },
+  'Front-Office': {
+    icon: '🎫', color: '#059669',
+    metric: 'bookings'
+  },
+  'Horeca': {
+    icon: '🍺', color: '#d97706',
+    fbComing: true
+  },
+  'Keuken': {
+    icon: '🍽️', color: '#dc2626',
+    fbComing: true
+  },
+  'Facilitair': {
+    icon: '🔧', color: '#6b7280',
+    overhead: true
+  },
+  'Kantoor': {
+    icon: '💼', color: '#6b7280',
+    overhead: true
+  },
+  'Training, Ontwikkeling & Bijeenkomsten': {
+    icon: '📚', color: '#6b7280',
+    overhead: true
+  }
+};
+
+// Color coding for loonkosten % KPI
+function kpiColor(pct) {
+  if (pct == null || isNaN(pct)) return '#6b7280';
+  if (pct < 20) return '#10b981';  // excellent (green)
+  if (pct < 30) return '#84cc16';  // good (light green)
+  if (pct < 40) return '#f59e0b';  // watch (amber)
+  if (pct < 50) return '#f97316';  // high (orange)
+  return '#ef4444';                // too high (red)
+}
+
+function renderDeptKpiCard(dept, totalOmzet, byRc, salesByChannel) {
+  const cfg = DEPT_KPI[dept.deptName] || { icon: '👤', color: '#6b7280', overhead: true };
+  const hasPlan  = dept.plannedH  > 0;
+  const hasClock = dept.clockedH  > 0;
+  if (!hasPlan && !hasClock) return '';
+
+  // Calculate revenue relevant to this department
+  let deptOmzet = null;
+  let deptOmzetLabel = '';
+  if (cfg.revCats && byRc) {
+    deptOmzet = cfg.revCats.reduce((s, cat) => s + (byRc[cat]?.revenue || 0), 0);
+    deptOmzetLabel = cfg.revLabelKey ? t(cfg.revLabelKey) : '';
+  }
+
+  // Reference revenue for loonkosten %
+  const refOmzet = (deptOmzet !== null && deptOmzet > 0) ? deptOmzet : totalOmzet;
+  const plannedPct = refOmzet > 0 && hasPlan  ? (dept.plannedCost  / refOmzet * 100) : null;
+  const clockedPct = refOmzet > 0 && hasClock ? (dept.clockedCost  / refOmzet * 100) : null;
+  const pctToShow  = clockedPct !== null ? clockedPct : plannedPct;
+  const pctColor   = kpiColor(pctToShow);
+
+  // KPI badge (big %)
+  const kpiBadge = pctToShow !== null
+    ? `<div style="text-align:right;">
+        <div style="font-size:22px;font-weight:800;color:${pctColor};line-height:1;">${pctToShow.toFixed(1)}%</div>
+        <div style="font-size:10px;color:#666;">${t('kpiLaborPct')}</div>
+      </div>`
+    : '';
+
+  // Revenue context line
+  let revContext = '';
+  if (cfg.fbComing) {
+    revContext = `<div style="font-size:11px;color:#555;font-style:italic;margin-top:6px;">🔗 ${t('kpiFbComing')}</div>`;
+  } else if (cfg.metric === 'bookings' && salesByChannel) {
+    const vmTrans = (salesByChannel['VenueManager']?.count || 0) + (salesByChannel['Venue manager']?.count || 0);
+    const totalTrans = Object.values(salesByChannel).reduce((s, c) => s + (c.count || 0), 0);
+    const costPerBooking = totalTrans > 0 && hasPlan ? (dept.plannedCost / totalTrans) : 0;
+    revContext = `
+      <div style="display:flex;gap:12px;margin-top:6px;">
+        <div style="font-size:11px;color:#888;">${t('kpiVmBoekingen')}: <span style="color:#e0e0f0;font-weight:600;">${vmTrans}</span></div>
+        <div style="font-size:11px;color:#888;">${t('kpiTotaalBoekingen')}: <span style="color:#e0e0f0;font-weight:600;">${totalTrans}</span></div>
+        ${costPerBooking > 0 ? `<div style="font-size:11px;color:#888;">${t('kpiKostenPerBoeking')}: <span style="color:#e0e0f0;font-weight:600;">${fmtEur(costPerBooking)}</span></div>` : ''}
+      </div>`;
+  } else if (deptOmzet !== null && deptOmzet > 0) {
+    revContext = `<div style="font-size:11px;color:#888;margin-top:6px;">${deptOmzetLabel}: <span style="color:#e0e0f0;font-weight:600;">${fmtEur(deptOmzet)}</span></div>`;
+  } else if (cfg.overhead) {
+    const ovhCost = hasClock ? dept.clockedCost : dept.plannedCost;
+    const ovhPct  = totalOmzet > 0 && ovhCost > 0 ? (ovhCost / totalOmzet * 100).toFixed(1) : null;
+    if (ovhPct) revContext = `<div style="font-size:11px;color:#888;margin-top:6px;">${t('kpiOverhead')}: ${ovhPct}% ${t('kpiVanTotaal')}</div>`;
+  }
+
+  // Progress bar
+  const barBlock = pctToShow !== null && refOmzet > 0
+    ? `<div style="height:4px;border-radius:999px;background:#1e1e2a;margin:8px 0 4px;">
+        <div style="height:4px;border-radius:999px;background:${pctColor};width:${Math.min(pctToShow, 100).toFixed(1)}%;transition:width .4s;"></div>
+      </div>`
+    : '';
+
+  return `
+    <div style="background:#12121c;border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:3px solid ${cfg.color};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div style="font-size:15px;font-weight:700;color:#e0e0f0;">${cfg.icon} ${dept.deptName}</div>
+        ${kpiBadge}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+          <div style="font-size:10px;color:#888;margin-bottom:4px;">${t('kpiPlanned')}</div>
+          ${hasPlan
+            ? `<div style="font-size:14px;font-weight:700;color:#7c3aed;">${dept.plannedH.toFixed(1)}u</div>
+               <div style="font-size:12px;color:#aaa;">${fmtEur(dept.plannedCost)}</div>
+               ${plannedPct !== null ? `<div style="font-size:11px;color:${kpiColor(plannedPct)};margin-top:2px;">${plannedPct.toFixed(1)}% omzet</div>` : ''}`
+            : `<div style="font-size:13px;color:#444;">—</div>`}
+        </div>
+        <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+          <div style="font-size:10px;color:#888;margin-bottom:4px;">${t('kpiClocked')}</div>
+          ${hasClock
+            ? `<div style="font-size:14px;font-weight:700;color:#10b981;">${dept.clockedH.toFixed(1)}u</div>
+               <div style="font-size:12px;color:#aaa;">${fmtEur(dept.clockedCost)}</div>
+               ${clockedPct !== null ? `<div style="font-size:11px;color:${kpiColor(clockedPct)};margin-top:2px;">${clockedPct.toFixed(1)}% omzet</div>` : ''}`
+            : `<div style="font-size:13px;color:#444;">—</div>`}
+        </div>
+      </div>
+      ${barBlock}${revContext}
+    </div>`;
+}
+
+async function renderKpi(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    // Period selector
+    const periodSel = `
+      <div style="display:flex;gap:6px;margin-bottom:16px;">
+        <button onclick="kpiPeriod='dag';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='dag'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiDag')}</button>
+        <button onclick="kpiPeriod='week';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='week'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiWeek')}</button>
+        <button style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;background:#111118;color:#333;cursor:not-allowed;" title="${t('kpiMaandSoon')}">${t('kpiMaand')} ⏳</button>
+      </div>`;
+
+    if (kpiPeriod === 'dag') {
+      // Date nav
+      const kpiNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,-1);renderKpi()">‹</button>
+          <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-kpi')">
+            <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(kpiDate)}</div>
+            <input type="date" id="dp-kpi" value="${kpiDate}" onchange="kpiDate=this.value;renderKpi()" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;pointer-events:none;">
+          </div>
+          <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,1);renderKpi()">›</button>
+        </div>`;
+
+      const [dayD, personnelD, mypos, payter] = await Promise.all([
+        api(`/api/day?date=${kpiDate}`, forceRefresh),
+        api(`/api/personeel?date=${kpiDate}`, forceRefresh).catch(() => ({ departments: [], totals: {} })),
+        api(`/api/mypos?date=${kpiDate}`, forceRefresh).catch(() => null),
+        api(`/api/payter?date=${kpiDate}`, forceRefresh).catch(() => null)
+      ]);
+
+      const depts = personnelD.departments || [];
+      const byRc = dayD.visit?.byReportingCategory || {};
+      const salesByChannel = dayD.sales?.byChannel || {};
+
+      const rollerRev = dayD.visit?.netRevenue || 0;
+      const myposRev  = mypos?.omzetExclBtw || 0;
+      const payterRev = payter?.omzetExclBtw || 0;
+      const totalOmzet = rollerRev + myposRev + payterRev;
+
+      const totP = personnelD.totals || {};
+      const plannedPct = totalOmzet > 0 && totP.plannedCost > 0 ? (totP.plannedCost / totalOmzet * 100) : null;
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, salesByChannel)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      setContent(`
+        ${periodSel}
+        ${kpiNav}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiOmzet')}</div>
+            <div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiPlannedPct')}</div>
+            <div class="kpi-value" style="font-size:15px;color:${kpiColor(plannedPct)};">${plannedPct !== null ? plannedPct.toFixed(1)+'%' : '—'}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiClockedPct')}</div>
+            <div class="kpi-value" style="font-size:15px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
+          </div>
+        </div>
+        <div class="section-title">${t('kpiPerDept')}</div>
+        ${deptCards}
+        ${cacheLabel(dayD)}
+      `);
+
+    } else if (kpiPeriod === 'week') {
+      const data = await api(`/api/kpi-week?offset=${kpiWeekOffset}`, forceRefresh);
+      const depts = data.personeel?.departments || [];
+      const rev = data.revenue || {};
+      const byRc = rev.byReportingCategory || {};
+      const totalOmzet = rev.totalOmzet || 0;
+
+      const totP = data.personeel?.totals || {};
+      const plannedPct = totalOmzet > 0 && totP.plannedCost > 0 ? (totP.plannedCost / totalOmzet * 100) : null;
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+
+      const dates = data.dates || [];
+      const startLabel = dates[0] ? new Date(dates[0]+'T00:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' }) : '';
+      const endLabel   = dates[6] ? new Date(dates[6]+'T00:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' }) : '';
+
+      const weekNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiWeekOffset--;renderKpi()">‹</button>
+          <div class="date-label">${startLabel} – ${endLabel}</div>
+          <button class="nav-btn" onclick="kpiWeekOffset++;renderKpi()">›</button>
+        </div>`;
+
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, null)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      setContent(`
+        ${periodSel}
+        ${weekNav}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiOmzetWeek')}</div>
+            <div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiPlannedPct')}</div>
+            <div class="kpi-value" style="font-size:15px;color:${kpiColor(plannedPct)};">${plannedPct !== null ? plannedPct.toFixed(1)+'%' : '—'}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiClockedPct')}</div>
+            <div class="kpi-value" style="font-size:15px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
+          </div>
+        </div>
+        <div class="section-title">${t('kpiPerDeptWeek')}</div>
+        ${deptCards}
+        ${cacheLabel(data)}
+      `);
+    }
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
