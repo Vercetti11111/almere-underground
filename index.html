@@ -957,9 +957,9 @@ function dateNav(mode = 'day', noPrint = false) {
   return `
     <div ${noPrint ? 'class="no-print"' : ''} style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <button class="nav-btn" onclick="${shiftFn}(-1)">‹</button>
-      <div style="flex:1;text-align:center;position:relative;" onclick="triggerDatePicker('dp-${mode}')">
+      <div style="flex:1;text-align:center;position:relative;">
         <div class="date-label" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">${fmtDateLong(dateStr)}</div>
-        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;opacity:0;width:0;height:0;top:0;left:50%;pointer-events:none;">
+        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;opacity:0;top:0;left:0;width:100%;height:100%;cursor:pointer;">
       </div>
       <button class="nav-btn" onclick="${shiftFn}(1)">›</button>
     </div>`;
