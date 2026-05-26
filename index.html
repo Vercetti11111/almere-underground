@@ -185,6 +185,11 @@ const TRANSLATIONS = {
     myposRevenue: 'Omzet excl. BTW',
     myposVat: 'BTW (21%)',
     myposTrans: 'Betalingen',
+    payterTitle: '🔐 Kluisjes (Payter)',
+    payterSales: 'Verkopen incl. BTW',
+    payterRevenue: 'Omzet excl. BTW',
+    payterVat: 'BTW (21%)',
+    payterTrans: 'Betalingen',
     // Run sheet
     kfTitle: 'Kinderfeestjes (KF)',
     bfTitle: 'Bedrijfsfeesten (BF)',
@@ -260,6 +265,11 @@ const TRANSLATIONS = {
     myposRevenue: 'Revenue excl. VAT',
     myposVat: 'VAT (21%)',
     myposTrans: 'Payments',
+    payterTitle: '🔐 Lockers (Payter)',
+    payterSales: 'Sales incl. VAT',
+    payterRevenue: 'Revenue excl. VAT',
+    payterVat: 'VAT (21%)',
+    payterTrans: 'Payments',
     kfTitle: 'Birthday Parties (KF)',
     bfTitle: 'Corporate Events (BF)',
     booking: 'booking',
@@ -624,13 +634,15 @@ function hourlyBarChart(byHour, color = '#2563eb') {
 async function renderBezoek(forceRefresh = false) {
   setContent(spinner());
   try {
-    const [data, mypos] = await Promise.all([
+    const [data, mypos, payter] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
-      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null)
+      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null)
     ]);
     const { visit } = data;
     const myposRev = mypos?.omzetExclBtw || 0;
-    const totalRev = visit.netRevenue + myposRev;
+    const payterRev = payter?.omzetExclBtw || 0;
+    const totalRev = visit.netRevenue + myposRev + payterRev;
     const avg = visit.visitors > 0 ? totalRev / visit.visitors : 0;
 
     const cats = CAT_ORDER.filter(c => visit.byCategory?.[c]);
@@ -666,6 +678,12 @@ async function renderBezoek(forceRefresh = false) {
       rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + myposRev;
       if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
       rcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'] = { revenue: myposRev, visitors: mypos.transactions || 0 };
+    }
+    if (payterRev > 0) {
+      if (!rcData['Overig']) rcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+      rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + payterRev;
+      if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
+      rcData['Overig'].subcategories['Kluisjes (Payter)'] = { revenue: payterRev, visitors: payter.transactions || 0 };
     }
     const rcEntries = Object.entries(rcData).sort((a,b) => b[1].revenue - a[1].revenue);
     let rcRows = '';
@@ -714,9 +732,12 @@ async function renderBezoek(forceRefresh = false) {
         </div>`;
     });
 
-    // Combine Roller + MyPOS hourly data (both excl BTW)
+    // Combine Roller + MyPOS + Payter hourly data (both excl BTW)
     const visitByHourCombined = Object.assign({}, visit.byHour || {});
     for (const [h, v] of Object.entries(mypos?.byHour || {})) {
+      visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
+    }
+    for (const [h, v] of Object.entries(payter?.byHour || {})) {
       visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
     }
     const hasHourData = Object.keys(visitByHourCombined).length > 0;
@@ -741,15 +762,17 @@ async function renderBezoek(forceRefresh = false) {
 async function renderVerkoop(forceRefresh = false) {
   setContent(spinner());
   try {
-    const [data, mypos] = await Promise.all([
+    const [data, mypos, payter] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
-      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null)
+      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null)
     ]);
     const { sales } = data;
     const myposSalesAmount = mypos?.totalInclBtw || 0;
     const myposRev = mypos?.omzetExclBtw || 0;
-    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount;
-    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0);
+    const payterSalesAmount = payter?.totalInclBtw || 0;
+    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount + payterSalesAmount;
+    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0) + (payter?.transactions || 0);
     const avg = totalTrans > 0 ? grandTotal / totalTrans : 0;
 
     const chEntries = Object.entries(sales.byChannel || {}).sort((a,b) => b[1].revenue - a[1].revenue);
@@ -785,10 +808,28 @@ async function renderVerkoop(forceRefresh = false) {
           <div style="font-size:11px;color:#888;margin-top:2px;">${mypos.transactions} ${t('transactions')} · incl. BTW</div>
         </div>`;
     }
+    if (payterSalesAmount > 0) {
+      const pct = grandTotal > 0 ? Math.round((payterSalesAmount / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#0369a1;">🔐 Kluisjes (Payter)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(payterSalesAmount)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#0369a1;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${payter.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
 
-    // Combine Roller + MyPOS hourly data (both incl BTW for payments)
+    // Combine Roller + MyPOS + Payter hourly data (both incl BTW for payments)
     const salesByHourCombined = Object.assign({}, sales.byHour || {});
     for (const [h, v] of Object.entries(mypos?.byHour || {})) {
+      salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
+    }
+    for (const [h, v] of Object.entries(payter?.byHour || {})) {
       salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
     }
     const hasSalesHourData = Object.keys(salesByHourCombined).length > 0;
