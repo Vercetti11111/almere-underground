@@ -519,7 +519,9 @@ async function renderWeek(forceRefresh = false) {
     let weekTotalVis = 0;
     for (const day of days) {
       const rc = day.visit?.byReportingCategory || {};
-      weekTotalRev += day.visit?.netRevenue || 0;
+      const dayMyposRev = (day.mypos?.omzetExclBtw || 0);
+      const dayPayterRev = (day.payter?.omzetExclBtw || 0);
+      weekTotalRev += (day.visit?.netRevenue || 0) + dayMyposRev + dayPayterRev;
       weekTotalVis += day.visit?.visitors || 0;
       for (const [catName, catData] of Object.entries(rc)) {
         if (!weekRcData[catName]) weekRcData[catName] = { revenue: 0, visitors: 0, subcategories: {} };
@@ -530,6 +532,22 @@ async function renderWeek(forceRefresh = false) {
           weekRcData[catName].subcategories[subName].revenue += subData.revenue || 0;
           weekRcData[catName].subcategories[subName].visitors += subData.visitors || 0;
         }
+      }
+      // MyPOS excl. BTW → Overig subcategorie
+      if (dayMyposRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayMyposRev;
+        if (!weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)']) weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'].revenue += dayMyposRev;
+        weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'].visitors += day.mypos?.aantalBetalingen || 0;
+      }
+      // Payter excl. BTW → Overig subcategorie
+      if (dayPayterRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayPayterRev;
+        if (!weekRcData['Overig'].subcategories['Kluisjes (Payter)']) weekRcData['Overig'].subcategories['Kluisjes (Payter)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Kluisjes (Payter)'].revenue += dayPayterRev;
+        weekRcData['Overig'].subcategories['Kluisjes (Payter)'].visitors += day.payter?.transactions || 0;
       }
     }
     const RC_COLORS_W = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
