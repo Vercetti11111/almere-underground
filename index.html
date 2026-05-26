@@ -1028,7 +1028,7 @@ function dateNav(mode = 'day', noPrint = false) {
       <button class="nav-btn" onclick="${shiftFn}(-1)">‹</button>
       <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-${mode}')">
         <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(dateStr)}</div>
-        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" onclick="event.stopPropagation()" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
+        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;pointer-events:none;">
       </div>
       <button class="nav-btn" onclick="${shiftFn}(1)">›</button>
     </div>`;
