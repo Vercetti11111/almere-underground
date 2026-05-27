@@ -160,8 +160,7 @@ let bmiData = null;
 async function loadBmiData() {
   if (bmiData) return bmiData;
   try {
-    const code = localStorage.getItem('accessCode') || '';
-    const r = await fetch(`${WORKER}/api/bmi`, { headers: { 'X-Access-Code': code } });
+    const r = await fetch(`${WORKER}/api/bmi`, { headers: { 'X-Access-Code': accessCode } });
     bmiData = await r.json();
   } catch(e) { bmiData = {}; }
   return bmiData;
@@ -215,32 +214,32 @@ function bmiComparisonCard(bmiResult, label, currentTotal) {
     let subRows = '';
     for (const [sub, amt] of subEntries) {
       const subPct = v.total > 0 ? (amt/v.total*100).toFixed(0) : 0;
-      subRows += \`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 4px 12px;border-left:2px solid \${color}40;margin-left:4px;">
-        <span style="font-size:11px;color:#aaa;">\${sub}</span>
-        <span style="font-size:11px;color:#aaa;">\${fmtEur(amt)} <span style="color:#666;">\${subPct}%</span></span>
-      </div>\`;
+      subRows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 4px 12px;border-left:2px solid ${color}40;margin-left:4px;">
+        <span style="font-size:11px;color:#aaa;">${sub}</span>
+        <span style="font-size:11px;color:#aaa;">${fmtEur(amt)} <span style="color:#666;">${subPct}%</span></span>
+      </div>`;
     }
-    rows += \`<div style="margin-bottom:10px;">
+    rows += `<div style="margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <div style="display:flex;align-items:center;gap:6px;">
-          <div style="width:8px;height:8px;border-radius:50%;background:\${color};flex-shrink:0;"></div>
-          <span style="font-size:12px;color:#ccc;">\${cat}</span>
+          <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+          <span style="font-size:12px;color:#ccc;">${cat}</span>
         </div>
-        <div style="font-size:12px;font-weight:600;color:#ccc;">\${fmtEur(v.total)} <span style="color:#666;">\${pct}%</span></div>
+        <div style="font-size:12px;font-weight:600;color:#ccc;">${fmtEur(v.total)} <span style="color:#666;">${pct}%</span></div>
       </div>
       <div style="height:4px;background:#333;border-radius:2px;margin-bottom:4px;">
-        <div style="height:4px;background:\${color}80;border-radius:2px;width:\${pct}%;"></div>
+        <div style="height:4px;background:${color}80;border-radius:2px;width:${pct}%;"></div>
       </div>
-      \${subRows}
-    </div>\`;
+      ${subRows}
+    </div>`;
   }
-  return \`<div class="card" style="opacity:0.85;border:1px solid #333;">
+  return `<div class="card" style="opacity:0.85;border:1px solid #333;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div class="section-title" style="margin-bottom:0;">📊 \${label}</div>
-      <div style="font-size:16px;font-weight:700;color:#aaa;">\${fmtEur(total)}\${growthHtml}</div>
+      <div class="section-title" style="margin-bottom:0;">📊 ${label}</div>
+      <div style="font-size:16px;font-weight:700;color:#aaa;">${fmtEur(total)}${growthHtml}</div>
     </div>
-    \${rows}
-  </div>\`;
+    ${rows}
+  </div>`;
 }
 
 // ── Translations ──────────────────────────────────────────────────────────────
