@@ -233,9 +233,25 @@ function weatherBadge(w, small = false) {
   return `<span style="font-size:${fs};color:#aaa;white-space:nowrap;">${w.icon} ${w.max}° / ${w.min}°</span>`;
 }
 
-function bmiComparisonCard(bmiResult, label, currentTotal, weather = null) {
+function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, myposLY = null, payterLY = null) {
   if (!bmiResult) return '';
-  const { total, byCategory } = bmiResult;
+  // Deep-clone to avoid mutating cached data
+  const byCategory = JSON.parse(JSON.stringify(bmiResult.byCategory || {}));
+  // Inject MyPOS + Payter vorig jaar onder Overig
+  const myposExcl = myposLY?.omzetExclBtw || 0;
+  const payterExcl = payterLY?.omzetExclBtw || 0;
+  if (myposExcl > 0 || payterExcl > 0) {
+    if (!byCategory['Overig']) byCategory['Overig'] = { total: 0, subs: {} };
+    if (myposExcl > 0) {
+      byCategory['Overig'].subs['Speelgoed Automaat (MyPOS)'] = (byCategory['Overig'].subs['Speelgoed Automaat (MyPOS)'] || 0) + myposExcl;
+      byCategory['Overig'].total += myposExcl;
+    }
+    if (payterExcl > 0) {
+      byCategory['Overig'].subs['Kluisjes (Payter)'] = (byCategory['Overig'].subs['Kluisjes (Payter)'] || 0) + payterExcl;
+      byCategory['Overig'].total += payterExcl;
+    }
+  }
+  const total = bmiResult.total + myposExcl + payterExcl;
   if (total === 0) return '';
   const growth = currentTotal > 0 ? ((currentTotal - total) / total * 100).toFixed(1) : null;
   const growthHtml = growth !== null
@@ -905,12 +921,14 @@ async function renderBezoek(forceRefresh = false) {
   try {
     await loadBmiData();
     const bmiDatePre = dateMinusYear(selectedDate);
-    const [data, mypos, payter, weatherToday, weatherLastYear] = await Promise.all([
+    const [data, mypos, payter, weatherToday, weatherLastYear, myposLY, payterLY] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
       api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
       fetchWeather(selectedDate).catch(() => null),
-      fetchWeather(bmiDatePre).catch(() => null)
+      fetchWeather(bmiDatePre).catch(() => null),
+      api(`/api/mypos?date=${bmiDatePre}`, false).catch(() => null),
+      api(`/api/payter?date=${bmiDatePre}`, false).catch(() => null)
     ]);
     const { visit } = data;
     const myposRev = mypos?.omzetExclBtw || 0;
@@ -1019,12 +1037,13 @@ async function renderBezoek(forceRefresh = false) {
     const bmiDate = bmiDatePre;
     const bmiDay = bmiForDate(bmiDate);
     const bmiLabelDate = new Date(bmiDate + 'T12:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
-    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear);
+    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear, myposLY, payterLY);
 
-    // Compact BMI totaal vergelijking (kleine tegel)
+    // Compact BMI totaal vergelijking (kleine tegel) — inclusief MyPOS + Payter vorig jaar
+    const bmiTotalLY = (bmiDay?.total || 0) + (myposLY?.omzetExclBtw || 0) + (payterLY?.omzetExclBtw || 0);
     let bmiTotaalHtml = '';
-    if (bmiDay && bmiDay.total > 0) {
-      const g = totalRev > 0 ? ((totalRev - bmiDay.total) / bmiDay.total * 100).toFixed(1) : null;
+    if (bmiTotalLY > 0) {
+      const g = totalRev > 0 ? ((totalRev - bmiTotalLY) / bmiTotalLY * 100).toFixed(1) : null;
       const gColor = g !== null ? (parseFloat(g) >= 0 ? '#22c55e' : '#ef4444') : '#aaa';
       const gArrow = g !== null ? (parseFloat(g) >= 0 ? '↑' : '↓') : '';
       bmiTotaalHtml = `<div class="card" style="padding:10px 14px;margin-bottom:0;">
@@ -1034,7 +1053,7 @@ async function renderBezoek(forceRefresh = false) {
             ${weatherLastYear ? `<span style="font-size:12px;color:#666;">${weatherLastYear.icon} ${weatherLastYear.max}°/${weatherLastYear.min}°</span>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:14px;font-weight:700;color:#aaa;">${fmtEur(bmiDay.total)}</span>
+            <span style="font-size:14px;font-weight:700;color:#aaa;">${fmtEur(bmiTotalLY)}</span>
             ${g !== null ? `<span style="font-size:12px;font-weight:700;color:${gColor};">${gArrow} ${Math.abs(g)}%</span>` : ''}
           </div>
         </div>
