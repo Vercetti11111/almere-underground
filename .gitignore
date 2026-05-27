@@ -1,0 +1,11 @@
+# Cache / generated data (served via Cloudflare Worker)
+data/
+bmi-historical.json
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# OS
+.DS_Store

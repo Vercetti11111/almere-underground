@@ -155,6 +155,94 @@
 // ── Config ────────────────────────────────────────────────────────────────────
 const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
 
+// ── BMI Historical Data ────────────────────────────────────────────────────
+let bmiData = null;
+async function loadBmiData() {
+  if (bmiData) return bmiData;
+  try {
+    const code = localStorage.getItem('accessCode') || '';
+    const r = await fetch(`${WORKER}/api/bmi`, { headers: { 'X-Access-Code': code } });
+    bmiData = await r.json();
+  } catch(e) { bmiData = {}; }
+  return bmiData;
+}
+function bmiForDate(dateStr) {
+  // Returns { total, byCategory } for a given date, or null
+  if (!bmiData || !bmiData[dateStr]) return null;
+  const d = bmiData[dateStr];
+  const total = Object.values(d).reduce((s,c) => s + (c.total||0), 0);
+  return { total, byCategory: d };
+}
+function bmiForDates(dates) {
+  // Aggregate bmi data for a list of date strings
+  if (!bmiData) return null;
+  const agg = {}; let total = 0;
+  for (const dt of dates) {
+    const d = bmiData[dt];
+    if (!d) continue;
+    for (const [cat, v] of Object.entries(d)) {
+      if (!agg[cat]) agg[cat] = { total: 0, subs: {} };
+      agg[cat].total += v.total || 0;
+      total += v.total || 0;
+      for (const [sub, amt] of Object.entries(v.subs || {})) {
+        agg[cat].subs[sub] = (agg[cat].subs[sub] || 0) + amt;
+      }
+    }
+  }
+  return total > 0 ? { total, byCategory: agg } : null;
+}
+function dateMinusYear(dateStr) {
+  // Returns dateStr - 364 days (same weekday last year)
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() - 364);
+  return d.toISOString().slice(0,10);
+}
+function bmiComparisonCard(bmiResult, label, currentTotal) {
+  if (!bmiResult) return '';
+  const { total, byCategory } = bmiResult;
+  if (total === 0) return '';
+  const growth = currentTotal > 0 ? ((currentTotal - total) / total * 100).toFixed(1) : null;
+  const growthHtml = growth !== null
+    ? `<span style="font-size:13px;font-weight:600;color:${parseFloat(growth)>=0?'#22c55e':'#ef4444'};margin-left:8px;">${parseFloat(growth)>=0?'↑':'↓'} ${Math.abs(growth)}%</span>`
+    : '';
+  const RC_COLORS = { 'Activiteiten':'#7c3aed','F&B':'#2563eb','Bedrijfsarrangementen':'#059669','Overig':'#6b7280' };
+  const sorted = Object.entries(byCategory).sort((a,b) => b[1].total - a[1].total).filter(([,v]) => v.total > 0);
+  let rows = '';
+  for (const [cat, v] of sorted) {
+    const pct = total > 0 ? (v.total/total*100).toFixed(1) : 0;
+    const color = RC_COLORS[cat] || '#6b7280';
+    const subEntries = Object.entries(v.subs || {}).sort((a,b)=>b[1]-a[1]).filter(([,s])=>s>0);
+    let subRows = '';
+    for (const [sub, amt] of subEntries) {
+      const subPct = v.total > 0 ? (amt/v.total*100).toFixed(0) : 0;
+      subRows += \`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 4px 12px;border-left:2px solid \${color}40;margin-left:4px;">
+        <span style="font-size:11px;color:#aaa;">\${sub}</span>
+        <span style="font-size:11px;color:#aaa;">\${fmtEur(amt)} <span style="color:#666;">\${subPct}%</span></span>
+      </div>\`;
+    }
+    rows += \`<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:\${color};flex-shrink:0;"></div>
+          <span style="font-size:12px;color:#ccc;">\${cat}</span>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#ccc;">\${fmtEur(v.total)} <span style="color:#666;">\${pct}%</span></div>
+      </div>
+      <div style="height:4px;background:#333;border-radius:2px;margin-bottom:4px;">
+        <div style="height:4px;background:\${color}80;border-radius:2px;width:\${pct}%;"></div>
+      </div>
+      \${subRows}
+    </div>\`;
+  }
+  return \`<div class="card" style="opacity:0.85;border:1px solid #333;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div class="section-title" style="margin-bottom:0;">📊 \${label}</div>
+      <div style="font-size:16px;font-weight:700;color:#aaa;">\${fmtEur(total)}\${growthHtml}</div>
+    </div>
+    \${rows}
+  </div>\`;
+}
+
 // ── Translations ──────────────────────────────────────────────────────────────
 const TRANSLATIONS = {
   nl: {
@@ -662,6 +750,14 @@ async function renderWeek(forceRefresh = false) {
         </div>`;
     }
 
+    // BMI week comparison (same 7 weekdays, 52 weeks ago)
+    await loadBmiData();
+    const bmiWeekDates = days.map(d => dateMinusYear(d.date));
+    const bmiWeek = bmiForDates(bmiWeekDates);
+    const bmiWeekStart = new Date(bmiWeekDates[0] + 'T12:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' });
+    const bmiWeekEnd   = new Date(bmiWeekDates[6] + 'T12:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short', year:'numeric' });
+    const bmiWeekCardHtml = bmiComparisonCard(bmiWeek, `Vorig jaar (${bmiWeekStart} – ${bmiWeekEnd})`, weekTotalRev);
+
     setContent(`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <button class="nav-btn" onclick="shiftWeek(-1)">‹</button>
@@ -683,6 +779,7 @@ async function renderWeek(forceRefresh = false) {
       <div style="background:#1a1a24;border-radius:14px;padding:14px;margin-bottom:16px;">
         ${weekCatRows}
       </div>` : ''}
+      ${bmiWeekCardHtml}
       <div class="section-title">${t('perDayTap')}</div>
       ${dayRows}
       ${cacheLabel(data)}
@@ -874,6 +971,13 @@ async function renderBezoek(forceRefresh = false) {
     }
     const hasHourData = Object.keys(visitByHourCombined).length > 0;
 
+    // BMI historical comparison
+    await loadBmiData();
+    const bmiDate = dateMinusYear(selectedDate);
+    const bmiDay = bmiForDate(bmiDate);
+    const bmiLabelDate = new Date(bmiDate + 'T12:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
+    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev);
+
     setContent(`
       ${dateNav()}
       <div class="info-banner">${t('bannerBezoek')}</div>
@@ -883,6 +987,7 @@ async function renderBezoek(forceRefresh = false) {
         <div class="kpi-card"><div class="kpi-label">${t('avgPer')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
       ${hasHourData ? `<div class="card"><div class="section-title">📈 Omzet per uur</div>${hourlyBarChart(visitByHourCombined, '#2563eb')}</div>` : ''}
+      ${bmiCardHtml}
       ${cats.length ? `<div class="card"><div class="section-title">${t('perCategory')}</div>${catRows}</div>` : ''}
       ${rcEntries.length ? `<div class="card"><div class="section-title">${t('perReportingCat')}</div>${rcRows}</div>` : ''}
       ${cacheLabel(data)}
