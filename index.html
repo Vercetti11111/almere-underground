@@ -1088,7 +1088,7 @@ function dateNav(mode = 'day', noPrint = false) {
       <button class="nav-btn" onclick="${shiftFn}(-1)">‹</button>
       <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-${mode}')">
         <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(dateStr)}</div>
-        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;pointer-events:none;">
+        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
       </div>
       <button class="nav-btn" onclick="${shiftFn}(1)">›</button>
     </div>`;
@@ -1325,9 +1325,8 @@ function kpiColor(pct) {
 
 function renderDeptKpiCard(dept, totalOmzet, byRc, salesByChannel) {
   const cfg = DEPT_KPI[dept.deptName] || { icon: '👤', color: '#6b7280', overhead: true };
-  const hasPlan  = dept.plannedH  > 0;
   const hasClock = dept.clockedH  > 0;
-  if (!hasPlan && !hasClock) return '';
+  if (!hasClock) return '';
 
   // Calculate revenue relevant to this department
   let deptOmzet = null;
@@ -1387,22 +1386,14 @@ function renderDeptKpiCard(dept, totalOmzet, byRc, salesByChannel) {
         <div style="font-size:15px;font-weight:700;color:#e0e0f0;">${cfg.icon} ${dept.deptName}</div>
         ${kpiBadge}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
-          <div style="font-size:10px;color:#888;margin-bottom:4px;">${t('kpiPlanned')}</div>
-          ${hasPlan
-            ? `<div style="font-size:14px;font-weight:700;color:#7c3aed;">${dept.plannedH.toFixed(1)}u</div>
-               <div style="font-size:12px;color:#aaa;">${fmtEur(dept.plannedCost)}</div>
-               ${plannedPct !== null ? `<div style="font-size:11px;color:${kpiColor(plannedPct)};margin-top:2px;">${plannedPct.toFixed(1)}% omzet</div>` : ''}`
-            : `<div style="font-size:13px;color:#444;">—</div>`}
-        </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:8px;">
         <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
           <div style="font-size:10px;color:#888;margin-bottom:4px;">${t('kpiClocked')}</div>
-          ${hasClock
-            ? `<div style="font-size:14px;font-weight:700;color:#10b981;">${dept.clockedH.toFixed(1)}u</div>
-               <div style="font-size:12px;color:#aaa;">${fmtEur(dept.clockedCost)}</div>
-               ${clockedPct !== null ? `<div style="font-size:11px;color:${kpiColor(clockedPct)};margin-top:2px;">${clockedPct.toFixed(1)}% omzet</div>` : ''}`
-            : `<div style="font-size:13px;color:#444;">—</div>`}
+          <div style="display:flex;align-items:baseline;gap:12px;">
+            <div style="font-size:14px;font-weight:700;color:#10b981;">${dept.clockedH.toFixed(1)}u</div>
+            <div style="font-size:12px;color:#aaa;">${fmtEur(dept.clockedCost)}</div>
+            ${clockedPct !== null ? `<div style="font-size:11px;color:${kpiColor(clockedPct)};margin-left:auto;">${clockedPct.toFixed(1)}% omzet</div>` : ''}
+          </div>
         </div>
       </div>
       ${barBlock}${revContext}
@@ -1427,7 +1418,7 @@ async function renderKpi(forceRefresh = false) {
           <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,-1);renderKpi()">‹</button>
           <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-kpi')">
             <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(kpiDate)}</div>
-            <input type="date" id="dp-kpi" value="${kpiDate}" onchange="kpiDate=this.value;renderKpi()" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;pointer-events:none;">
+            <input type="date" id="dp-kpi" value="${kpiDate}" onchange="kpiDate=this.value;renderKpi()" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
           </div>
           <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,1);renderKpi()">›</button>
         </div>`;
@@ -1458,18 +1449,14 @@ async function renderKpi(forceRefresh = false) {
       setContent(`
         ${periodSel}
         ${kpiNav}
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
           <div class="kpi-card">
             <div class="kpi-label">${t('kpiOmzet')}</div>
             <div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">${t('kpiPlannedPct')}</div>
-            <div class="kpi-value" style="font-size:15px;color:${kpiColor(plannedPct)};">${plannedPct !== null ? plannedPct.toFixed(1)+'%' : '—'}</div>
-          </div>
-          <div class="kpi-card">
             <div class="kpi-label">${t('kpiClockedPct')}</div>
-            <div class="kpi-value" style="font-size:15px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
+            <div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
           </div>
         </div>
         <div class="section-title">${t('kpiPerDept')}</div>
@@ -1505,18 +1492,14 @@ async function renderKpi(forceRefresh = false) {
       setContent(`
         ${periodSel}
         ${weekNav}
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
           <div class="kpi-card">
             <div class="kpi-label">${t('kpiOmzetWeek')}</div>
             <div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">${t('kpiPlannedPct')}</div>
-            <div class="kpi-value" style="font-size:15px;color:${kpiColor(plannedPct)};">${plannedPct !== null ? plannedPct.toFixed(1)+'%' : '—'}</div>
-          </div>
-          <div class="kpi-card">
             <div class="kpi-label">${t('kpiClockedPct')}</div>
-            <div class="kpi-value" style="font-size:15px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
+            <div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
           </div>
         </div>
         <div class="section-title">${t('kpiPerDeptWeek')}</div>
