@@ -1326,6 +1326,7 @@ function kpiColor(pct) {
 function renderDeptKpiCard(dept, totalOmzet, byRc, salesByChannel) {
   const cfg = DEPT_KPI[dept.deptName] || { icon: '👤', color: '#6b7280', overhead: true };
   const hasClock = dept.clockedH  > 0;
+  const hasPlan  = dept.plannedH  > 0;
   if (!hasClock) return '';
 
   // Calculate revenue relevant to this department
