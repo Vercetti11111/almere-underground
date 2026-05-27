@@ -196,7 +196,44 @@ function dateMinusYear(dateStr) {
   d.setDate(d.getDate() - 364);
   return d.toISOString().slice(0,10);
 }
-function bmiComparisonCard(bmiResult, label, currentTotal) {
+
+// ── Weather (Open-Meteo, free, no key) ────────────────────────────────────────
+const WMO_ICONS = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
+  45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌦️',
+  61:'🌧️', 63:'🌧️', 65:'🌧️',
+  71:'❄️', 73:'❄️', 75:'❄️', 77:'🌨️',
+  80:'🌧️', 81:'🌧️', 82:'⛈️',
+  85:'❄️', 86:'❄️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️'
+};
+function wmoIcon(code) { return WMO_ICONS[code] || '🌡️'; }
+const _weatherCache = {};
+async function fetchWeather(dateStr) {
+  if (_weatherCache[dateStr] !== undefined) return _weatherCache[dateStr];
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const isArchive = dateStr < today;
+    const base = isArchive
+      ? 'https://archive-api.open-meteo.com/v1/archive'
+      : 'https://api.open-meteo.com/v1/forecast';
+    const url = `${base}?latitude=52.37&longitude=5.22&daily=weathercode,temperature_2m_max,temperature_2m_min&start_date=${dateStr}&end_date=${dateStr}&timezone=Europe%2FAmsterdam`;
+    const r = await fetch(url);
+    const d = await r.json();
+    if (!d.daily?.weathercode?.length) { _weatherCache[dateStr] = null; return null; }
+    const w = { icon: wmoIcon(d.daily.weathercode[0]), max: Math.round(d.daily.temperature_2m_max[0]), min: Math.round(d.daily.temperature_2m_min[0]) };
+    _weatherCache[dateStr] = w;
+    return w;
+  } catch(e) { _weatherCache[dateStr] = null; return null; }
+}
+function weatherBadge(w, small = false) {
+  if (!w) return '';
+  const fs = small ? '11px' : '13px';
+  return `<span style="font-size:${fs};color:#aaa;white-space:nowrap;">${w.icon} ${w.max}° / ${w.min}°</span>`;
+}
+
+function bmiComparisonCard(bmiResult, label, currentTotal, weather = null) {
   if (!bmiResult) return '';
   const { total, byCategory } = bmiResult;
   if (total === 0) return '';
@@ -204,6 +241,7 @@ function bmiComparisonCard(bmiResult, label, currentTotal) {
   const growthHtml = growth !== null
     ? `<span style="font-size:13px;font-weight:600;color:${parseFloat(growth)>=0?'#22c55e':'#ef4444'};margin-left:8px;">${parseFloat(growth)>=0?'↑':'↓'} ${Math.abs(growth)}%</span>`
     : '';
+  const weatherHtml = weather ? `<span style="font-size:12px;color:#888;margin-left:8px;">${weather.icon} ${weather.max}°/${weather.min}°</span>` : '';
   const RC_COLORS = { 'Activiteiten':'#7c3aed','F&B':'#2563eb','Bedrijfsarrangementen':'#059669','Overig':'#6b7280' };
   const sorted = Object.entries(byCategory).sort((a,b) => b[1].total - a[1].total).filter(([,v]) => v.total > 0);
   let rows = '';
@@ -235,7 +273,10 @@ function bmiComparisonCard(bmiResult, label, currentTotal) {
   }
   return `<div class="card" style="opacity:0.85;border:1px solid #333;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div class="section-title" style="margin-bottom:0;">📊 ${label}</div>
+      <div>
+        <div class="section-title" style="margin-bottom:0;">📊 ${label}</div>
+        ${weatherHtml}
+      </div>
       <div style="font-size:16px;font-weight:700;color:#aaa;">${fmtEur(total)}${growthHtml}</div>
     </div>
     ${rows}
@@ -862,10 +903,14 @@ function hourlyBarChart(byHour, color = '#2563eb') {
 async function renderBezoek(forceRefresh = false) {
   setContent(spinner());
   try {
-    const [data, mypos, payter] = await Promise.all([
+    await loadBmiData();
+    const bmiDatePre = dateMinusYear(selectedDate);
+    const [data, mypos, payter, weatherToday, weatherLastYear] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
-      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null)
+      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
+      fetchWeather(selectedDate).catch(() => null),
+      fetchWeather(bmiDatePre).catch(() => null)
     ]);
     const { visit } = data;
     const myposRev = mypos?.omzetExclBtw || 0;
@@ -971,24 +1016,50 @@ async function renderBezoek(forceRefresh = false) {
     const hasHourData = Object.keys(visitByHourCombined).length > 0;
 
     // BMI historical comparison
-    await loadBmiData();
-    const bmiDate = dateMinusYear(selectedDate);
+    const bmiDate = bmiDatePre;
     const bmiDay = bmiForDate(bmiDate);
     const bmiLabelDate = new Date(bmiDate + 'T12:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
-    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev);
+    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear);
+
+    // Compact BMI totaal vergelijking (kleine tegel)
+    let bmiTotaalHtml = '';
+    if (bmiDay && bmiDay.total > 0) {
+      const g = totalRev > 0 ? ((totalRev - bmiDay.total) / bmiDay.total * 100).toFixed(1) : null;
+      const gColor = g !== null ? (parseFloat(g) >= 0 ? '#22c55e' : '#ef4444') : '#aaa';
+      const gArrow = g !== null ? (parseFloat(g) >= 0 ? '↑' : '↓') : '';
+      bmiTotaalHtml = `<div class="card" style="padding:10px 14px;margin-bottom:0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#888;">📊 Vorig jaar (${bmiLabelDate})</span>
+            ${weatherLastYear ? `<span style="font-size:12px;color:#666;">${weatherLastYear.icon} ${weatherLastYear.max}°/${weatherLastYear.min}°</span>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:14px;font-weight:700;color:#aaa;">${fmtEur(bmiDay.total)}</span>
+            ${g !== null ? `<span style="font-size:12px;font-weight:700;color:${gColor};">${gArrow} ${Math.abs(g)}%</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // Vandaag weer badge
+    const todayWeatherHtml = weatherToday
+      ? `<div style="text-align:center;font-size:13px;color:#888;margin-bottom:6px;">${weatherToday.icon} ${weatherToday.max}° / ${weatherToday.min}°</div>`
+      : '';
 
     setContent(`
       ${dateNav()}
+      ${todayWeatherHtml}
       <div class="info-banner">${t('bannerBezoek')}</div>
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">${t('revenue')}</div><div class="kpi-value">${fmtEur(totalRev)}</div></div>
         <div class="kpi-card"><div class="kpi-label">${t('visitors')}</div><div class="kpi-value">${visit.visitors.toLocaleString(locale())}</div></div>
         <div class="kpi-card"><div class="kpi-label">${t('avgPer')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
+      ${bmiTotaalHtml}
       ${hasHourData ? `<div class="card"><div class="section-title">📈 Omzet per uur</div>${hourlyBarChart(visitByHourCombined, '#2563eb')}</div>` : ''}
-      ${bmiCardHtml}
       ${cats.length ? `<div class="card"><div class="section-title">${t('perCategory')}</div>${catRows}</div>` : ''}
       ${rcEntries.length ? `<div class="card"><div class="section-title">${t('perReportingCat')}</div>${rcRows}</div>` : ''}
+      ${bmiCardHtml}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
