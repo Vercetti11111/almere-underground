@@ -233,7 +233,7 @@ function weatherBadge(w, small = false) {
   return `<span style="font-size:${fs};color:#aaa;white-space:nowrap;">${w.icon} ${w.max}° / ${w.min}°</span>`;
 }
 
-function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, myposLY = null, payterLY = null) {
+function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, myposLY = null, payterLY = null, nayaxLY = null) {
   if (!bmiResult) return '';
   // Deep-clone to avoid mutating cached data
   const byCategory = JSON.parse(JSON.stringify(bmiResult.byCategory || {}));
@@ -251,7 +251,21 @@ function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, mypos
       byCategory['Overig'].total += payterExcl;
     }
   }
-  const total = bmiResult.total + myposExcl + payterExcl;
+  // Inject Nayax (Photobooths) vorig jaar onder Overig
+  const nayaxPhotoExcl = nayaxLY?.photobooth?.omzetExclBtw || 0;
+  const nayaxSpiegelExcl = nayaxLY?.spiegel?.omzetExclBtw || 0;
+  if (nayaxPhotoExcl > 0 || nayaxSpiegelExcl > 0) {
+    if (!byCategory['Overig']) byCategory['Overig'] = { total: 0, subs: {} };
+    if (nayaxPhotoExcl > 0) {
+      byCategory['Overig'].subs['Photobooth Wit (Nayax)'] = (byCategory['Overig'].subs['Photobooth Wit (Nayax)'] || 0) + nayaxPhotoExcl;
+      byCategory['Overig'].total += nayaxPhotoExcl;
+    }
+    if (nayaxSpiegelExcl > 0) {
+      byCategory['Overig'].subs['Spiegel Booth (Nayax)'] = (byCategory['Overig'].subs['Spiegel Booth (Nayax)'] || 0) + nayaxSpiegelExcl;
+      byCategory['Overig'].total += nayaxSpiegelExcl;
+    }
+  }
+  const total = bmiResult.total + myposExcl + payterExcl + nayaxPhotoExcl + nayaxSpiegelExcl;
   if (total === 0) return '';
   const growth = currentTotal > 0 ? ((currentTotal - total) / total * 100).toFixed(1) : null;
   const growthHtml = growth !== null
@@ -338,6 +352,13 @@ const TRANSLATIONS = {
     payterRevenue: 'Omzet excl. BTW',
     payterVat: 'BTW (21%)',
     payterTrans: 'Betalingen',
+    nayaxTitle: '📸 Photobooths (Nayax)',
+    nayaxPhotoTitle: '📸 Photobooth Wit (Nayax)',
+    nayaxSpiegelTitle: '🪞 Spiegel Booth (Nayax)',
+    nayaxSales: 'Verkopen incl. BTW',
+    nayaxRevenue: 'Omzet excl. BTW',
+    nayaxVat: 'BTW (21%)',
+    nayaxTrans: 'Betalingen',
     // Run sheet
     kfTitle: 'Kinderfeestjes (KF)',
     bfTitle: 'Bedrijfsfeesten (BF)',
@@ -444,6 +465,13 @@ const TRANSLATIONS = {
     payterRevenue: 'Revenue excl. VAT',
     payterVat: 'VAT (21%)',
     payterTrans: 'Payments',
+    nayaxTitle: '📸 Photobooths (Nayax)',
+    nayaxPhotoTitle: '📸 Photobooth Wit (Nayax)',
+    nayaxSpiegelTitle: '🪞 Spiegel Booth (Nayax)',
+    nayaxSales: 'Sales incl. VAT',
+    nayaxRevenue: 'Revenue excl. VAT',
+    nayaxVat: 'VAT (21%)',
+    nayaxTrans: 'Payments',
     kfTitle: 'Birthday Parties (KF)',
     bfTitle: 'Corporate Events (BF)',
     booking: 'booking',
@@ -753,6 +781,25 @@ async function renderWeek(forceRefresh = false) {
         weekRcData['Overig'].subcategories['Kluisjes (Payter)'].revenue += dayPayterRev;
         weekRcData['Overig'].subcategories['Kluisjes (Payter)'].visitors += day.payter?.transactions || 0;
       }
+      // Nayax excl. BTW → Overig subcategorieën (Photobooth Wit + Spiegel Booth)
+      const dayNayaxPhotoRev = day.nayax?.photobooth?.omzetExclBtw || 0;
+      const dayNayaxSpiegelRev = day.nayax?.spiegel?.omzetExclBtw || 0;
+      if (dayNayaxPhotoRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayNayaxPhotoRev;
+        weekTotalRev += dayNayaxPhotoRev;
+        if (!weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)']) weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)'].revenue += dayNayaxPhotoRev;
+        weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)'].visitors += day.nayax?.photobooth?.transactions || 0;
+      }
+      if (dayNayaxSpiegelRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayNayaxSpiegelRev;
+        weekTotalRev += dayNayaxSpiegelRev;
+        if (!weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)']) weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'].revenue += dayNayaxSpiegelRev;
+        weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'].visitors += day.nayax?.spiegel?.transactions || 0;
+      }
     }
     const RC_COLORS_W = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
     const weekRcEntries = Object.entries(weekRcData).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,d]) => d.revenue > 0);
@@ -921,19 +968,22 @@ async function renderBezoek(forceRefresh = false) {
   try {
     await loadBmiData();
     const bmiDatePre = dateMinusYear(selectedDate);
-    const [data, mypos, payter, weatherToday, weatherLastYear, myposLY, payterLY] = await Promise.all([
+    const [data, mypos, payter, nayax, weatherToday, weatherLastYear, myposLY, payterLY, nayaxLY] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
       api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null),
       fetchWeather(selectedDate).catch(() => null),
       fetchWeather(bmiDatePre).catch(() => null),
       api(`/api/mypos?date=${bmiDatePre}`, false).catch(() => null),
-      api(`/api/payter?date=${bmiDatePre}`, false).catch(() => null)
+      api(`/api/payter?date=${bmiDatePre}`, false).catch(() => null),
+      api(`/api/nayax?date=${bmiDatePre}`, false).catch(() => null)
     ]);
     const { visit } = data;
     const myposRev = mypos?.omzetExclBtw || 0;
     const payterRev = payter?.omzetExclBtw || 0;
-    const totalRev = visit.netRevenue + myposRev + payterRev;
+    const nayaxRev = nayax?.omzetExclBtw || 0;
+    const totalRev = visit.netRevenue + myposRev + payterRev + nayaxRev;
     const avg = visit.visitors > 0 ? totalRev / visit.visitors : 0;
 
     const cats = CAT_ORDER.filter(c => visit.byCategory?.[c]);
@@ -975,6 +1025,20 @@ async function renderBezoek(forceRefresh = false) {
       rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + payterRev;
       if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
       rcData['Overig'].subcategories['Kluisjes (Payter)'] = { revenue: payterRev, visitors: payter.transactions || 0 };
+    }
+    if (nayax?.photobooth?.omzetExclBtw > 0 || nayax?.spiegel?.omzetExclBtw > 0) {
+      if (!rcData['Overig']) rcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+      if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
+      const photoRev = nayax?.photobooth?.omzetExclBtw || 0;
+      const spiegelRev = nayax?.spiegel?.omzetExclBtw || 0;
+      if (photoRev > 0) {
+        rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + photoRev;
+        rcData['Overig'].subcategories['Photobooth Wit (Nayax)'] = { revenue: photoRev, visitors: nayax.photobooth.transactions || 0 };
+      }
+      if (spiegelRev > 0) {
+        rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + spiegelRev;
+        rcData['Overig'].subcategories['Spiegel Booth (Nayax)'] = { revenue: spiegelRev, visitors: nayax.spiegel.transactions || 0 };
+      }
     }
     const rcEntries = Object.entries(rcData).sort((a,b) => b[1].revenue - a[1].revenue);
     let rcRows = '';
@@ -1031,13 +1095,16 @@ async function renderBezoek(forceRefresh = false) {
     for (const [h, v] of Object.entries(payter?.byHour || {})) {
       visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
     }
+    for (const [h, v] of Object.entries(nayax?.byHour || {})) {
+      visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
+    }
     const hasHourData = Object.keys(visitByHourCombined).length > 0;
 
     // BMI historical comparison
     const bmiDate = bmiDatePre;
     const bmiDay = bmiForDate(bmiDate);
     const bmiLabelDate = new Date(bmiDate + 'T12:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
-    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear, myposLY, payterLY);
+    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear, myposLY, payterLY, nayaxLY);
 
     // Compact BMI totaal vergelijking (kleine tegel) — inclusief MyPOS + Payter vorig jaar
     const bmiTotalLY = (bmiDay?.total || 0) + (myposLY?.omzetExclBtw || 0) + (payterLY?.omzetExclBtw || 0);
@@ -1088,17 +1155,19 @@ async function renderBezoek(forceRefresh = false) {
 async function renderVerkoop(forceRefresh = false) {
   setContent(spinner());
   try {
-    const [data, mypos, payter] = await Promise.all([
+    const [data, mypos, payter, nayax] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
-      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null)
+      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null)
     ]);
     const { sales } = data;
     const myposSalesAmount = mypos?.totalInclBtw || 0;
     const myposRev = mypos?.omzetExclBtw || 0;
     const payterSalesAmount = payter?.totalInclBtw || 0;
-    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount + payterSalesAmount;
-    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0) + (payter?.transactions || 0);
+    const nayaxSalesAmount = nayax?.totalInclBtw || 0;
+    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount + payterSalesAmount + nayaxSalesAmount;
+    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0) + (payter?.transactions || 0) + (nayax?.transactions || 0);
     const avg = totalTrans > 0 ? grandTotal / totalTrans : 0;
 
     const chEntries = Object.entries(sales.byChannel || {}).sort((a,b) => b[1].revenue - a[1].revenue);
@@ -1150,12 +1219,49 @@ async function renderVerkoop(forceRefresh = false) {
         </div>`;
     }
 
+    // Nayax Photobooth Wit
+    const nayaxPhotoSales = nayax?.photobooth?.totalInclBtw || 0;
+    if (nayaxPhotoSales > 0) {
+      const pct = grandTotal > 0 ? Math.round((nayaxPhotoSales / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#b45309;">📸 Photobooth Wit (Nayax)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(nayaxPhotoSales)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#b45309;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${nayax.photobooth.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
+    // Nayax Spiegel Booth
+    const nayaxSpiegelSales = nayax?.spiegel?.totalInclBtw || 0;
+    if (nayaxSpiegelSales > 0) {
+      const pct = grandTotal > 0 ? Math.round((nayaxSpiegelSales / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#d97706;">🪞 Spiegel Booth (Nayax)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(nayaxSpiegelSales)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#d97706;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${nayax.spiegel.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
     // Combine Roller + MyPOS + Payter hourly data (both incl BTW for payments)
     const salesByHourCombined = Object.assign({}, sales.byHour || {});
     for (const [h, v] of Object.entries(mypos?.byHour || {})) {
       salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
     }
     for (const [h, v] of Object.entries(payter?.byHour || {})) {
+      salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
+    }
+    for (const [h, v] of Object.entries(nayax?.byHour || {})) {
       salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
     }
     const hasSalesHourData = Object.keys(salesByHourCombined).length > 0;
@@ -1169,7 +1275,7 @@ async function renderVerkoop(forceRefresh = false) {
         <div class="kpi-card"><div class="kpi-label">${t('avgTrans')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
       </div>
       ${hasSalesHourData ? `<div class="card"><div class="section-title">💳 Betalingen per uur</div>${hourlyBarChart(salesByHourCombined, '#059669')}</div>` : ''}
-      ${chEntries.length || myposSalesAmount > 0 ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
+      ${chEntries.length || myposSalesAmount > 0 || nayaxSalesAmount > 0 ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
