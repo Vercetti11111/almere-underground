@@ -687,9 +687,11 @@ let persDate = todayStr();
 let expandedDept = null;
 
 // KPI tab state
-let kpiPeriod = 'dag'; // 'dag' | 'week'
+let kpiPeriod = 'dag'; // 'dag' | 'week' | 'maand'
 let kpiDate = todayStr();
 let kpiWeekOffset = 0;
+let kpiMonthYear = new Date().getFullYear();
+let kpiMonth = new Date().getMonth() + 1; // 1-12
 
 // Controle tab state
 let controleMode = 'dag'; // 'dag' | 'week'
@@ -1936,7 +1938,7 @@ async function renderKpi(forceRefresh = false) {
       <div style="display:flex;gap:6px;margin-bottom:16px;">
         <button onclick="kpiPeriod='dag';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='dag'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiDag')}</button>
         <button onclick="kpiPeriod='week';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='week'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiWeek')}</button>
-        <button style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;background:#111118;color:#333;cursor:not-allowed;" title="${t('kpiMaandSoon')}">${t('kpiMaand')} ⏳</button>
+        <button onclick="kpiPeriod='maand';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='maand'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiMaand')}</button>
       </div>`;
 
     if (kpiPeriod === 'dag') {
@@ -2031,6 +2033,55 @@ async function renderKpi(forceRefresh = false) {
           </div>
         </div>
         <div class="section-title">${t('kpiPerDeptWeek')}</div>
+        ${deptCards}
+        ${cacheLabel(data)}
+      `);
+
+    } else if (kpiPeriod === 'maand') {
+      const monthNames = lang === 'en'
+        ? ['January','February','March','April','May','June','July','August','September','October','November','December']
+        : ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+
+      const monthNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiMonth--;if(kpiMonth<1){kpiMonth=12;kpiMonthYear--;}renderKpi()">‹</button>
+          <div class="date-label">${monthNames[kpiMonth - 1]} ${kpiMonthYear}</div>
+          <button class="nav-btn" onclick="kpiMonth++;if(kpiMonth>12){kpiMonth=1;kpiMonthYear++;}renderKpi()">›</button>
+        </div>`;
+
+      const data = await api(`/api/kpi-month?year=${kpiMonthYear}&month=${kpiMonth}`, forceRefresh);
+      const rev = data.revenue || {};
+      const byRc = rev.byReportingCategory || {};
+      const totalOmzet = rev.totalOmzet || 0;
+      const daysWithData = data.daysWithData || 0;
+      const totalDays = data.totalDays || 0;
+
+      const totP = data.personeel?.totals || {};
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+
+      const depts = data.personeel?.departments || [];
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, null)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      const dataCoverage = daysWithData < totalDays
+        ? `<div style="text-align:center;font-size:11px;color:#888;margin-bottom:12px;">📊 ${daysWithData}/${totalDays} ${lang === 'en' ? 'days with data' : 'dagen met data'}</div>`
+        : '';
+
+      setContent(`
+        ${periodSel}
+        ${monthNav}
+        ${dataCoverage}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">${lang === 'en' ? '💰 Revenue month' : '💰 Omzet maand'}</div>
+            <div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiClockedPct')}</div>
+            <div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
+          </div>
+        </div>
+        <div class="section-title">${lang === 'en' ? '🏢 Per department — month' : '🏢 Per afdeling — maand'}</div>
         ${deptCards}
         ${cacheLabel(data)}
       `);
