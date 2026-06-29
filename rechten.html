@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Gebruikersrechten — Almere Underground</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { display: none; }
+    body { margin: 0; background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    
+    .container { max-width: 520px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+    
+    /* Top bar */
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .back-link { color: #6366f1; text-decoration: none; font-size: 14px; font-weight: 600; }
+    .top-bar-right { display: flex; gap: 8px; align-items: center; }
+    #lang-select { background: #1a1a24; border: 1px solid #2a2a38; color: #f1f1f5; border-radius: 8px; padding: 5px 8px; font-size: 13px; cursor: pointer; }
+    
+    .page-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+    .page-subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+    
+    /* Role cards */
+    .role-card {
+      background: #1a1a24; border: 1px solid #2a2a38; border-radius: 14px;
+      padding: 16px; margin-bottom: 12px;
+    }
+    .role-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .role-name { font-weight: 700; font-size: 15px; }
+    .role-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+    }
+    .role-badge.admin { background: #6366f120; color: #818cf8; }
+    .role-badge.manager { background: #22c55e20; color: #4ade80; }
+    .role-badge.operations { background: #f59e0b20; color: #fbbf24; }
+    .role-badge.custom { background: #64748b20; color: #94a3b8; }
+    
+    .role-code { font-size: 13px; color: #888; margin-bottom: 8px; }
+    .role-code code {
+      background: #2a2a38; padding: 2px 8px; border-radius: 4px;
+      font-family: monospace; color: #f1f1f5; letter-spacing: 1px;
+    }
+    
+    .role-pages { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .page-tag {
+      font-size: 11px; background: #2a2a38; color: #aaa; padding: 3px 8px;
+      border-radius: 6px;
+    }
+    
+    .role-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-sm {
+      background: none; border: 1px solid #333; color: #888; border-radius: 8px;
+      padding: 5px 12px; font-size: 12px; cursor: pointer;
+    }
+    .btn-sm:active { background: #2a2a38; }
+    .btn-sm.danger { border-color: #ef444450; color: #ef4444; }
+    .btn-sm.danger:active { background: #ef444420; }
+    
+    /* Add button */
+    .add-btn {
+      width: 100%; background: #6366f1; border: none; border-radius: 12px;
+      color: white; padding: 14px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+    }
+    .add-btn:active { opacity: 0.8; }
+    
+    /* Modal */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .modal {
+      background: #1a1a24; border: 1px solid #2a2a38; border-radius: 16px;
+      padding: 24px; width: 100%; max-width: 400px;
+    }
+    .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
+    
+    .form-group { margin-bottom: 14px; }
+    .form-label { font-size: 12px; color: #888; font-weight: 600; margin-bottom: 4px; display: block; }
+    .form-input {
+      width: 100%; background: #0f0f13; border: 1px solid #2a2a38; color: #f1f1f5;
+      border-radius: 10px; padding: 10px 12px; font-size: 14px; outline: none;
+    }
+    .form-input:focus { border-color: #6366f1; }
+    .form-select {
+      width: 100%; background: #0f0f13; border: 1px solid #2a2a38; color: #f1f1f5;
+      border-radius: 10px; padding: 10px 12px; font-size: 14px; cursor: pointer;
+    }
+    
+    .checkbox-group { display: flex; flex-direction: column; gap: 8px; }
+    .checkbox-item {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;
+    }
+    .checkbox-item input { accent-color: #6366f1; width: 16px; height: 16px; cursor: pointer; }
+    
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-btn {
+      flex: 1; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700;
+      cursor: pointer; border: none;
+    }
+    .modal-btn.cancel { background: #2a2a38; color: #888; }
+    .modal-btn.save { background: #6366f1; color: white; }
+    .modal-btn:active { opacity: 0.8; }
+    
+    .hidden { display: none !important; }
+    
+    /* Login */
+    .login-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #0f0f13; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-box { text-align: center; width: 100%; max-width: 360px; padding: 16px; }
+    .login-box .logo { font-size: 64px; margin-bottom: 12px; }
+    .login-box .title { font-size: 24px; font-weight: 800; margin-bottom: 32px; }
+    .login-input {
+      width: 100%; background: #1a1a24; border: 1px solid #2a2a38;
+      color: #f1f1f5; border-radius: 12px; padding: 14px 16px;
+      font-size: 16px; text-align: center; letter-spacing: 3px;
+      font-weight: 700; outline: none; margin-bottom: 12px;
+    }
+    .login-input:focus { border-color: #6366f1; }
+    .login-input.error { border-color: #ef4444; animation: shake 0.4s; }
+    @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+    .login-btn {
+      width: 100%; background: #6366f1; border: none; border-radius: 12px;
+      color: white; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .login-btn:active { opacity: 0.8; }
+    .login-btn:disabled { opacity: 0.5; }
+    .login-error { color: #ef4444; font-size: 13px; margin-top: 12px; }
+    .access-denied { color: #ef4444; font-size: 14px; margin-top: 12px; }
+    
+    .empty-state { text-align: center; padding: 40px 0; color: #555; }
+    
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #22c55e; color: white; padding: 10px 24px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; z-index: 300;
+      animation: fadeInUp 0.3s;
+    }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
+  </style>
+</head>
+<body>
+  <!-- Login -->
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-box">
+      <div class="logo">🔐</div>
+      <div class="title" id="login-title">Admin Login</div>
+      <input type="text" class="login-input" id="login-code" placeholder="••••••" autocomplete="off" autocapitalize="characters" />
+      <button class="login-btn" id="login-btn" onclick="doLogin()">Inloggen</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="container hidden" id="main-content">
+    <div class="top-bar">
+      <a href="index.html" class="back-link" id="back-link">← Menu</a>
+      <div class="top-bar-right">
+        <select id="lang-select" onchange="setLang(this.value)">
+          <option value="nl">🇳🇱 NL</option>
+          <option value="en">🇬🇧 EN</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="page-title" id="page-title">Gebruikersrechten</div>
+    <div class="page-subtitle" id="page-subtitle">Beheer toegangscodes en rollen</div>
+    
+    <div id="roles-list"></div>
+    
+    <button class="add-btn" id="add-btn" onclick="openModal()">+ Nieuwe gebruiker</button>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal-overlay hidden" id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <div class="modal-title" id="modal-title">Nieuwe gebruiker</div>
+      
+      <div class="form-group">
+        <label class="form-label" id="lbl-name">Naam</label>
+        <input class="form-input" id="inp-name" placeholder="bijv. Operations Team" />
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" id="lbl-code">Toegangscode</label>
+        <input class="form-input" id="inp-code" placeholder="bijv. OPS2026" style="text-transform:uppercase;letter-spacing:2px;font-weight:700;" />
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" id="lbl-role">Rol</label>
+        <select class="form-select" id="inp-role">
+          <option value="admin">Admin</option>
+          <option value="manager">Manager</option>
+          <option value="operations">Operations</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" id="lbl-pages">Paginatoegang</label>
+        <div class="checkbox-group" id="pages-checkboxes">
+          <label class="checkbox-item"><input type="checkbox" value="dashboard" /> 📊 Omzet Dashboard</label>
+          <label class="checkbox-item"><input type="checkbox" value="runsheet" /> 📋 Run Sheet</label>
+          <label class="checkbox-item"><input type="checkbox" value="openstaand" /> 💰 Openstaande Posten</label>
+          <label class="checkbox-item"><input type="checkbox" value="rechten" /> 🔐 Gebruikersrechten</label>
+        </div>
+      </div>
+      
+      <div class="modal-actions">
+        <button class="modal-btn cancel" onclick="closeModal()" id="btn-cancel">Annuleren</button>
+        <button class="modal-btn save" onclick="saveRole()" id="btn-save">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
+
+const TR = {
+  nl: {
+    pageTitle: 'Gebruikersrechten',
+    pageSub: 'Beheer toegangscodes en rollen',
+    addBtn: '+ Nieuwe gebruiker',
+    modalTitleNew: 'Nieuwe gebruiker',
+    modalTitleEdit: 'Gebruiker bewerken',
+    lblName: 'Naam', lblCode: 'Toegangscode', lblRole: 'Rol', lblPages: 'Paginatoegang',
+    cancel: 'Annuleren', save: 'Opslaan',
+    edit: 'Bewerken', delete: 'Verwijderen',
+    confirmDelete: 'Weet je zeker dat je deze gebruiker wilt verwijderen?',
+    saved: '✅ Opgeslagen', deleted: '🗑️ Verwijderd',
+    back: '← Menu',
+    loginTitle: 'Admin Login',
+    loginBtn: 'Inloggen',
+    noAdmin: 'Alleen admins hebben toegang',
+    pageDashboard: '📊 Omzet Dashboard', pageRunsheet: '📋 Run Sheet',
+    pageOpenstaand: '💰 Openstaande Posten', pageRechten: '🔐 Gebruikersrechten',
+  },
+  en: {
+    pageTitle: 'User Permissions',
+    pageSub: 'Manage access codes and roles',
+    addBtn: '+ New user',
+    modalTitleNew: 'New user',
+    modalTitleEdit: 'Edit user',
+    lblName: 'Name', lblCode: 'Access code', lblRole: 'Role', lblPages: 'Page access',
+    cancel: 'Cancel', save: 'Save',
+    edit: 'Edit', delete: 'Delete',
+    confirmDelete: 'Are you sure you want to delete this user?',
+    saved: '✅ Saved', deleted: '🗑️ Deleted',
+    back: '← Menu',
+    loginTitle: 'Admin Login',
+    loginBtn: 'Sign in',
+    noAdmin: 'Admin access only',
+    pageDashboard: '📊 Revenue Dashboard', pageRunsheet: '📋 Run Sheet',
+    pageOpenstaand: '💰 Outstanding Bookings', pageRechten: '🔐 User Permissions',
+  }
+};
+
+let lang = localStorage.getItem('au_lang') || 'nl';
+let authCode = '';
+let roles = [];
+let editingCode = null;
+
+function t(k) { return (TR[lang] || TR.nl)[k] || k; }
+
+function setLang(v) {
+  lang = v;
+  localStorage.setItem('au_lang', lang);
+  document.getElementById('lang-select').value = lang;
+  updateLabels();
+  renderRoles();
+}
+
+function updateLabels() {
+  document.getElementById('page-title').textContent = t('pageTitle');
+  document.getElementById('page-subtitle').textContent = t('pageSub');
+  document.getElementById('add-btn').textContent = t('addBtn');
+  document.getElementById('back-link').textContent = t('back');
+  document.getElementById('login-title').textContent = t('loginTitle');
+  document.getElementById('login-btn').textContent = t('loginBtn');
+}
+
+const PAGE_LABELS = {
+  dashboard: () => t('pageDashboard'),
+  runsheet: () => t('pageRunsheet'),
+  openstaand: () => t('pageOpenstaand'),
+  rechten: () => t('pageRechten'),
+};
+
+function renderRoles() {
+  const container = document.getElementById('roles-list');
+  if (roles.length === 0) {
+    container.innerHTML = '<div class="empty-state">Geen gebruikers gevonden</div>';
+    return;
+  }
+  
+  container.innerHTML = roles.map(r => `
+    <div class="role-card">
+      <div class="role-header">
+        <span class="role-name">${escHtml(r.name)}</span>
+        <span class="role-badge ${r.role}">${r.role}</span>
+      </div>
+      <div class="role-code">Code: <code>${escHtml(r.code)}</code></div>
+      <div class="role-pages">
+        ${r.pages.map(p => `<span class="page-tag">${PAGE_LABELS[p] ? PAGE_LABELS[p]() : p}</span>`).join('')}
+      </div>
+      <div class="role-actions">
+        <button class="btn-sm" onclick="openModal('${escAttr(r.code)}')">${t('edit')}</button>
+        ${r.code === authCode ? '' : `<button class="btn-sm danger" onclick="deleteRole('${escAttr(r.code)}')">${t('delete')}</button>`}
+      </div>
+    </div>
+  `).join('');
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+function openModal(code) {
+  editingCode = code || null;
+  const modal = document.getElementById('modal');
+  document.getElementById('modal-title').textContent = code ? t('modalTitleEdit') : t('modalTitleNew');
+  document.getElementById('lbl-name').textContent = t('lblName');
+  document.getElementById('lbl-code').textContent = t('lblCode');
+  document.getElementById('lbl-role').textContent = t('lblRole');
+  document.getElementById('lbl-pages').textContent = t('lblPages');
+  document.getElementById('btn-cancel').textContent = t('cancel');
+  document.getElementById('btn-save').textContent = t('save');
+  
+  // Update checkbox labels
+  const checkboxes = document.querySelectorAll('#pages-checkboxes .checkbox-item');
+  const pageIds = ['dashboard', 'runsheet', 'openstaand', 'rechten'];
+  checkboxes.forEach((cb, i) => {
+    cb.querySelector('input').checked = false;
+    const label = cb.childNodes[cb.childNodes.length - 1];
+    label.textContent = ' ' + (PAGE_LABELS[pageIds[i]] ? PAGE_LABELS[pageIds[i]]() : pageIds[i]);
+  });
+  
+  if (code) {
+    const r = roles.find(x => x.code === code);
+    if (r) {
+      document.getElementById('inp-name').value = r.name;
+      document.getElementById('inp-code').value = r.code;
+      document.getElementById('inp-code').readOnly = true;
+      document.getElementById('inp-code').style.opacity = '0.5';
+      document.getElementById('inp-role').value = r.role;
+      checkboxes.forEach((cb, i) => {
+        cb.querySelector('input').checked = r.pages.includes(pageIds[i]);
+      });
+    }
+  } else {
+    document.getElementById('inp-name').value = '';
+    document.getElementById('inp-code').value = '';
+    document.getElementById('inp-code').readOnly = false;
+    document.getElementById('inp-code').style.opacity = '1';
+    document.getElementById('inp-role').value = 'operations';
+  }
+  
+  modal.classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+  editingCode = null;
+}
+
+async function saveRole() {
+  const name = document.getElementById('inp-name').value.trim();
+  const roleCode = document.getElementById('inp-code').value.trim().toUpperCase();
+  const role = document.getElementById('inp-role').value;
+  const checkboxes = document.querySelectorAll('#pages-checkboxes input[type=checkbox]');
+  const pages = [];
+  checkboxes.forEach(cb => { if (cb.checked) pages.push(cb.value); });
+  
+  if (!name || !roleCode || pages.length === 0) return;
+  
+  try {
+    const r = await fetch(`${WORKER}/api/roles?code=${encodeURIComponent(authCode)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roleCode, name, role, pages })
+    });
+    const data = await r.json();
+    if (data.error) { alert(data.error); return; }
+    
+    closeModal();
+    showToast(t('saved'));
+    await loadRoles();
+  } catch (e) { alert('Fout: ' + e.message); }
+}
+
+async function deleteRole(code) {
+  if (!confirm(t('confirmDelete'))) return;
+  
+  try {
+    const r = await fetch(`${WORKER}/api/roles?code=${encodeURIComponent(authCode)}&roleCode=${encodeURIComponent(code)}`, {
+      method: 'DELETE'
+    });
+    const data = await r.json();
+    if (data.error) { alert(data.error); return; }
+    
+    showToast(t('deleted'));
+    await loadRoles();
+  } catch (e) { alert('Fout: ' + e.message); }
+}
+
+async function loadRoles() {
+  try {
+    const r = await fetch(`${WORKER}/api/roles?code=${encodeURIComponent(authCode)}`);
+    const data = await r.json();
+    if (data.roles) {
+      roles = data.roles;
+      renderRoles();
+    }
+  } catch {}
+}
+
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+// Login
+async function doLogin() {
+  const input = document.getElementById('login-code');
+  const errorEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  const code = input.value.trim().toUpperCase();
+  
+  if (!code) { input.classList.add('error'); setTimeout(() => input.classList.remove('error'), 400); return; }
+  
+  btn.disabled = true;
+  btn.textContent = '...';
+  errorEl.textContent = '';
+  
+  try {
+    const r = await fetch(`${WORKER}/api/auth?code=${encodeURIComponent(code)}`);
+    const data = await r.json();
+    
+    if (data.error || data.role !== 'admin') {
+      input.classList.add('error');
+      setTimeout(() => input.classList.remove('error'), 400);
+      errorEl.textContent = data.error || t('noAdmin');
+      btn.disabled = false;
+      btn.textContent = t('loginBtn');
+      return;
+    }
+    
+    authCode = code;
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.getElementById('main-content').classList.remove('hidden');
+    await loadRoles();
+  } catch (e) {
+    errorEl.textContent = 'Verbindingsfout';
+    btn.disabled = false;
+    btn.textContent = t('loginBtn');
+  }
+}
+
+document.getElementById('login-code').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// Check saved session
+const savedSession = localStorage.getItem('au_session');
+if (savedSession) {
+  try {
+    const s = JSON.parse(savedSession);
+    if (s.role === 'admin' && s.code) {
+      authCode = s.code;
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('main-content').classList.remove('hidden');
+      loadRoles();
+    }
+  } catch {}
+}
+
+document.getElementById('lang-select').value = lang;
+updateLabels();
+</script>
+</body>
+</html>
