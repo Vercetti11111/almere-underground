@@ -72,6 +72,20 @@
     .refresh-btn { background: #7c3aed; border: none; color: white; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .refresh-btn:active { opacity: 0.7; }
 
+    /* Month group (collapsible) */
+    .month-group { margin: 6px 0; }
+    .month-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #1e1e2a; border-radius: 10px; cursor: pointer; user-select: none; }
+    .month-header:active { opacity: 0.7; }
+    .month-header .month-left { display: flex; align-items: center; gap: 8px; }
+    .month-header .chevron { font-size: 12px; color: #888; transition: transform 0.2s; }
+    .month-header .chevron.open { transform: rotate(90deg); }
+    .month-header .month-name { font-size: 13px; font-weight: 700; }
+    .month-header .month-count { font-size: 11px; color: #888; }
+    .month-header .month-total { font-size: 13px; font-weight: 700; color: #f59e0b; }
+    .month-body { overflow: hidden; transition: max-height 0.3s ease; }
+    .month-body.collapsed { max-height: 0 !important; }
+    .month-body .booking-row:first-child { margin-top: 6px; }
+
     /* Empty */
     .empty { text-align: center; padding: 40px 0; color: #555; font-size: 14px; }
 
@@ -333,9 +347,9 @@ function render() {
     html += renderSection(t('pastBookings'), past, pastOwing, true);
   }
 
-  // Future bookings
+  // Future bookings — grouped by month
   if (future.length > 0) {
-    html += renderSection(t('futureBookings'), future, futureOwing, false);
+    html += renderFutureGrouped(future, futureOwing);
   }
 
   if (past.length === 0 && future.length === 0) {
@@ -343,6 +357,109 @@ function render() {
   }
 
   content.innerHTML = html;
+
+  // Set initial max-height for open month groups
+  document.querySelectorAll('.month-body:not(.collapsed)').forEach(el => {
+    el.style.maxHeight = el.scrollHeight + 'px';
+  });
+}
+
+function getMonthKey(iso) {
+  if (!iso) return '0000-00';
+  return iso.substring(0, 7); // "2026-07"
+}
+
+function getMonthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  const monthNames = {
+    nl: ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'],
+    en: ['January','February','March','April','May','June','July','August','September','October','November','December']
+  };
+  const names = monthNames[lang] || monthNames.nl;
+  return `${names[m - 1]} ${y}`;
+}
+
+function renderFutureGrouped(bookings, totalOwing) {
+  // Group by month
+  const groups = new Map();
+  for (const b of bookings) {
+    const key = getMonthKey(b.bookingDate);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(b);
+  }
+
+  // Current month and next month should be expanded
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextKey = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+
+  let html = `<div class="section">
+    <div class="section-header">
+      <div>
+        <span class="section-title">${t('futureBookings')}</span>
+        <span class="section-count"> · ${bookings.length} ${t('bookings')}</span>
+      </div>
+      <span class="section-total">${fmtEur(totalOwing)}</span>
+    </div>`;
+
+  let groupIdx = 0;
+  for (const [monthKey, monthBookings] of groups) {
+    const monthOwing = monthBookings.reduce((s, b) => s + (b.owing || 0), 0);
+    const isOpen = monthKey === curKey || monthKey === nextKey;
+    const gid = `mg-${groupIdx++}`;
+
+    html += `<div class="month-group">
+      <div class="month-header" onclick="toggleMonth('${gid}', this)">
+        <div class="month-left">
+          <span class="chevron ${isOpen ? 'open' : ''}" id="${gid}-chev">▶</span>
+          <span class="month-name">${getMonthLabel(monthKey)}</span>
+          <span class="month-count">(${monthBookings.length})</span>
+        </div>
+        <span class="month-total">${fmtEur(monthOwing)}</span>
+      </div>
+      <div class="month-body ${isOpen ? '' : 'collapsed'}" id="${gid}">`;
+
+    for (const b of monthBookings) {
+      const badgeClass = b.status === 'PartiallyPaid' ? 'partial' : 'pending';
+      const badgeText = b.status === 'PartiallyPaid' ? t('partial') : t('pending');
+
+      html += `<div class="booking-row">
+        <div class="booking-info">
+          <div class="booking-name">${escHtml(b.name || '–')}</div>
+          <div class="booking-meta">
+            <span class="badge ${badgeClass}">${badgeText}</span>
+            ${t('visit')}: ${fmtDateShort(b.bookingDate)}
+          </div>
+        </div>
+        <div class="booking-amounts">
+          <div class="booking-owing">${fmtEur(b.owing)}</div>
+          <div class="booking-total">/ ${fmtEur(b.total)}</div>
+        </div>
+      </div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function toggleMonth(gid, headerEl) {
+  const body = document.getElementById(gid);
+  const chev = document.getElementById(gid + '-chev');
+  if (body.classList.contains('collapsed')) {
+    body.classList.remove('collapsed');
+    body.style.maxHeight = body.scrollHeight + 'px';
+    chev.classList.add('open');
+  } else {
+    body.style.maxHeight = body.scrollHeight + 'px';
+    requestAnimationFrame(() => {
+      body.classList.add('collapsed');
+      chev.classList.remove('open');
+    });
+  }
 }
 
 function renderSection(title, bookings, totalOwing, isPast) {
