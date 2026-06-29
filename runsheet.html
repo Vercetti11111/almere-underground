@@ -434,18 +434,6 @@ function downloadRunsheetPDF(date) {
 
 
 
-function downloadRunsheetPDF(date) {
-  const hdr = document.getElementById('rs-print-header');
-  if (hdr) hdr.style.display = 'block';
-  const origTitle = document.title;
-  document.title = `Run Sheet - Almere Underground - ${date}`;
-  window.print();
-  setTimeout(() => {
-    document.title = origTitle;
-    if (hdr) hdr.style.display = 'none';
-  }, 1000);
-}
-
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
   if (!accessCode) return;
