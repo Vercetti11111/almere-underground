@@ -16,7 +16,7 @@
     .lang-switch { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; padding: 4px 8px; color: #f1f1f5; font-size: 12px; cursor: pointer; }
 
     /* Login */
-    .login-overlay { position: fixed; inset: 0; background: #0f0f13; display: flex; align-items: center; justify-content: center; z-index: 999; }
+    /* login removed - SSO via landing page */
     .login-box { text-align: center; padding: 32px; }
     .login-box .icon { font-size: 48px; margin-bottom: 12px; }
     .login-box h2 { font-size: 20px; margin-bottom: 16px; font-weight: 700; }
@@ -98,16 +98,9 @@
 </head>
 <body>
 
-<div class="login-overlay" id="login-overlay">
-  <div class="login-box">
-    <div class="icon">💰</div>
-    <h2>Openstaande Posten</h2>
-    <input type="password" id="login-code" placeholder="Toegangscode" autofocus />
-    <div class="err" id="login-error"></div>
-  </div>
-</div>
+<!-- SSO: login via landing page -->
 
-<div class="container" id="app" style="display:none">
+<div class="container" id="app">
   <div class="header">
     <a class="back" href="index.html">← Menu</a>
     <span class="title" id="page-title">Openstaande Posten</span>
@@ -205,39 +198,13 @@ function dateStr(d) {
   return d.toISOString().split('T')[0];
 }
 
-// ── Login ───────────────────────────────────────────────────────────────────
-const loginInput = document.getElementById('login-code');
-loginInput.addEventListener('keydown', async (e) => {
-  if (e.key !== 'Enter') return;
-  const code = loginInput.value.trim();
-  if (!code) return;
-  try {
-    const r = await fetch(`${WORKER}/health`);
-    // Verify code by making a test call
-    const r2 = await fetch(`${WORKER}/api/openstaand?code=${encodeURIComponent(code)}`);
-    const d = await r2.json();
-    if (d.error === 'Ongeldige toegangscode') {
-      document.getElementById('login-error').textContent = lang === 'nl' ? 'Ongeldige code' : 'Invalid code';
-      return;
-    }
-    accessCode = code;
-    localStorage.setItem('au_code', code);
-    document.getElementById('login-overlay').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    loadData();
-  } catch (err) {
-    document.getElementById('login-error').textContent = 'Verbindingsfout';
-  }
-});
-
-// Auto-login
-const savedCode = localStorage.getItem('au_code');
-if (savedCode) {
-  accessCode = savedCode;
-  document.getElementById('login-overlay').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  loadData();
+// ── SSO Auth (via landing page) ───────────────────────────────────────────────
+const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_session || !_session.code) {
+  window.location.href = 'index.html';
 }
+accessCode = _session ? _session.code : '';
+loadData();
 
 // ── Language ────────────────────────────────────────────────────────────────
 const langSwitch = document.getElementById('lang-switch');

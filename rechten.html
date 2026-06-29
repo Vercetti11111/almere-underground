@@ -146,18 +146,8 @@
 </head>
 <body>
   <!-- Login -->
-  <div class="login-overlay" id="login-overlay">
-    <div class="login-box">
-      <div class="logo">🔐</div>
-      <div class="title" id="login-title">Admin Login</div>
-      <input type="text" class="login-input" id="login-code" placeholder="••••••" autocomplete="off" autocapitalize="characters" />
-      <button class="login-btn" id="login-btn" onclick="doLogin()">Inloggen</button>
-      <div class="login-error" id="login-error"></div>
-    </div>
-  </div>
-
-  <!-- Main -->
-  <div class="container hidden" id="main-content">
+  <!-- SSO: login via landing page -->
+  <div class="container" id="main-content">
     <div class="top-bar">
       <a href="index.html" class="back-link" id="back-link">← Menu</a>
       <div class="top-bar-right">
@@ -425,59 +415,13 @@ function showToast(msg) {
   setTimeout(() => toast.remove(), 2500);
 }
 
-// Login
-async function doLogin() {
-  const input = document.getElementById('login-code');
-  const errorEl = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
-  const code = input.value.trim().toUpperCase();
-  
-  if (!code) { input.classList.add('error'); setTimeout(() => input.classList.remove('error'), 400); return; }
-  
-  btn.disabled = true;
-  btn.textContent = '...';
-  errorEl.textContent = '';
-  
-  try {
-    const r = await fetch(`${WORKER}/api/auth?code=${encodeURIComponent(code)}`);
-    const data = await r.json();
-    
-    if (data.error || data.role !== 'admin') {
-      input.classList.add('error');
-      setTimeout(() => input.classList.remove('error'), 400);
-      errorEl.textContent = data.error || t('noAdmin');
-      btn.disabled = false;
-      btn.textContent = t('loginBtn');
-      return;
-    }
-    
-    authCode = code;
-    document.getElementById('login-overlay').classList.add('hidden');
-    document.getElementById('main-content').classList.remove('hidden');
-    await loadRoles();
-  } catch (e) {
-    errorEl.textContent = 'Verbindingsfout';
-    btn.disabled = false;
-    btn.textContent = t('loginBtn');
-  }
-}
-
-document.getElementById('login-code').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
-});
-
-// Check saved session
-const savedSession = localStorage.getItem('au_session');
-if (savedSession) {
-  try {
-    const s = JSON.parse(savedSession);
-    if (s.role === 'admin' && s.code) {
-      authCode = s.code;
-      document.getElementById('login-overlay').classList.add('hidden');
-      document.getElementById('main-content').classList.remove('hidden');
-      loadRoles();
-    }
-  } catch {}
+// SSO Auth (via landing page) — admin only
+const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_session || !_session.code || _session.role !== 'admin') {
+  window.location.href = 'index.html';
+} else {
+  authCode = _session.code;
+  loadRoles();
 }
 
 document.getElementById('lang-select').value = lang;

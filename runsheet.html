@@ -12,7 +12,7 @@
     select { background: #1a1a24; color: #f1f1f5; border: 1px solid #3a3a4a; border-radius: 8px; padding: 6px 10px; font-size: 14px; cursor: pointer; }
 
     /* Login */
-    #login-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+    /* login removed - SSO via landing page */
     .login-logo { font-size:40px; margin-bottom:12px; }
     .login-title { font-size:22px; font-weight:800; margin-bottom:4px; }
     .login-sub { font-size:13px; color:#888; margin-bottom:32px; }
@@ -27,7 +27,7 @@
     @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
 
     /* App */
-    #app-screen { display:none; max-width:480px; margin:0 auto; padding:16px 12px 90px; }
+    #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; }
 
     /* Common */
     .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
@@ -63,7 +63,7 @@
 
     @media print {
       body { background:#fff !important; color:#000 !important; font-size:11pt; }
-      #login-screen, .nav-btn, #refresh-btn, #lang-select, .cache-label, .no-print { display:none !important; }
+      .nav-btn, #refresh-btn, #lang-select, .cache-label, .no-print { display:none !important; }
       #app-screen { padding:0 !important; max-width:100% !important; }
       .rs-section { border:1px solid #ccc !important; border-radius:4px !important; break-inside:avoid; margin-bottom:12pt; }
       .rs-section-header { -webkit-print-color-adjust:exact; print-color-adjust:exact; padding:8px 12px !important; }
@@ -82,21 +82,7 @@
 <body>
 
 <!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-logo">📋</div>
-  <div class="login-title">Almere Underground</div>
-  <div class="login-sub">Run Sheet</div>
-  <div class="login-card">
-    <div class="login-label" id="login-label">Toegangscode</div>
-    <input class="login-input" type="password" id="code-input" placeholder="••••••••"
-      autocomplete="off" autocorrect="off" autocapitalize="none"
-      onkeydown="if(event.key==='Enter')doLogin()" />
-    <button class="login-btn" id="login-btn" onclick="doLogin()">Inloggen →</button>
-    <div class="login-error" id="login-error"></div>
-  </div>
-</div>
-
-<!-- APP -->
+<!-- SSO: login via landing page -->
 <div id="app-screen">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
     <div>
@@ -190,55 +176,15 @@ function setLang(newLang) {
   lang = newLang;
   localStorage.setItem('au_lang', lang);
   document.getElementById('lang-select').value = lang;
-  const ll = document.getElementById('login-label');
-  const lb = document.getElementById('login-btn');
-  if (ll) ll.textContent = t('accessCode');
-  if (lb) lb.textContent = t('loginBtn');
   render();
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-let accessCode = sessionStorage.getItem('au_code') || '';
-
-async function doLogin() {
-  const input = document.getElementById('code-input');
-  const errEl = document.getElementById('login-error');
-  const code = input.value.trim();
-  if (!code) return;
-
-  errEl.textContent = '';
-  input.disabled = true;
-
-  try {
-    const test = await fetch(`${WORKER}/api/runsheet?date=${todayStr()}`, {
-      headers: { 'X-Access-Code': code }
-    });
-    const data = await test.json();
-
-    if (data.error && data.error.includes('Ongeldig')) {
-      input.classList.add('error');
-      setTimeout(() => input.classList.remove('error'), 600);
-      errEl.textContent = t('invalidCode');
-      input.disabled = false;
-      input.focus();
-      return;
-    }
-
-    accessCode = code;
-    sessionStorage.setItem('au_code', code);
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app-screen').style.display = 'block';
-    render();
-  } catch (e) {
-    errEl.textContent = t('connError');
-    input.disabled = false;
-  }
+// ── SSO Auth (via landing page) ───────────────────────────────────────────────
+const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_session || !_session.code) {
+  window.location.href = 'index.html';
 }
-
-if (accessCode) {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'block';
-}
+const accessCode = _session ? _session.code : '';
 
 // ── API ───────────────────────────────────────────────────────────────────────
 const cache = {};
