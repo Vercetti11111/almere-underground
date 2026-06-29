@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <title>Almere Underground – Run Sheet</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { display: none; }
+    body { margin: 0; background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    select { background: #1a1a24; color: #f1f1f5; border: 1px solid #3a3a4a; border-radius: 8px; padding: 6px 10px; font-size: 14px; cursor: pointer; }
+
+    /* Login */
+    #login-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+    .login-logo { font-size:40px; margin-bottom:12px; }
+    .login-title { font-size:22px; font-weight:800; margin-bottom:4px; }
+    .login-sub { font-size:13px; color:#888; margin-bottom:32px; }
+    .login-card { background:#1a1a24; border-radius:20px; padding:28px 24px; width:100%; max-width:360px; }
+    .login-label { font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px; }
+    .login-input { width:100%; background:#0f0f13; border:2px solid #2a2a38; border-radius:12px; padding:14px 16px; font-size:18px; color:#f1f1f5; letter-spacing:0.15em; text-align:center; outline:none; transition:border-color 0.2s; font-family:monospace; }
+    .login-input:focus { border-color:#7c3aed; }
+    .login-input.error { border-color:#ef4444; animation: shake 0.3s; }
+    .login-btn { width:100%; margin-top:16px; background:#7c3aed; color:white; border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:700; cursor:pointer; transition:background 0.2s; }
+    .login-btn:active { background:#6d28d9; }
+    .login-error { color:#ef4444; font-size:13px; text-align:center; margin-top:12px; min-height:18px; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+    /* App */
+    #app-screen { display:none; max-width:480px; margin:0 auto; padding:16px 12px 90px; }
+
+    /* Common */
+    .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
+    .nav-btn { background:#1a1a24; border:none; color:#aaa; border-radius:10px; padding:8px 14px; font-size:18px; cursor:pointer; }
+    .nav-btn:active { background:#2a2a38; }
+    .date-label { font-size:15px; font-weight:700; text-align:center; flex:1; }
+    .spinner { width:32px; height:32px; border:3px solid #2a2a38; border-top-color:#7c3aed; border-radius:50%; animation:spin 0.8s linear infinite; margin:48px auto; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .err-msg { text-align:center; padding:40px 20px; color:#ef4444; font-size:13px; line-height:1.6; }
+
+    /* Language switcher */
+    #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+
+    /* Runsheet */
+    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; }
+    .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
+    .rs-kf { background:#7c1a1a; }
+    .rs-bf { background:#1a3060; }
+    .rs-booking { background:#1a1a24; margin-bottom:1px; padding:14px 16px; }
+    .rs-booking:last-child { border-radius:0 0 14px 14px; }
+    .rs-booking-name { font-size:15px; font-weight:700; margin-bottom:2px; }
+    .rs-booking-id { font-size:11px; color:#666; margin-bottom:10px; }
+    .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; }
+    .rs-table th { text-align:left; color:#888; font-weight:600; padding:4px 6px 4px 0; border-bottom:1px solid #2a2a38; }
+    .rs-table td { padding:5px 6px 5px 0; vertical-align:top; border-bottom:1px solid #1e1e2a; color:#ddd; }
+    .rs-table tr:last-child td { border-bottom:none; }
+    .rs-notes { background:#111118; border-radius:8px; padding:10px 12px; font-size:12px; color:#bbb; margin-top:8px; }
+    .rs-notes-label { font-size:10px; color:#666; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
+    .pay-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; color:white; }
+    .pay-paid { background:#166534; }
+    .pay-unpaid { background:#92400e; }
+    .rs-empty { text-align:center; padding:32px; color:#555; font-size:13px; background:#1a1a24; border-radius:12px; }
+
+    @media print {
+      body { background:#fff !important; color:#000 !important; font-size:11pt; }
+      #login-screen, .nav-btn, #refresh-btn, #lang-select, .cache-label, .no-print { display:none !important; }
+      #app-screen { padding:0 !important; max-width:100% !important; }
+      .rs-section { border:1px solid #ccc !important; border-radius:4px !important; break-inside:avoid; margin-bottom:12pt; }
+      .rs-section-header { -webkit-print-color-adjust:exact; print-color-adjust:exact; padding:8px 12px !important; }
+      .rs-booking { border-bottom:1px solid #eee !important; padding:8px 12px !important; break-inside:avoid; }
+      .rs-table { font-size:9pt !important; }
+      .pay-badge { border:1px solid #888 !important; color:#000 !important; background:#fff !important; }
+      .pay-paid { background:#d4edda !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .pay-unpaid { background:#fff3cd !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .rs-kf { background:#7c3aed !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .rs-bf { background:#1d4ed8 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      h2, .date-label { color:#000 !important; }
+      * { box-shadow:none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-logo">📋</div>
+  <div class="login-title">Almere Underground</div>
+  <div class="login-sub">Run Sheet</div>
+  <div class="login-card">
+    <div class="login-label" id="login-label">Toegangscode</div>
+    <input class="login-input" type="password" id="code-input" placeholder="••••••••"
+      autocomplete="off" autocorrect="off" autocapitalize="none"
+      onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Inloggen →</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;">📋 Run Sheet</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <button id="refresh-btn" onclick="refreshAll()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
+    </div>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
+
+// ── Translations ──────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  nl: {
+    kfTitle: 'Kinderfeestjes (KF)',
+    bfTitle: 'Bedrijfsfeesten (BF)',
+    booking: 'boeking',
+    bookings: 'boekingen',
+    bookingNr: 'Boeking #',
+    pers: 'pers.',
+    activity: 'Activiteit',
+    subtype: 'Subtype',
+    time: 'Tijd',
+    persons: 'Pers.',
+    location: 'Locatie',
+    notes: 'Opmerkingen',
+    noNotes: 'geen',
+    paid: 'Betaald',
+    outstanding: 'Openstaand',
+    paidWord: 'betaald',
+    openWord: 'open',
+    downloadPdf: '📄 Download PDF',
+    noBookings: 'Geen KF/BF boekingen voor',
+    runsheetTitle: 'Almere Underground — Run Sheet',
+    accessCode: 'Toegangscode',
+    loginBtn: 'Inloggen →',
+    invalidCode: 'Ongeldige toegangscode',
+    connError: 'Verbindingsfout – probeer opnieuw',
+    fromCache: 'Uit cache',
+    liveData: 'Live data',
+    agoSec: 's geleden',
+    agoMin: 'm geleden',
+  },
+  en: {
+    kfTitle: 'Birthday Parties (KF)',
+    bfTitle: 'Corporate Events (BF)',
+    booking: 'booking',
+    bookings: 'bookings',
+    bookingNr: 'Booking #',
+    pers: 'pers.',
+    activity: 'Activity',
+    subtype: 'Subtype',
+    time: 'Time',
+    persons: 'Pers.',
+    location: 'Location',
+    notes: 'Notes',
+    noNotes: 'none',
+    paid: 'Paid',
+    outstanding: 'Outstanding',
+    paidWord: 'paid',
+    openWord: 'due',
+    downloadPdf: '📄 Download PDF',
+    noBookings: 'No KF/BF bookings for',
+    runsheetTitle: 'Almere Underground — Run Sheet',
+    accessCode: 'Access code',
+    loginBtn: 'Log in →',
+    invalidCode: 'Invalid access code',
+    connError: 'Connection error – please try again',
+    fromCache: 'From cache',
+    liveData: 'Live data',
+    agoSec: 's ago',
+    agoMin: 'm ago',
+  }
+};
+
+let lang = localStorage.getItem('au_lang') || 'nl';
+function t(key) { return (TRANSLATIONS[lang] || TRANSLATIONS.nl)[key] || TRANSLATIONS.nl[key] || key; }
+function locale() { return lang === 'en' ? 'en-GB' : 'nl-NL'; }
+
+function setLang(newLang) {
+  lang = newLang;
+  localStorage.setItem('au_lang', lang);
+  document.getElementById('lang-select').value = lang;
+  const ll = document.getElementById('login-label');
+  const lb = document.getElementById('login-btn');
+  if (ll) ll.textContent = t('accessCode');
+  if (lb) lb.textContent = t('loginBtn');
+  render();
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let accessCode = sessionStorage.getItem('au_code') || '';
+
+async function doLogin() {
+  const input = document.getElementById('code-input');
+  const errEl = document.getElementById('login-error');
+  const code = input.value.trim();
+  if (!code) return;
+
+  errEl.textContent = '';
+  input.disabled = true;
+
+  try {
+    const test = await fetch(`${WORKER}/api/runsheet?date=${todayStr()}`, {
+      headers: { 'X-Access-Code': code }
+    });
+    const data = await test.json();
+
+    if (data.error && data.error.includes('Ongeldig')) {
+      input.classList.add('error');
+      setTimeout(() => input.classList.remove('error'), 600);
+      errEl.textContent = t('invalidCode');
+      input.disabled = false;
+      input.focus();
+      return;
+    }
+
+    accessCode = code;
+    sessionStorage.setItem('au_code', code);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    render();
+  } catch (e) {
+    errEl.textContent = t('connError');
+    input.disabled = false;
+  }
+}
+
+if (accessCode) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+const cache = {};
+
+async function api(path, forceRefresh = false) {
+  const key = path;
+  if (!forceRefresh && cache[key]) return cache[key];
+  const sep = path.includes('?') ? '&' : '?';
+  const url = forceRefresh ? `${WORKER}${path}${sep}refresh=1` : `${WORKER}${path}`;
+  const r = await fetch(url, { headers: { 'X-Access-Code': accessCode } });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  cache[key] = data;
+  if (!forceRefresh) setTimeout(() => delete cache[key], 5 * 60 * 1000);
+  return data;
+}
+
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  Object.keys(cache).forEach(k => delete cache[k]);
+  try {
+    await renderRunsheet(true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄'; }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function todayStr() { return new Date().toLocaleDateString('sv-SE'); }
+
+function addDays(s, n) {
+  const d = new Date(s + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('sv-SE');
+}
+
+function fmtEur(v) {
+  if (v == null || isNaN(v)) return '—';
+  return '€\u00a0' + v.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDateLong(s) {
+  return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function fmtDate(s) {
+  return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function fmtTime(t) {
+  if (!t) return '—';
+  return t.length > 5 ? t.substring(11, 16) : t;
+}
+
+function setContent(html) { document.getElementById('content').innerHTML = html; }
+function spinner() { return '<div class="spinner"></div>'; }
+function errMsg(m) { return `<div class="err-msg">⚠️ ${m}</div>`; }
+
+function cacheLabel(data) {
+  if (!data) return '';
+  const at = data._cachedAt || data.generatedAt;
+  const fromCache = data._cached;
+  const age = data._cacheAge;
+  const timeStr = at ? new Date(at).toLocaleString(locale(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const ageStr = age != null ? (age < 60 ? `${age}${t('agoSec')}` : `${Math.floor(age/60)}${t('agoMin')}`) : '';
+  const icon = fromCache ? '📦' : '⚡';
+  const label = fromCache ? `${t('fromCache')} · ${ageStr}` : t('liveData');
+  return `<div style="font-size:10px;color:#444;text-align:center;margin-top:12px;">${icon} ${label}${timeStr ? ' · ' + timeStr : ''}</div>`;
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let rsDate = todayStr();
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function dateNav() {
+  return `
+    <div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <button class="nav-btn" onclick="shiftRs(-1)">‹</button>
+      <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-rs')">
+        <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(rsDate)}</div>
+        <input type="date" id="dp-rs" value="${rsDate}" onchange="onRsDateChange(this.value)" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
+      </div>
+      <button class="nav-btn" onclick="shiftRs(1)">›</button>
+    </div>`;
+}
+
+function triggerDatePicker(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  try { if (el.showPicker) el.showPicker(); else el.click(); } catch(e) { el.click(); }
+}
+
+function onRsDateChange(val) { rsDate = val; render(); }
+function shiftRs(n) { rsDate = addDays(rsDate, n); render(); }
+
+// ── RUNSHEET VIEW ─────────────────────────────────────────────────────────────
+async function renderRunsheet(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    const data = await api(`/api/runsheet?date=${rsDate}`, forceRefresh);
+
+    function renderBooking(b) {
+      const isPaid = b.paymentStatus === 'paid';
+      const payClass = isPaid ? 'pay-paid' : 'pay-unpaid';
+      const fmtE = v => '€' + (v || 0).toLocaleString(locale(), {minimumFractionDigits:2, maximumFractionDigits:2});
+      const amountPaid = (b.total || 0) - (b.amountOwing || 0);
+      const payLabel = isPaid
+        ? `${t('paid')} · ${fmtE(b.total)}`
+        : `${t('outstanding')} · ${fmtE(amountPaid)} ${t('paidWord')} / ${fmtE(b.amountOwing)} ${t('openWord')}`;
+
+      let actRows = '';
+      for (const act of (b.activities || [])) {
+        const locs = act.locations?.length ? act.locations.join(', ') : '—';
+        actRows += `
+          <tr>
+            <td>${act.mainActivity || '—'}</td>
+            <td>${act.subtype || '—'}</td>
+            <td>${fmtTime(act.startTime)}${act.endTime ? '–'+fmtTime(act.endTime) : ''}</td>
+            <td>${act.quantity || '—'}</td>
+            <td>${locs}</td>
+          </tr>`;
+      }
+
+      const notes = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ') || t('noNotes');
+
+      return `
+        <div class="rs-booking">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+            <div class="rs-booking-name">${b.name}</div>
+            <span class="pay-badge ${payClass}">${payLabel}</span>
+          </div>
+          <div class="rs-booking-id">${t('bookingNr')}${b.id}${b.totalGuests ? ` · ${b.totalGuests} ${t('pers')}` : ''}</div>
+          ${actRows ? `
+          <table class="rs-table">
+            <tr>
+              <th>${t('activity')}</th><th>${t('subtype')}</th><th>${t('time')}</th><th>${t('persons')}</th><th>${t('location')}</th>
+            </tr>
+            ${actRows}
+          </table>` : ''}
+          <div class="rs-notes">
+            <div class="rs-notes-label">${t('notes')}</div>
+            ${notes}
+          </div>
+        </div>`;
+    }
+
+    function bookingCount(n) {
+      return n === 1 ? `1 ${t('booking')}` : `${n} ${t('bookings')}`;
+    }
+
+    const kfSection = data.kf?.length ? `
+      <div class="rs-section">
+        <div class="rs-section-header rs-kf">🎂 ${t('kfTitle')} — ${bookingCount(data.kf.length)}</div>
+        ${data.kf.map(renderBooking).join('')}
+      </div>` : '';
+
+    const bfSection = data.bf?.length ? `
+      <div class="rs-section">
+        <div class="rs-section-header rs-bf">🏢 ${t('bfTitle')} — ${bookingCount(data.bf.length)}</div>
+        ${data.bf.map(renderBooking).join('')}
+      </div>` : '';
+
+    const empty = (!data.kf?.length && !data.bf?.length) ?
+      `<div class="rs-empty">${t('noBookings')} ${fmtDate(rsDate)}</div>` : '';
+
+    setContent(`
+      ${dateNav()}
+      <div style="text-align:right;margin-bottom:14px;" class="no-print">
+        <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">${t('downloadPdf')}</button>
+      </div>
+      <div id="rs-print-header" style="display:none;margin-bottom:16px;">
+        <div style="font-size:18pt;font-weight:800;">${t('runsheetTitle')}</div>
+        <div style="font-size:12pt;color:#555;">${fmtDateLong(rsDate)}</div>
+      </div>
+      ${kfSection}${bfSection}${empty}
+      ${cacheLabel(data)}
+    `);
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+function downloadRunsheetPDF(date) {
+  const hdr = document.getElementById('rs-print-header');
+  if (hdr) hdr.style.display = 'block';
+  const origTitle = document.title;
+  document.title = `Run Sheet - Almere Underground - ${date}`;
+  window.print();
+  setTimeout(() => {
+    document.title = origTitle;
+    if (hdr) hdr.style.display = 'none';
+  }, 1000);
+}
+
+
+
+function downloadRunsheetPDF(date) {
+  const hdr = document.getElementById('rs-print-header');
+  if (hdr) hdr.style.display = 'block';
+  const origTitle = document.title;
+  document.title = `Run Sheet - Almere Underground - ${date}`;
+  window.print();
+  setTimeout(() => {
+    document.title = origTitle;
+    if (hdr) hdr.style.display = 'none';
+  }, 1000);
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  if (!accessCode) return;
+  renderRunsheet(false);
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+document.getElementById('lang-select').value = lang;
+if (accessCode) render();
+</script>
+</body>
+</html>

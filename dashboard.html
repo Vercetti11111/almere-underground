@@ -1,0 +1,2098 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Almere Underground – Dashboard</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { display: none; }
+    body { margin: 0; background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    select { background: #1a1a24; color: #f1f1f5; border: 1px solid #3a3a4a; border-radius: 8px; padding: 6px 10px; font-size: 14px; cursor: pointer; }
+
+    /* Login */
+    #login-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+    .login-logo { font-size:40px; margin-bottom:12px; }
+    .login-title { font-size:22px; font-weight:800; margin-bottom:4px; }
+    .login-sub { font-size:13px; color:#888; margin-bottom:32px; }
+    .login-card { background:#1a1a24; border-radius:20px; padding:28px 24px; width:100%; max-width:360px; }
+    .login-label { font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px; }
+    .login-input { width:100%; background:#0f0f13; border:2px solid #2a2a38; border-radius:12px; padding:14px 16px; font-size:18px; color:#f1f1f5; letter-spacing:0.15em; text-align:center; outline:none; transition:border-color 0.2s; font-family:monospace; }
+    .login-input:focus { border-color:#7c3aed; }
+    .login-input.error { border-color:#ef4444; animation: shake 0.3s; }
+    .login-btn { width:100%; margin-top:16px; background:#7c3aed; color:white; border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:700; cursor:pointer; transition:background 0.2s; }
+    .login-btn:active { background:#6d28d9; }
+    .login-error { color:#ef4444; font-size:13px; text-align:center; margin-top:12px; min-height:18px; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+    /* App */
+    #app-screen { display:none; max-width:480px; margin:0 auto; padding:16px 12px 90px; }
+
+    /* Common */
+    .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
+    .card-sm { background:#1a1a24; border-radius:12px; padding:12px; }
+    .tab-bar { background:#1a1a24; border-radius:12px; padding:4px; display:flex; gap:4px; margin-bottom:20px; }
+    .tab-btn { flex:1; padding:8px 2px; border-radius:8px; font-size:12px; font-weight:600; text-align:center; cursor:pointer; border:none; background:transparent; color:#888; transition:all 0.2s; white-space:nowrap; }
+    .tab-btn.active { background:#7c3aed; color:white; }
+    .bar-bg { background:#2a2a38; border-radius:999px; height:6px; }
+    .bar-fill { border-radius:999px; height:6px; transition:width 0.4s ease; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+    .kpi-card { background:#1a1a24; border-radius:12px; padding:12px 8px; text-align:center; }
+    .kpi-label { font-size:11px; color:#888; margin-bottom:2px; }
+    .kpi-value { font-size:16px; font-weight:700; }
+    .section-title { font-size:12px; font-weight:700; color:#aaa; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.05em; }
+    .spinner { width:32px; height:32px; border:3px solid #2a2a38; border-top-color:#7c3aed; border-radius:50%; animation:spin 0.8s linear infinite; margin:48px auto; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .nav-btn { background:#1a1a24; border:none; color:#aaa; border-radius:10px; padding:8px 14px; font-size:18px; cursor:pointer; }
+    .nav-btn:active { background:#2a2a38; }
+    .date-label { font-size:15px; font-weight:700; text-align:center; flex:1; }
+    .info-banner { background:#1a1a2480; border:1px solid #2a2a3a; border-radius:10px; padding:10px 12px; font-size:12px; color:#888; margin-bottom:12px; }
+    .cat-row { margin-bottom:14px; }
+    .cat-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .cat-name { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; }
+    .cat-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .cat-sub { display:flex; justify-content:space-between; font-size:11px; color:#888; margin-top:4px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+    .week-day-card { background:#1a1a24; border-radius:12px; padding:12px; cursor:pointer; transition:background 0.15s; margin-bottom:8px; }
+    .week-day-card:active { background:#2a2a38; }
+    .week-day-card.today { border:2px solid #7c3aed; }
+    .week-day-card.today .wd-name { color:#7c3aed; }
+    .err-msg { text-align:center; padding:40px 20px; color:#ef4444; font-size:13px; line-height:1.6; }
+
+    /* Language switcher */
+    #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+
+    /* Runsheet */
+    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; }
+    .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
+
+  @media print {
+    body { background:#fff !important; color:#000 !important; font-size:11pt; }
+    #login-screen, .tab-bar, .nav-btn, #refresh-btn, #lang-select, .cache-label, .no-print { display:none !important; }
+    #app-screen { padding:0 !important; max-width:100% !important; }
+    .rs-section { border:1px solid #ccc !important; border-radius:4px !important; break-inside:avoid; margin-bottom:12pt; }
+    .rs-section-header { -webkit-print-color-adjust:exact; print-color-adjust:exact; padding:8px 12px !important; }
+    .rs-booking { border-bottom:1px solid #eee !important; padding:8px 12px !important; break-inside:avoid; }
+    .rs-table { font-size:9pt !important; }
+    .pay-badge { border:1px solid #888 !important; color:#000 !important; background:#fff !important; }
+    .pay-paid { background:#d4edda !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .pay-unpaid { background:#fff3cd !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .rs-kf { background:#7c3aed !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .rs-bf { background:#1d4ed8 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    h2, .date-label { color:#000 !important; }
+    * { box-shadow:none !important; }
+  }
+    .rs-kf { background:#7c1a1a; }
+    .rs-bf { background:#1a3060; }
+    .rs-booking { background:#1a1a24; margin-bottom:1px; padding:14px 16px; }
+    .rs-booking:last-child { border-radius:0 0 14px 14px; }
+    .rs-booking-name { font-size:15px; font-weight:700; margin-bottom:2px; }
+    .rs-booking-id { font-size:11px; color:#666; margin-bottom:10px; }
+    .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; }
+    .rs-table th { text-align:left; color:#888; font-weight:600; padding:4px 6px 4px 0; border-bottom:1px solid #2a2a38; }
+    .rs-table td { padding:5px 6px 5px 0; vertical-align:top; border-bottom:1px solid #1e1e2a; color:#ddd; }
+    .rs-table tr:last-child td { border-bottom:none; }
+    .rs-notes { background:#111118; border-radius:8px; padding:10px 12px; font-size:12px; color:#bbb; margin-top:8px; }
+    .rs-notes-label { font-size:10px; color:#666; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
+    .pay-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; color:white; }
+    .pay-paid { background:#166534; }
+    .pay-unpaid { background:#92400e; }
+    .rs-empty { text-align:center; padding:32px; color:#555; font-size:13px; background:#1a1a24; border-radius:12px; }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ─────────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-logo">🎳</div>
+  <div class="login-title">Almere Underground</div>
+  <div class="login-sub">Analytics Dashboard</div>
+  <div class="login-card">
+    <div class="login-label" id="login-label">Toegangscode</div>
+    <input class="login-input" type="password" id="code-input" placeholder="••••••••"
+      autocomplete="off" autocorrect="off" autocapitalize="none"
+      onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Inloggen →</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── APP ───────────────────────────────────────────────────────────────── -->
+<div id="app-screen">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;">Analytics</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <div id="live-dot" style="width:8px;height:8px;border-radius:50%;background:#10b981;" title="Live data"></div>
+      <button id="refresh-btn" onclick="refreshAll()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('week')" id="tab-week">📅 Week</button>
+    <button class="tab-btn" onclick="switchTab('bezoek')" id="tab-bezoek">🏟️ Bezoek</button>
+    <button class="tab-btn" onclick="switchTab('verkoop')" id="tab-verkoop">💳 Verkoop</button>
+    <button class="tab-btn" onclick="switchTab('personeel')" id="tab-personeel">👥 Personeel</button>
+    <button class="tab-btn" onclick="switchTab('kpi')" id="tab-kpi">📊 KPI</button>
+    <button class="tab-btn" onclick="switchTab('controle')" id="tab-controle">🔍 Controle</button>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
+
+// ── BMI Historical Data ────────────────────────────────────────────────────
+let bmiData = null;
+async function loadBmiData() {
+  if (bmiData) return bmiData;
+  try {
+    const r = await fetch(`${WORKER}/api/bmi`, { headers: { 'X-Access-Code': accessCode } });
+    bmiData = await r.json();
+  } catch(e) { bmiData = {}; }
+  return bmiData;
+}
+function bmiForDate(dateStr) {
+  // Returns { total, byCategory } for a given date, or null
+  if (!bmiData || !bmiData[dateStr]) return null;
+  const d = bmiData[dateStr];
+  const total = Object.values(d).reduce((s,c) => s + (c.total||0), 0);
+  return { total, byCategory: d };
+}
+function bmiForDates(dates) {
+  // Aggregate bmi data for a list of date strings
+  if (!bmiData) return null;
+  const agg = {}; let total = 0;
+  for (const dt of dates) {
+    const d = bmiData[dt];
+    if (!d) continue;
+    for (const [cat, v] of Object.entries(d)) {
+      if (!agg[cat]) agg[cat] = { total: 0, subs: {} };
+      agg[cat].total += v.total || 0;
+      total += v.total || 0;
+      for (const [sub, amt] of Object.entries(v.subs || {})) {
+        agg[cat].subs[sub] = (agg[cat].subs[sub] || 0) + amt;
+      }
+    }
+  }
+  return total > 0 ? { total, byCategory: agg } : null;
+}
+function dateMinusYear(dateStr) {
+  // Returns dateStr - 364 days (same weekday last year)
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() - 364);
+  return d.toISOString().slice(0,10);
+}
+
+// ── Weather (Open-Meteo, free, no key) ────────────────────────────────────────
+const WMO_ICONS = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
+  45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌦️',
+  61:'🌧️', 63:'🌧️', 65:'🌧️',
+  71:'❄️', 73:'❄️', 75:'❄️', 77:'🌨️',
+  80:'🌧️', 81:'🌧️', 82:'⛈️',
+  85:'❄️', 86:'❄️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️'
+};
+function wmoIcon(code) { return WMO_ICONS[code] || '🌡️'; }
+const _weatherCache = {};
+async function fetchWeather(dateStr) {
+  if (_weatherCache[dateStr] !== undefined) return _weatherCache[dateStr];
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const isArchive = dateStr < today;
+    const base = isArchive
+      ? 'https://archive-api.open-meteo.com/v1/archive'
+      : 'https://api.open-meteo.com/v1/forecast';
+    const url = `${base}?latitude=52.37&longitude=5.22&daily=weathercode,temperature_2m_max,temperature_2m_min&start_date=${dateStr}&end_date=${dateStr}&timezone=Europe%2FAmsterdam`;
+    const r = await fetch(url);
+    const d = await r.json();
+    if (!d.daily?.weathercode?.length) { _weatherCache[dateStr] = null; return null; }
+    const w = { icon: wmoIcon(d.daily.weathercode[0]), max: Math.round(d.daily.temperature_2m_max[0]), min: Math.round(d.daily.temperature_2m_min[0]) };
+    _weatherCache[dateStr] = w;
+    return w;
+  } catch(e) { _weatherCache[dateStr] = null; return null; }
+}
+function weatherBadge(w, small = false) {
+  if (!w) return '';
+  const fs = small ? '11px' : '13px';
+  return `<span style="font-size:${fs};color:#aaa;white-space:nowrap;">${w.icon} ${w.max}° / ${w.min}°</span>`;
+}
+
+function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, myposLY = null, payterLY = null, nayaxLY = null) {
+  if (!bmiResult) return '';
+  // Deep-clone to avoid mutating cached data
+  const byCategory = JSON.parse(JSON.stringify(bmiResult.byCategory || {}));
+  // Inject MyPOS + Payter vorig jaar onder Overig
+  const myposExcl = myposLY?.omzetExclBtw || 0;
+  const payterExcl = payterLY?.omzetExclBtw || 0;
+  if (myposExcl > 0 || payterExcl > 0) {
+    if (!byCategory['Overig']) byCategory['Overig'] = { total: 0, subs: {} };
+    if (myposExcl > 0) {
+      byCategory['Overig'].subs['Speelgoed Automaat (MyPOS)'] = (byCategory['Overig'].subs['Speelgoed Automaat (MyPOS)'] || 0) + myposExcl;
+      byCategory['Overig'].total += myposExcl;
+    }
+    if (payterExcl > 0) {
+      byCategory['Overig'].subs['Kluisjes (Payter)'] = (byCategory['Overig'].subs['Kluisjes (Payter)'] || 0) + payterExcl;
+      byCategory['Overig'].total += payterExcl;
+    }
+  }
+  // Inject Nayax (Photobooths) vorig jaar onder Overig
+  const nayaxPhotoExcl = nayaxLY?.photobooth?.omzetExclBtw || 0;
+  const nayaxSpiegelExcl = nayaxLY?.spiegel?.omzetExclBtw || 0;
+  if (nayaxPhotoExcl > 0 || nayaxSpiegelExcl > 0) {
+    if (!byCategory['Overig']) byCategory['Overig'] = { total: 0, subs: {} };
+    if (nayaxPhotoExcl > 0) {
+      byCategory['Overig'].subs['Photobooth Wit (Nayax)'] = (byCategory['Overig'].subs['Photobooth Wit (Nayax)'] || 0) + nayaxPhotoExcl;
+      byCategory['Overig'].total += nayaxPhotoExcl;
+    }
+    if (nayaxSpiegelExcl > 0) {
+      byCategory['Overig'].subs['Spiegel Booth (Nayax)'] = (byCategory['Overig'].subs['Spiegel Booth (Nayax)'] || 0) + nayaxSpiegelExcl;
+      byCategory['Overig'].total += nayaxSpiegelExcl;
+    }
+  }
+  const total = bmiResult.total + myposExcl + payterExcl + nayaxPhotoExcl + nayaxSpiegelExcl;
+  if (total === 0) return '';
+  const growth = currentTotal > 0 ? ((currentTotal - total) / total * 100).toFixed(1) : null;
+  const growthHtml = growth !== null
+    ? `<span style="font-size:13px;font-weight:600;color:${parseFloat(growth)>=0?'#22c55e':'#ef4444'};margin-left:8px;">${parseFloat(growth)>=0?'↑':'↓'} ${Math.abs(growth)}%</span>`
+    : '';
+  const weatherHtml = weather ? `<span style="font-size:12px;color:#888;margin-left:8px;">${weather.icon} ${weather.max}°/${weather.min}°</span>` : '';
+  const RC_COLORS = { 'Activiteiten':'#7c3aed','F&B':'#2563eb','Bedrijfsarrangementen':'#059669','Overig':'#6b7280' };
+  const sorted = Object.entries(byCategory).sort((a,b) => b[1].total - a[1].total).filter(([,v]) => v.total > 0);
+  let rows = '';
+  for (const [cat, v] of sorted) {
+    const pct = total > 0 ? (v.total/total*100).toFixed(1) : 0;
+    const color = RC_COLORS[cat] || '#6b7280';
+    const subEntries = Object.entries(v.subs || {}).sort((a,b)=>b[1]-a[1]).filter(([,s])=>s>0);
+    let subRows = '';
+    for (const [sub, amt] of subEntries) {
+      const subPct = v.total > 0 ? (amt/v.total*100).toFixed(0) : 0;
+      subRows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 4px 12px;border-left:2px solid ${color}40;margin-left:4px;">
+        <span style="font-size:11px;color:#aaa;">${sub}</span>
+        <span style="font-size:11px;color:#aaa;">${fmtEur(amt)} <span style="color:#666;">${subPct}%</span></span>
+      </div>`;
+    }
+    rows += `<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+          <span style="font-size:12px;color:#ccc;">${cat}</span>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:#ccc;">${fmtEur(v.total)} <span style="color:#666;">${pct}%</span></div>
+      </div>
+      <div style="height:4px;background:#333;border-radius:2px;margin-bottom:4px;">
+        <div style="height:4px;background:${color}80;border-radius:2px;width:${pct}%;"></div>
+      </div>
+      ${subRows}
+    </div>`;
+  }
+  return `<div class="card" style="opacity:0.85;border:1px solid #333;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div>
+        <div class="section-title" style="margin-bottom:0;">📊 ${label}</div>
+        ${weatherHtml}
+      </div>
+      <div style="font-size:16px;font-weight:700;color:#aaa;">${fmtEur(total)}${growthHtml}</div>
+    </div>
+    ${rows}
+  </div>`;
+}
+
+// ── Translations ──────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  nl: {
+    // Tabs
+    tabWeek: '📅 Week',
+    tabBezoek: '🏟️ Bezoek',
+    tabVerkoop: '💳 Verkoop',
+    tabRun: '📋 Run',
+    // General
+    today: 'vandaag',
+    visitors: 'bezoekers',
+    transactions: 'transacties',
+    // Week view
+    revenueVisit: 'Omzet (bezoek)',
+    perDayTap: 'Per dag — tik voor details',
+    // Bezoek view
+    revenue: 'Omzet',
+    avgPer: 'Gem./pers.',
+    perCategory: 'Per categorie',
+    perReportingCat: 'Per reporting categorie',
+    subcategories: 'subcategorieën',
+    ofCat: 'van cat.',
+    bannerBezoek: '🏟️ Omzet — erkend bij daadwerkelijk bezoek (Recognition)',
+    // Verkoop view
+    received: 'Ontvangen',
+    transCount: 'Transacties',
+    avgTrans: 'Gem./trans.',
+    salesChannel: 'Sales channel',
+    bannerVerkoop: '💳 Verkopen — geld ontvangen op deze dag (ongeacht bezoekdatum)',
+    myposTitle: '🎮 Speelgoed Automaat (MyPOS)',
+    myposSales: 'Verkopen incl. BTW',
+    myposRevenue: 'Omzet excl. BTW',
+    myposVat: 'BTW (21%)',
+    myposTrans: 'Betalingen',
+    payterTitle: '🔐 Kluisjes (Payter)',
+    payterSales: 'Verkopen incl. BTW',
+    payterRevenue: 'Omzet excl. BTW',
+    payterVat: 'BTW (21%)',
+    payterTrans: 'Betalingen',
+    nayaxTitle: '📸 Photobooths (Nayax)',
+    nayaxPhotoTitle: '📸 Photobooth Wit (Nayax)',
+    nayaxSpiegelTitle: '🪞 Spiegel Booth (Nayax)',
+    nayaxSales: 'Verkopen incl. BTW',
+    nayaxRevenue: 'Omzet excl. BTW',
+    nayaxVat: 'BTW (21%)',
+    nayaxTrans: 'Betalingen',
+    // Run sheet
+    kfTitle: 'Kinderfeestjes (KF)',
+    bfTitle: 'Bedrijfsfeesten (BF)',
+    booking: 'boeking',
+    bookings: 'boekingen',
+    bookingNr: 'Boeking #',
+    pers: 'pers.',
+    activity: 'Activiteit',
+    subtype: 'Subtype',
+    time: 'Tijd',
+    persons: 'Pers.',
+    location: 'Locatie',
+    notes: 'Opmerkingen',
+    noNotes: 'geen',
+    paid: 'Betaald',
+    outstanding: 'Openstaand',
+    paidWord: 'betaald',
+    openWord: 'open',
+    downloadPdf: '📄 Download PDF',
+    noBookings: 'Geen KF/BF boekingen voor',
+    runsheetTitle: 'Almere Underground — Run Sheet',
+    // Login
+    accessCode: 'Toegangscode',
+    loginBtn: 'Inloggen →',
+    invalidCode: 'Ongeldige toegangscode',
+    connError: 'Verbindingsfout – probeer opnieuw',
+    // Personeel tab
+    tabPersoneel: '👥 Personeel',
+    tabPersoneelEn: '👥 Staff',
+    staffDate: 'Datum',
+    staffDept: 'Afdeling',
+    staffPlanned: 'Gepland',
+    staffClocked: 'Geklokt',
+    staffHours: 'Uren',
+    staffCost: 'Kosten',
+    staffName: 'Naam',
+    staffStart: 'Aanvang',
+    staffEnd: 'Einde',
+    staffVsClocked: 'Gepland vs Geklokt',
+    staffTotals: 'Totaal',
+    staffNoData: 'Geen planning of uren beschikbaar voor deze datum.',
+    staffBack: '← Terug naar overzicht',
+    // Cache
+    fromCache: 'Uit cache',
+    liveData: 'Live data',
+    agoSec: 's geleden',
+    agoMin: 'm geleden',
+    // KPI tab
+    tabKpi: '📊 KPI',
+    kpiTitle: 'KPI Dashboard',
+    kpiDag: '📅 Dag',
+    kpiWeek: '📆 Week',
+    kpiMaand: '📅 Maand',
+    kpiMaandSoon: 'Maand (binnenkort)',
+    kpiOmzet: '💰 Omzet',
+    kpiPlannedPct: '📅 Gepland %',
+    kpiClockedPct: '🕐 Geklokt %',
+    kpiPerDept: '🏢 Per afdeling',
+    kpiPerDeptWeek: '🏢 Per afdeling — week',
+    kpiPlanned: '📅 Gepland',
+    kpiClocked: '🕐 Geklokt',
+    kpiLaborPct: 'loonkosten',
+    kpiOmzetWeek: '💰 Omzet week',
+    kpiFbComing: 'F&B koppeling binnenkort',
+    kpiOverhead: 'Overhead',
+    kpiVanTotaal: 'van totaal',
+    kpiVmBoekingen: 'VM boekingen',
+    kpiTotaalBoekingen: 'Totaal boekingen',
+    kpiKostenPerBoeking: 'Kosten/boeking',
+    kpiActRevLabel: 'Activiteiten omzet',
+    kpiSalesRevLabel: 'Bedrijfsarr. omzet',
+    kpiFbRevLabel: 'F&B omzet (gesplitst binnenkort)',
+    kpiNoData: 'Geen personeelsdata beschikbaar',
+    // Controle tab
+    tabControle: '🔍 Controle',
+    ctrlDag: '📅 Dag',
+    ctrlWeek: '📆 Week',
+    ctrlOmzetTitle: 'Omzet per systeem',
+    ctrlOmzetSub: 'excl. BTW · boekingsdatum',
+    ctrlBetalingTitle: 'Betalingen per systeem',
+    ctrlBetalingSub: 'incl. BTW · transactiedatum',
+    ctrlSystem: 'Systeem',
+    ctrlOmzet: 'Omzet excl. BTW',
+    ctrlBetaling: 'Betaling incl. BTW',
+    ctrlTx: 'Tx',
+    ctrlTotal: 'Totaal',
+    ctrlMatchBezoek: 'Aansluit met Bezoek tab',
+    ctrlMatchVerkoop: 'Aansluit met Verkoop tab',
+    ctrlDiffNote: '— verwacht door verschil boekings- vs transactiedatum',
+    ctrlDiffLabel: 'Verschil omzet vs betalingen',
+    ctrlWeekTotal: 'Week totaal',
+    ctrlPerDay: 'Per dag',
+    ctrlDate: 'Datum',
+    ctrlNoData: 'Geen data',
+  },
+  en: {
+    tabWeek: '📅 Week',
+    tabBezoek: '🏟️ Visit',
+    tabVerkoop: '💳 Sales',
+    tabRun: '📋 Run',
+    today: 'today',
+    visitors: 'visitors',
+    transactions: 'transactions',
+    revenueVisit: 'Revenue (visit)',
+    perDayTap: 'Per day — tap for details',
+    revenue: 'Revenue',
+    avgPer: 'Avg./pers.',
+    perCategory: 'Per category',
+    perReportingCat: 'Per reporting category',
+    subcategories: 'subcategories',
+    ofCat: 'of cat.',
+    bannerBezoek: '🏟️ Revenue — recognised at actual visit (Recognition)',
+    received: 'Received',
+    transCount: 'Transactions',
+    avgTrans: 'Avg./trans.',
+    salesChannel: 'Sales channel',
+    bannerVerkoop: '💳 Sales — funds received on this day (regardless of visit date)',
+    myposTitle: '🎮 Toy Machine (MyPOS)',
+    myposSales: 'Sales incl. VAT',
+    myposRevenue: 'Revenue excl. VAT',
+    myposVat: 'VAT (21%)',
+    myposTrans: 'Payments',
+    payterTitle: '🔐 Lockers (Payter)',
+    payterSales: 'Sales incl. VAT',
+    payterRevenue: 'Revenue excl. VAT',
+    payterVat: 'VAT (21%)',
+    payterTrans: 'Payments',
+    nayaxTitle: '📸 Photobooths (Nayax)',
+    nayaxPhotoTitle: '📸 Photobooth Wit (Nayax)',
+    nayaxSpiegelTitle: '🪞 Spiegel Booth (Nayax)',
+    nayaxSales: 'Sales incl. VAT',
+    nayaxRevenue: 'Revenue excl. VAT',
+    nayaxVat: 'VAT (21%)',
+    nayaxTrans: 'Payments',
+    kfTitle: 'Birthday Parties (KF)',
+    bfTitle: 'Corporate Events (BF)',
+    booking: 'booking',
+    bookings: 'bookings',
+    bookingNr: 'Booking #',
+    pers: 'pers.',
+    activity: 'Activity',
+    subtype: 'Subtype',
+    time: 'Time',
+    persons: 'Pers.',
+    location: 'Location',
+    notes: 'Notes',
+    noNotes: 'none',
+    paid: 'Paid',
+    outstanding: 'Outstanding',
+    paidWord: 'paid',
+    openWord: 'due',
+    downloadPdf: '📄 Download PDF',
+    noBookings: 'No KF/BF bookings for',
+    runsheetTitle: 'Almere Underground — Run Sheet',
+    accessCode: 'Access code',
+    loginBtn: 'Log in →',
+    invalidCode: 'Invalid access code',
+    connError: 'Connection error – please try again',
+    // Personeel tab
+    tabPersoneel: '👥 Staff',
+    tabPersoneelEn: '👥 Staff',
+    staffDate: 'Date',
+    staffDept: 'Department',
+    staffPlanned: 'Planned',
+    staffClocked: 'Clocked',
+    staffHours: 'Hours',
+    staffCost: 'Cost',
+    staffName: 'Name',
+    staffStart: 'Start',
+    staffEnd: 'End',
+    staffVsClocked: 'Planned vs Clocked',
+    staffTotals: 'Total',
+    staffNoData: 'No planning or hours available for this date.',
+    staffBack: '← Back to overview',
+    fromCache: 'From cache',
+    liveData: 'Live data',
+    agoSec: 's ago',
+    agoMin: 'm ago',
+    // KPI tab
+    tabKpi: '📊 KPI',
+    kpiTitle: 'KPI Dashboard',
+    kpiDag: '📅 Day',
+    kpiWeek: '📆 Week',
+    kpiMaand: '📅 Month',
+    kpiMaandSoon: 'Month (coming soon)',
+    kpiOmzet: '💰 Revenue',
+    kpiPlannedPct: '📅 Planned %',
+    kpiClockedPct: '🕐 Clocked %',
+    kpiPerDept: '🏢 Per department',
+    kpiPerDeptWeek: '🏢 Per department — week',
+    kpiPlanned: '📅 Planned',
+    kpiClocked: '🕐 Clocked',
+    kpiLaborPct: 'labor cost',
+    kpiOmzetWeek: '💰 Weekly revenue',
+    kpiFbComing: 'F&B link coming soon',
+    kpiOverhead: 'Overhead',
+    kpiVanTotaal: 'of total',
+    kpiVmBoekingen: 'VM bookings',
+    kpiTotaalBoekingen: 'Total bookings',
+    kpiKostenPerBoeking: 'Cost/booking',
+    kpiActRevLabel: 'Activities revenue',
+    kpiSalesRevLabel: 'Corporate arr. revenue',
+    kpiFbRevLabel: 'F&B revenue (split coming soon)',
+    kpiNoData: 'No staff data available',
+    // Controle tab
+    tabControle: '🔍 Control',
+    ctrlDag: '📅 Day',
+    ctrlWeek: '📆 Week',
+    ctrlOmzetTitle: 'Revenue per system',
+    ctrlOmzetSub: 'excl. VAT · booking date',
+    ctrlBetalingTitle: 'Payments per system',
+    ctrlBetalingSub: 'incl. VAT · transaction date',
+    ctrlSystem: 'System',
+    ctrlOmzet: 'Revenue excl. VAT',
+    ctrlBetaling: 'Payment incl. VAT',
+    ctrlTx: 'Tx',
+    ctrlTotal: 'Total',
+    ctrlMatchBezoek: 'Matches Visit tab',
+    ctrlMatchVerkoop: 'Matches Sales tab',
+    ctrlDiffNote: '— expected due to booking vs transaction date difference',
+    ctrlDiffLabel: 'Difference revenue vs payments',
+    ctrlWeekTotal: 'Week total',
+    ctrlPerDay: 'Per day',
+    ctrlDate: 'Date',
+    ctrlNoData: 'No data',
+  }
+};
+
+let lang = localStorage.getItem('au_lang') || 'nl';
+
+function t(key) {
+  return (TRANSLATIONS[lang] || TRANSLATIONS.nl)[key] || TRANSLATIONS.nl[key] || key;
+}
+
+function locale() {
+  return lang === 'en' ? 'en-GB' : 'nl-NL';
+}
+
+function setLang(newLang) {
+  lang = newLang;
+  localStorage.setItem('au_lang', lang);
+  applyLang();
+  render();
+}
+
+function applyLang() {
+  const sel = document.getElementById('lang-select');
+  if (sel) sel.value = lang;
+  // Tabs
+  const tw = document.getElementById('tab-week');
+  const tb = document.getElementById('tab-bezoek');
+  const tv = document.getElementById('tab-verkoop');
+  const tp = document.getElementById('tab-personeel');
+  const tk = document.getElementById('tab-kpi');
+  if (tw) tw.textContent = t('tabWeek');
+  if (tb) tb.textContent = t('tabBezoek');
+  if (tv) tv.textContent = t('tabVerkoop');
+  if (tp) tp.textContent = t('tabPersoneel');
+  if (tk) tk.textContent = t('tabKpi');
+  const tct = document.getElementById('tab-controle');
+  if (tct) tct.textContent = t('tabControle');
+  // Login screen
+  const ll = document.getElementById('login-label');
+  const lb = document.getElementById('login-btn');
+  if (ll) ll.textContent = t('accessCode');
+  if (lb) lb.textContent = t('loginBtn');
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let accessCode = sessionStorage.getItem('au_code') || '';
+
+async function doLogin() {
+  const input = document.getElementById('code-input');
+  const errEl = document.getElementById('login-error');
+  const code = input.value.trim();
+  if (!code) return;
+
+  errEl.textContent = '';
+  input.disabled = true;
+
+  try {
+    const test = await fetch(`${WORKER}/api/day?date=${todayStr()}`, {
+      headers: { 'X-Access-Code': code }
+    });
+    const data = await test.json();
+
+    if (data.error && data.error.includes('Ongeldig')) {
+      input.classList.add('error');
+      setTimeout(() => input.classList.remove('error'), 600);
+      errEl.textContent = t('invalidCode');
+      input.disabled = false;
+      input.focus();
+      return;
+    }
+
+    accessCode = code;
+    sessionStorage.setItem('au_code', code);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    render();
+  } catch (e) {
+    errEl.textContent = t('connError');
+    input.disabled = false;
+  }
+}
+
+// Check if already logged in
+if (accessCode) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+const cache = {};
+
+async function api(path, forceRefresh = false) {
+  const key = path;
+  if (!forceRefresh && cache[key]) return cache[key];
+  const sep = path.includes('?') ? '&' : '?';
+  const url = forceRefresh ? `${WORKER}${path}${sep}refresh=1` : `${WORKER}${path}`;
+  const r = await fetch(url, { headers: { 'X-Access-Code': accessCode } });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  cache[key] = data;
+  if (!forceRefresh) setTimeout(() => delete cache[key], 5 * 60 * 1000);
+  return data;
+}
+
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  Object.keys(cache).forEach(k => delete cache[k]);
+  try {
+    await renderCurrentTab(true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄'; }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function todayStr() {
+  return new Date().toLocaleDateString('sv-SE');
+}
+
+function addDays(s, n) {
+  const d = new Date(s + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('sv-SE');
+}
+
+function fmtEur(v) {
+  if (v == null || isNaN(v)) return '—';
+  return '€\u00a0' + v.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(s) {
+  return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function fmtDateLong(s) {
+  return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function fmtTime(t) {
+  if (!t) return '—';
+  return t.length > 5 ? t.substring(11, 16) : t;
+}
+
+function setContent(html) { document.getElementById('content').innerHTML = html; }
+function spinner() { return '<div class="spinner"></div>'; }
+function errMsg(m) { return `<div class="err-msg">⚠️ ${m}</div>`; }
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentTab = 'week';
+let selectedDate = todayStr();
+let weekOffset = 0;
+let persDate = todayStr();
+let expandedDept = null;
+
+// KPI tab state
+let kpiPeriod = 'dag'; // 'dag' | 'week'
+let kpiDate = todayStr();
+let kpiWeekOffset = 0;
+
+// Controle tab state
+let controleMode = 'dag'; // 'dag' | 'week'
+
+// ── Category colors ───────────────────────────────────────────────────────────
+const CAT_COLORS = {
+  'Kinderfeestjes': '#ef4444',
+  'Bedrijfsfeesten': '#3b82f6',
+  'Box office': '#f59e0b',
+  'Online': '#8b5cf6',
+  'Venue Manager': '#10b981',
+  'Overig': '#6b7280',
+};
+const CAT_ORDER = ['Kinderfeestjes', 'Bedrijfsfeesten', 'Box office', 'Online', 'Venue Manager', 'Overig'];
+
+const CHANNEL_META = {
+  'Online checkout': { label: 'Online checkout', color: '#8b5cf6' },
+  'POS':            { label: 'Kassa (POS)', color: '#10b981' },
+  'VenueManager':   { label: 'Venue Manager', color: '#f59e0b' },
+  'Venue manager':  { label: 'Venue Manager', color: '#f59e0b' },
+};
+
+// ── Cache label ───────────────────────────────────────────────────────────────
+function cacheLabel(data) {
+  if (!data) return '';
+  const at = data._cachedAt || data.generatedAt;
+  const fromCache = data._cached;
+  const age = data._cacheAge;
+  const timeStr = at ? new Date(at).toLocaleString(locale(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const ageStr = age != null ? (age < 60 ? `${age}${t('agoSec')}` : `${Math.floor(age/60)}${t('agoMin')}`) : '';
+  const icon = fromCache ? '📦' : '⚡';
+  const label = fromCache ? `${t('fromCache')} · ${ageStr}` : t('liveData');
+  return `<div style="font-size:10px;color:#444;text-align:center;margin-top:12px;">${icon} ${label}${timeStr ? ` · ${timeStr}` : ''}</div>`;
+}
+
+// ── WEEK VIEW ─────────────────────────────────────────────────────────────────
+async function renderWeek(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    const data = await api(`/api/week?offset=${weekOffset}`, forceRefresh);
+    const days = data.days || [];
+    const today = todayStr();
+    const maxRev = Math.max(...days.map(d => d.visit?.netRevenue || 0), 1);
+
+    const startLabel = new Date(days[0]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+    const endLabel   = new Date(days[6]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+
+    // ── Cumulative week category breakdown ────────────────────────────────────
+    const weekRcData = {};
+    let weekTotalRev = 0;
+    let weekTotalVis = 0;
+    for (const day of days) {
+      const rc = day.visit?.byReportingCategory || {};
+      const dayMyposRev = (day.mypos?.omzetExclBtw || 0);
+      const dayPayterRev = (day.payter?.omzetExclBtw || 0);
+      weekTotalRev += (day.visit?.netRevenue || 0) + dayMyposRev + dayPayterRev;
+      weekTotalVis += day.visit?.visitors || 0;
+      for (const [catName, catData] of Object.entries(rc)) {
+        if (!weekRcData[catName]) weekRcData[catName] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData[catName].revenue += catData.revenue || 0;
+        weekRcData[catName].visitors += catData.visitors || 0;
+        for (const [subName, subData] of Object.entries(catData.subcategories || {})) {
+          if (!weekRcData[catName].subcategories[subName]) weekRcData[catName].subcategories[subName] = { revenue: 0, visitors: 0 };
+          weekRcData[catName].subcategories[subName].revenue += subData.revenue || 0;
+          weekRcData[catName].subcategories[subName].visitors += subData.visitors || 0;
+        }
+      }
+      // MyPOS excl. BTW → Overig subcategorie
+      if (dayMyposRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayMyposRev;
+        if (!weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)']) weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'].revenue += dayMyposRev;
+        weekRcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'].visitors += day.mypos?.aantalBetalingen || 0;
+      }
+      // Payter excl. BTW → Overig subcategorie
+      if (dayPayterRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayPayterRev;
+        if (!weekRcData['Overig'].subcategories['Kluisjes (Payter)']) weekRcData['Overig'].subcategories['Kluisjes (Payter)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Kluisjes (Payter)'].revenue += dayPayterRev;
+        weekRcData['Overig'].subcategories['Kluisjes (Payter)'].visitors += day.payter?.transactions || 0;
+      }
+      // Nayax excl. BTW → Overig subcategorieën (Photobooth Wit + Spiegel Booth)
+      const dayNayaxPhotoRev = day.nayax?.photobooth?.omzetExclBtw || 0;
+      const dayNayaxSpiegelRev = day.nayax?.spiegel?.omzetExclBtw || 0;
+      if (dayNayaxPhotoRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayNayaxPhotoRev;
+        weekTotalRev += dayNayaxPhotoRev;
+        if (!weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)']) weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)'].revenue += dayNayaxPhotoRev;
+        weekRcData['Overig'].subcategories['Photobooth Wit (Nayax)'].visitors += day.nayax?.photobooth?.transactions || 0;
+      }
+      if (dayNayaxSpiegelRev > 0) {
+        if (!weekRcData['Overig']) weekRcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['Overig'].revenue += dayNayaxSpiegelRev;
+        weekTotalRev += dayNayaxSpiegelRev;
+        if (!weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)']) weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'] = { revenue: 0, visitors: 0 };
+        weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'].revenue += dayNayaxSpiegelRev;
+        weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'].visitors += day.nayax?.spiegel?.transactions || 0;
+      }
+    }
+    const RC_COLORS_W = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
+    const weekRcEntries = Object.entries(weekRcData).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,d]) => d.revenue > 0);
+    let weekCatRows = '';
+    weekRcEntries.forEach(([catName, catData], ci) => {
+      const color = RC_COLORS_W[ci % RC_COLORS_W.length];
+      const pct = weekTotalRev > 0 ? (catData.revenue / weekTotalRev * 100).toFixed(1) : 0;
+      const catAvg = catData.visitors > 0 ? catData.revenue / catData.visitors : 0;
+      const subEntries = Object.entries(catData.subcategories || {}).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,s]) => s.revenue > 0);
+      let subRows = '';
+      for (const [subName, subData] of subEntries) {
+        const subPct = catData.revenue > 0 ? (subData.revenue / catData.revenue * 100).toFixed(0) : 0;
+        const subAvg = subData.visitors > 0 ? (subData.revenue / subData.visitors).toFixed(2) : 0;
+        subRows += `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0 5px 14px;border-left:2px solid ${color}30;margin-left:4px;">
+            <div style="flex:1;"><div style="font-size:12px;color:#ccc;">${subName}</div><div style="font-size:11px;color:#888;">${subData.visitors.toLocaleString(locale())} ${t('visitors')} · gem. ${fmtEur(parseFloat(subAvg))}/pers.</div></div>
+            <div style="text-align:right;margin-left:8px;"><div style="font-size:12px;font-weight:600;">${fmtEur(subData.revenue)}</div><div style="font-size:10px;color:#888;">${subPct}% ${t('ofCat')}</div></div>
+          </div>`;
+      }
+      weekCatRows += `<div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <div><span style="font-size:14px;font-weight:700;">${catName}</span>${subEntries.length > 0 ? `<span style="font-size:10px;color:#888;margin-left:6px;">${subEntries.length} ${t('subcategories')}</span>` : ''}</div>
+            <div style="text-align:right;"><div style="font-size:14px;font-weight:700;">${fmtEur(catData.revenue)}</div><div style="font-size:11px;color:#888;">${pct}% · ${catData.visitors.toLocaleString(locale())} ${t('visitors')} · ${fmtEur(catAvg)}/pers.</div></div>
+          </div>
+          <div style="height:4px;border-radius:999px;background:${color};width:${pct}%;margin-bottom:${subEntries.length > 0 ? 6 : 0}px;"></div>
+          ${subRows}
+        </div>`;
+    });
+
+    let dayRows = '';
+    for (const day of days) {
+      const isToday = day.date === today;
+      const rev = day.visit?.netRevenue || 0;
+      const vis = day.visit?.visitors || 0;
+      const barW = Math.round((rev / maxRev) * 100);
+      const dayName = new Date(day.date + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'short' });
+      const dayNum  = new Date(day.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+      dayRows += `
+        <div class="week-day-card ${isToday ? 'today' : ''}" onclick="goToDay('${day.date}')">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="wd-name" style="font-size:13px;font-weight:700;min-width:28px;">${dayName}</div>
+              <div style="font-size:12px;color:#888;">${dayNum}</div>
+              ${isToday ? `<span class="badge" style="background:#7c3aed22;color:#7c3aed;">${t('today')}</span>` : ''}
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:14px;font-weight:700;">${fmtEur(rev)}</div>
+              <div style="font-size:11px;color:#888;">${vis.toLocaleString(locale())} ${t('visitors')}</div>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:#7c3aed;"></div></div>
+        </div>`;
+    }
+
+    // BMI week comparison (same 7 weekdays, 52 weeks ago)
+    await loadBmiData();
+    const bmiWeekDates = days.map(d => dateMinusYear(d.date));
+    const bmiWeek = bmiForDates(bmiWeekDates);
+    const bmiWeekStart = new Date(bmiWeekDates[0] + 'T12:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' });
+    const bmiWeekEnd   = new Date(bmiWeekDates[6] + 'T12:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short', year:'numeric' });
+    const bmiWeekCardHtml = bmiComparisonCard(bmiWeek, `Vorig jaar (${bmiWeekStart} – ${bmiWeekEnd})`, weekTotalRev);
+
+    setContent(`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <button class="nav-btn" onclick="shiftWeek(-1)">‹</button>
+        <div class="date-label">${startLabel} – ${endLabel}</div>
+        <button class="nav-btn" onclick="shiftWeek(1)">›</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        <div class="kpi-card">
+          <div class="kpi-label">${t('revenueVisit')}</div>
+          <div class="kpi-value" style="font-size:14px;">${fmtEur(data.totals?.netRevenue)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">${t('visitors')}</div>
+          <div class="kpi-value" style="font-size:14px;">${(data.totals?.visitors||0).toLocaleString(locale())}</div>
+        </div>
+      </div>
+      ${weekCatRows.length > 0 ? `
+      <div class="section-title">📊 ${t('perReportingCat')}</div>
+      <div style="background:#1a1a24;border-radius:14px;padding:14px;margin-bottom:16px;">
+        ${weekCatRows}
+      </div>` : ''}
+      ${bmiWeekCardHtml}
+      <div class="section-title">${t('perDayTap')}</div>
+      ${dayRows}
+      ${cacheLabel(data)}
+    `);
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+
+// ── Hourly line chart ─────────────────────────────────────────────────────────
+function hourlyBarChart(byHour, color = '#2563eb') {
+  // Show hours 09–01 (CEST business day)
+  const hours = [];
+  for (let i = 9; i <= 23; i++) hours.push(String(i).padStart(2, '0'));
+  hours.push('00', '01');
+
+  const vals = hours.map(h => byHour[h] || 0);
+  const max = Math.max(...vals, 1);
+
+  // SVG dimensions
+  const W = 600, H = 90, padL = 0, padR = 8, padT = 20, padB = 22;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const n = hours.length;
+
+  // Format value without currency: e.g. 1234 → "1234", 12345 → "12k"
+  function fmtVal(v) {
+    if (v >= 1000) return Math.round(v / 1000 * 10) / 10 + 'k';
+    return Math.round(v).toString();
+  }
+
+  // X/Y helpers
+  const x = i => padL + (i / (n - 1)) * chartW;
+  const y = v => padT + chartH - (v / max) * chartH;
+
+  // Build polyline points
+  const points = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+
+  // Fill area under line
+  const fillPts = `${x(0).toFixed(1)},${(padT + chartH).toFixed(1)} ` +
+    vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ') +
+    ` ${x(n-1).toFixed(1)},${(padT + chartH).toFixed(1)}`;
+
+  // Dots + labels every hour
+  const dotsSVG = hours.map((h, i) => {
+    const v = vals[i];
+    const cx = x(i).toFixed(1), cy = y(v).toFixed(1);
+    const showLabel = v > 0;
+    const labelY = (parseFloat(cy) - 5 < padT + 4) ? parseFloat(cy) + 12 : parseFloat(cy) - 5;
+    return `
+      <circle cx="${cx}" cy="${cy}" r="${v > 0 ? 2.5 : 1.5}" fill="${v > 0 ? color : '#ccc'}" />
+      ${showLabel ? `<text x="${cx}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="11" fill="white" font-weight="800" stroke="rgba(0,0,0,0.55)" stroke-width="3" paint-order="stroke">${fmtVal(v)}</text>` : ''}
+    `;
+  }).join('');
+
+  // X-axis hour labels (every hour)
+  const labelsSVG = hours.map((h, i) => {
+    return `<text x="${x(i).toFixed(1)}" y="${(H - 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="#888">${parseInt(h)}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;overflow:visible;" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="lg${color.replace('#','')}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0.01"/>
+      </linearGradient>
+    </defs>
+    <!-- fill area -->
+    <polygon points="${fillPts}" fill="url(#lg${color.replace('#','')})" />
+    <!-- baseline -->
+    <line x1="${padL}" y1="${padT + chartH}" x2="${W - padR}" y2="${padT + chartH}" stroke="#e5e7eb" stroke-width="1"/>
+    <!-- line -->
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- dots + value labels -->
+    ${dotsSVG}
+    <!-- hour labels -->
+    ${labelsSVG}
+  </svg>`;
+}
+
+// ── BEZOEK VIEW ───────────────────────────────────────────────────────────────
+async function renderBezoek(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    await loadBmiData();
+    const bmiDatePre = dateMinusYear(selectedDate);
+    const [data, mypos, payter, nayax, weatherToday, weatherLastYear, myposLY, payterLY, nayaxLY] = await Promise.all([
+      api(`/api/day?date=${selectedDate}`, forceRefresh),
+      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null),
+      fetchWeather(selectedDate).catch(() => null),
+      fetchWeather(bmiDatePre).catch(() => null),
+      api(`/api/mypos?date=${bmiDatePre}`, false).catch(() => null),
+      api(`/api/payter?date=${bmiDatePre}`, false).catch(() => null),
+      api(`/api/nayax?date=${bmiDatePre}`, false).catch(() => null)
+    ]);
+    const { visit } = data;
+    const myposRev = mypos?.omzetExclBtw || 0;
+    const payterRev = payter?.omzetExclBtw || 0;
+    const nayaxRev = nayax?.omzetExclBtw || 0;
+    const totalRev = visit.netRevenue + myposRev + payterRev + nayaxRev;
+    const avg = visit.visitors > 0 ? totalRev / visit.visitors : 0;
+
+    const cats = CAT_ORDER.filter(c => visit.byCategory?.[c]);
+    let catRows = '';
+    for (const cat of cats) {
+      const d = visit.byCategory[cat];
+      const pct = totalRev > 0 ? Math.round((d.revenue / totalRev) * 100) : 0;
+      const catAvg = d.visitors > 0 ? d.revenue / d.visitors : 0;
+      const color = CAT_COLORS[cat] || '#6b7280';
+      catRows += `
+        <div class="cat-row">
+          <div class="cat-top">
+            <div class="cat-name">
+              <div class="cat-dot" style="background:${color};"></div>${cat}
+            </div>
+            <div>
+              <span style="font-size:14px;font-weight:700;">${fmtEur(d.revenue)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+          <div class="cat-sub">
+            <span>${d.visitors.toLocaleString(locale())} ${t('visitors')}</span>
+            <span>${t('avgPer').replace('Gem.','gem.')} ${fmtEur(catAvg)}/pers.</span>
+          </div>
+        </div>`;
+    }
+
+    // Reporting category breakdown — include MyPOS under Overig
+    const rcData = JSON.parse(JSON.stringify(visit.byReportingCategory || {}));
+    if (myposRev > 0) {
+      if (!rcData['Overig']) rcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+      rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + myposRev;
+      if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
+      rcData['Overig'].subcategories['Speelgoed Automaat (MyPOS)'] = { revenue: myposRev, visitors: mypos.transactions || 0 };
+    }
+    if (payterRev > 0) {
+      if (!rcData['Overig']) rcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+      rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + payterRev;
+      if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
+      rcData['Overig'].subcategories['Kluisjes (Payter)'] = { revenue: payterRev, visitors: payter.transactions || 0 };
+    }
+    if (nayax?.photobooth?.omzetExclBtw > 0 || nayax?.spiegel?.omzetExclBtw > 0) {
+      if (!rcData['Overig']) rcData['Overig'] = { revenue: 0, visitors: 0, subcategories: {} };
+      if (!rcData['Overig'].subcategories) rcData['Overig'].subcategories = {};
+      const photoRev = nayax?.photobooth?.omzetExclBtw || 0;
+      const spiegelRev = nayax?.spiegel?.omzetExclBtw || 0;
+      if (photoRev > 0) {
+        rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + photoRev;
+        rcData['Overig'].subcategories['Photobooth Wit (Nayax)'] = { revenue: photoRev, visitors: nayax.photobooth.transactions || 0 };
+      }
+      if (spiegelRev > 0) {
+        rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + spiegelRev;
+        rcData['Overig'].subcategories['Spiegel Booth (Nayax)'] = { revenue: spiegelRev, visitors: nayax.spiegel.transactions || 0 };
+      }
+    }
+    const rcEntries = Object.entries(rcData).sort((a,b) => b[1].revenue - a[1].revenue);
+    let rcRows = '';
+    const RC_COLORS = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
+    rcEntries.forEach(([catName, catData], ci) => {
+      if (catData.revenue === 0) return;
+      const color = RC_COLORS[ci % RC_COLORS.length];
+      const pct = totalRev > 0 ? (catData.revenue / totalRev * 100).toFixed(1) : 0;
+      const catAvg = catData.visitors > 0 ? catData.revenue / catData.visitors : 0;
+      const subEntries = Object.entries(catData.subcategories || {}).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,s]) => s.revenue > 0);
+
+      let subRows = '';
+      for (const [subName, subData] of subEntries) {
+        const subPct = catData.revenue > 0 ? (subData.revenue / catData.revenue * 100).toFixed(0) : 0;
+        const subAvg = subData.visitors > 0 ? (subData.revenue / subData.visitors).toFixed(2) : 0;
+        subRows += `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0 5px 14px;border-left:2px solid ${color}30;margin-left:4px;">
+            <div style="flex:1;">
+              <div style="font-size:12px;color:#ccc;">${subName}</div>
+              <div style="font-size:11px;color:#888;">${subData.visitors.toLocaleString(locale())} ${t('visitors')} · gem. ${fmtEur(parseFloat(subAvg))}/pers.</div>
+            </div>
+            <div style="text-align:right;margin-left:8px;">
+              <div style="font-size:12px;font-weight:600;">${fmtEur(subData.revenue)}</div>
+              <div style="font-size:10px;color:#888;">${subPct}% ${t('ofCat')}</div>
+            </div>
+          </div>`;
+      }
+
+      rcRows += `
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <div>
+              <span style="font-size:14px;font-weight:700;">${catName}</span>
+              ${subEntries.length > 0 ? `<span style="font-size:10px;color:#888;margin-left:6px;">${subEntries.length} ${t('subcategories')}</span>` : ''}
+            </div>
+            <div style="text-align:right;">
+              <span style="font-size:14px;font-weight:700;">${fmtEur(catData.revenue)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:3px;margin-bottom:${subEntries.length ? '8px' : '0'};">
+            ${catData.visitors.toLocaleString(locale())} ${t('visitors')} · gem. ${fmtEur(catAvg)}/pers.
+          </div>
+          ${subRows}
+        </div>`;
+    });
+
+    // Combine Roller + MyPOS + Payter hourly data (both excl BTW)
+    const visitByHourCombined = Object.assign({}, visit.byHour || {});
+    for (const [h, v] of Object.entries(mypos?.byHour || {})) {
+      visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
+    }
+    for (const [h, v] of Object.entries(payter?.byHour || {})) {
+      visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
+    }
+    for (const [h, v] of Object.entries(nayax?.byHour || {})) {
+      visitByHourCombined[h] = (visitByHourCombined[h] || 0) + (v / 1.21);
+    }
+    const hasHourData = Object.keys(visitByHourCombined).length > 0;
+
+    // BMI historical comparison
+    const bmiDate = bmiDatePre;
+    const bmiDay = bmiForDate(bmiDate);
+    const bmiLabelDate = new Date(bmiDate + 'T12:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
+    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear, myposLY, payterLY, nayaxLY);
+
+    // Compact BMI totaal vergelijking (kleine tegel) — inclusief MyPOS + Payter vorig jaar
+    const bmiTotalLY = (bmiDay?.total || 0) + (myposLY?.omzetExclBtw || 0) + (payterLY?.omzetExclBtw || 0);
+    let bmiTotaalHtml = '';
+    if (bmiTotalLY > 0) {
+      const g = totalRev > 0 ? ((totalRev - bmiTotalLY) / bmiTotalLY * 100).toFixed(1) : null;
+      const gColor = g !== null ? (parseFloat(g) >= 0 ? '#22c55e' : '#ef4444') : '#aaa';
+      const gArrow = g !== null ? (parseFloat(g) >= 0 ? '↑' : '↓') : '';
+      bmiTotaalHtml = `<div class="card" style="padding:10px 14px;margin-bottom:0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#888;">📊 Vorig jaar (${bmiLabelDate})</span>
+            ${weatherLastYear ? `<span style="font-size:12px;color:#666;">${weatherLastYear.icon} ${weatherLastYear.max}°/${weatherLastYear.min}°</span>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:14px;font-weight:700;color:#aaa;">${fmtEur(bmiTotalLY)}</span>
+            ${g !== null ? `<span style="font-size:12px;font-weight:700;color:${gColor};">${gArrow} ${Math.abs(g)}%</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // Vandaag weer badge
+    const todayWeatherHtml = weatherToday
+      ? `<div style="text-align:center;font-size:13px;color:#888;margin-bottom:6px;">${weatherToday.icon} ${weatherToday.max}° / ${weatherToday.min}°</div>`
+      : '';
+
+    setContent(`
+      ${dateNav()}
+      ${todayWeatherHtml}
+      <div class="info-banner">${t('bannerBezoek')}</div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">${t('revenue')}</div><div class="kpi-value">${fmtEur(totalRev)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('visitors')}</div><div class="kpi-value">${visit.visitors.toLocaleString(locale())}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('avgPer')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
+      </div>
+      ${bmiTotaalHtml}
+      ${hasHourData ? `<div class="card"><div class="section-title">📈 Omzet per uur</div>${hourlyBarChart(visitByHourCombined, '#2563eb')}</div>` : ''}
+      ${cats.length ? `<div class="card"><div class="section-title">${t('perCategory')}</div>${catRows}</div>` : ''}
+      ${rcEntries.length ? `<div class="card"><div class="section-title">${t('perReportingCat')}</div>${rcRows}</div>` : ''}
+      ${bmiCardHtml}
+      ${cacheLabel(data)}
+    `);
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+// ── VERKOOP VIEW ──────────────────────────────────────────────────────────────
+async function renderVerkoop(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    const [data, mypos, payter, nayax] = await Promise.all([
+      api(`/api/day?date=${selectedDate}`, forceRefresh),
+      api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null)
+    ]);
+    const { sales } = data;
+    const myposSalesAmount = mypos?.totalInclBtw || 0;
+    const myposRev = mypos?.omzetExclBtw || 0;
+    const payterSalesAmount = payter?.totalInclBtw || 0;
+    const nayaxSalesAmount = nayax?.totalInclBtw || 0;
+    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount + payterSalesAmount + nayaxSalesAmount;
+    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0) + (payter?.transactions || 0) + (nayax?.transactions || 0);
+    const avg = totalTrans > 0 ? grandTotal / totalTrans : 0;
+
+    const chEntries = Object.entries(sales.byChannel || {}).sort((a,b) => b[1].revenue - a[1].revenue);
+    let chRows = '';
+    for (const [ch, d] of chEntries) {
+      const meta = CHANNEL_META[ch] || { label: ch, color: '#6b7280' };
+      const pct = grandTotal > 0 ? Math.round((d.revenue / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:${meta.color};">${meta.label}</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(d.revenue)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${meta.color};"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${d.count} ${t('transactions')}</div>
+        </div>`;
+    }
+    if (myposSalesAmount > 0) {
+      const pct = grandTotal > 0 ? Math.round((myposSalesAmount / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#7c3aed;">🎮 Speelgoed automaat (MyPOS)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(myposSalesAmount)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#7c3aed;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${mypos.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
+    if (payterSalesAmount > 0) {
+      const pct = grandTotal > 0 ? Math.round((payterSalesAmount / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#0369a1;">🔐 Kluisjes (Payter)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(payterSalesAmount)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#0369a1;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${payter.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
+
+    // Nayax Photobooth Wit
+    const nayaxPhotoSales = nayax?.photobooth?.totalInclBtw || 0;
+    if (nayaxPhotoSales > 0) {
+      const pct = grandTotal > 0 ? Math.round((nayaxPhotoSales / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#b45309;">📸 Photobooth Wit (Nayax)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(nayaxPhotoSales)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#b45309;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${nayax.photobooth.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
+    // Nayax Spiegel Booth
+    const nayaxSpiegelSales = nayax?.spiegel?.totalInclBtw || 0;
+    if (nayaxSpiegelSales > 0) {
+      const pct = grandTotal > 0 ? Math.round((nayaxSpiegelSales / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#d97706;">🪞 Spiegel Booth (Nayax)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(nayaxSpiegelSales)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#d97706;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${nayax.spiegel.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
+    // Combine Roller + MyPOS + Payter hourly data (both incl BTW for payments)
+    const salesByHourCombined = Object.assign({}, sales.byHour || {});
+    for (const [h, v] of Object.entries(mypos?.byHour || {})) {
+      salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
+    }
+    for (const [h, v] of Object.entries(payter?.byHour || {})) {
+      salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
+    }
+    for (const [h, v] of Object.entries(nayax?.byHour || {})) {
+      salesByHourCombined[h] = (salesByHourCombined[h] || 0) + v;
+    }
+    const hasSalesHourData = Object.keys(salesByHourCombined).length > 0;
+
+    setContent(`
+      ${dateNav()}
+      <div class="info-banner">${t('bannerVerkoop')}</div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">${t('received')}</div><div class="kpi-value">${fmtEur(grandTotal)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('transCount')}</div><div class="kpi-value">${totalTrans.toLocaleString(locale())}</div></div>
+        <div class="kpi-card"><div class="kpi-label">${t('avgTrans')}</div><div class="kpi-value">${fmtEur(avg)}</div></div>
+      </div>
+      ${hasSalesHourData ? `<div class="card"><div class="section-title">💳 Betalingen per uur</div>${hourlyBarChart(salesByHourCombined, '#059669')}</div>` : ''}
+      ${chEntries.length || myposSalesAmount > 0 || nayaxSalesAmount > 0 ? `<div class="card"><div class="section-title">${t('salesChannel')}</div>${chRows}</div>` : ''}
+      ${cacheLabel(data)}
+    `);
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function dateNav(mode = 'day', noPrint = false) {
+  const dateStr = mode === 'day' ? selectedDate : persDate;
+  const shiftFn = mode === 'day' ? 'shiftDay' : 'shiftPers';
+  const changeFn = mode === 'day' ? 'onDayDateChange' : 'onPersDateChange';
+  return `
+    <div ${noPrint ? 'class="no-print"' : ''} style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <button class="nav-btn" onclick="${shiftFn}(-1)">‹</button>
+      <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-${mode}')">
+        <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(dateStr)}</div>
+        <input type="date" id="dp-${mode}" value="${dateStr}" onchange="${changeFn}(this.value)" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
+      </div>
+      <button class="nav-btn" onclick="${shiftFn}(1)">›</button>
+    </div>`;
+}
+
+function triggerDatePicker(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  try { if (el.showPicker) el.showPicker(); else el.click(); } catch(e) { el.click(); }
+}
+function onDayDateChange(val) { selectedDate = val; render(); }
+function onPersDateChange(val) { persDate = val; expandedDept = null; render(); }
+function shiftDay(n) { selectedDate = addDays(selectedDate, n); render(); }
+function shiftWeek(n) { weekOffset += n; render(); }
+function shiftPers(n) { persDate = addDays(persDate, n); expandedDept = null; render(); }
+
+function goToDay(date) {
+  selectedDate = date;
+  switchTab('bezoek');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  expandedDept = null;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('tab-' + tab);
+  if (el) el.classList.add('active');
+  render();
+}
+
+function render() {
+  if (!accessCode) return;
+  renderCurrentTab(false);
+}
+
+async function renderCurrentTab(forceRefresh = false) {
+  if (!accessCode) return;
+  if (currentTab === 'week')      await renderWeek(forceRefresh);
+  else if (currentTab === 'bezoek')   await renderBezoek(forceRefresh);
+  else if (currentTab === 'verkoop')  await renderVerkoop(forceRefresh);
+  else if (currentTab === 'personeel') await renderPersoneel(forceRefresh);
+  else if (currentTab === 'kpi')       await renderKpi(forceRefresh);
+  else if (currentTab === 'controle')  await renderControle(forceRefresh);
+}
+
+// ── CONTROLE VIEW ─────────────────────────────────────────────────────────────
+
+function controleModeBtns() {
+  return `<div style="display:flex;gap:8px;margin-bottom:16px;">
+    <button onclick="controleMode='dag';renderControle()" style="flex:1;padding:9px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;${controleMode==='dag'?'background:#7c3aed;color:#fff;':'background:#1a1a24;color:#aaa;'}">${t('ctrlDag')}</button>
+    <button onclick="controleMode='week';renderControle()" style="flex:1;padding:9px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;${controleMode==='week'?'background:#7c3aed;color:#fff;':'background:#1a1a24;color:#aaa;'}">${t('ctrlWeek')}</button>
+  </div>`;
+}
+
+async function renderControle(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    if (controleMode === 'dag') {
+      await renderControleDay(forceRefresh);
+    } else {
+      await renderControleWeek(forceRefresh);
+    }
+  } catch(e) { setContent(errMsg(e.message)); }
+}
+
+async function renderControleDay(forceRefresh = false) {
+  const [data, mypos, payter, nayax] = await Promise.all([
+    api(`/api/day?date=${selectedDate}`, forceRefresh),
+    api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
+    api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
+    api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null),
+  ]);
+  const { visit, sales } = data;
+
+  // Omzet (excl BTW, boekingsdatum)
+  const rollerOmzet    = visit?.netRevenue || 0;
+  const myposOmzet     = mypos?.omzetExclBtw || 0;
+  const payterOmzet    = payter?.omzetExclBtw || 0;
+  const nayaxPhotoOmzet   = nayax?.photobooth?.omzetExclBtw || 0;
+  const nayaxSpiegelOmzet = nayax?.spiegel?.omzetExclBtw || 0;
+  const totalOmzet = rollerOmzet + myposOmzet + payterOmzet + nayaxPhotoOmzet + nayaxSpiegelOmzet;
+
+  // Betalingen (incl BTW, transactiedatum)
+  const rollerBetaling    = sales?.fundsReceived || 0;
+  const myposBetaling     = mypos?.totalInclBtw || 0;
+  const payterBetaling    = payter?.totalInclBtw || 0;
+  const nayaxPhotoBetaling   = nayax?.photobooth?.totalInclBtw || 0;
+  const nayaxSpiegelBetaling = nayax?.spiegel?.totalInclBtw || 0;
+  const totalBetaling = rollerBetaling + myposBetaling + payterBetaling + nayaxPhotoBetaling + nayaxSpiegelBetaling;
+
+  // Referentie-totalen zoals Bezoek/Verkoop tab ze berekenen
+  const bezoekRef  = rollerOmzet + myposOmzet + payterOmzet + (nayax?.omzetExclBtw || 0);
+  const verkoopRef = rollerBetaling + myposBetaling + payterBetaling + (nayax?.totalInclBtw || 0);
+  const omzetMatch   = Math.abs(totalOmzet - bezoekRef) < 0.02;
+  const betalingMatch = Math.abs(totalBetaling - verkoopRef) < 0.02;
+
+  function sysRow(emoji, name, amount, tx, isTotaal = false) {
+    if (!isTotaal && amount === 0 && tx === 0) return '';
+    const style = isTotaal ? 'border-top:2px solid #3a3a4a;' : '';
+    const fw = isTotaal ? '800' : '600';
+    const fs = isTotaal ? '15px' : '13px';
+    return `<tr style="${style}">
+      <td style="padding:9px 4px;font-size:${isTotaal?'14px':'13px'};font-weight:${fw};">${emoji ? emoji+' ' : ''}${name}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:${fs};font-weight:${fw};">${fmtEur(amount)}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:12px;color:#888;">${tx > 0 ? tx.toLocaleString(locale()) : (isTotaal ? '' : '—')}</td>
+    </tr>`;
+  }
+
+  function checkBadge(ok, label) {
+    if (ok) return `<span style="background:#05966920;color:#059669;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;">✅ ${label}</span>`;
+    return `<span style="background:#ef444420;color:#ef4444;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;">⚠️ ${t('controleDiff')}</span>`;
+  }
+
+  function tableHead(amountLabel) {
+    return `<thead><tr style="border-bottom:1px solid #3a3a4a;">
+      <th style="text-align:left;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlSystem')}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${amountLabel}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlTx')}</th>
+    </tr></thead>`;
+  }
+
+  const diffOmzetBetaling = Math.abs(totalOmzet - totalBetaling);
+
+  setContent(`
+    ${controleModeBtns()}
+    ${dateNav()}
+
+    <div class="card">
+      <div class="section-title">📊 ${t('ctrlOmzetTitle')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlOmzetSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlOmzet'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', rollerOmzet, visit?.visitors || 0)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', myposOmzet, mypos?.aantalBetalingen || 0)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', payterOmzet, payter?.transactions || 0)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', nayaxPhotoOmzet, nayax?.photobooth?.transactions || 0)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', nayaxSpiegelOmzet, nayax?.spiegel?.transactions || 0)}
+          ${sysRow('', t('ctrlTotal'), totalOmzet, 0, true)}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;">${checkBadge(omzetMatch, t('ctrlMatchBezoek'))}</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">💳 ${t('ctrlBetalingTitle')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlBetalingSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlBetaling'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', rollerBetaling, sales?.transactionCount || 0)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', myposBetaling, mypos?.transactions || 0)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', payterBetaling, payter?.transactions || 0)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', nayaxPhotoBetaling, nayax?.photobooth?.transactions || 0)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', nayaxSpiegelBetaling, nayax?.spiegel?.transactions || 0)}
+          ${sysRow('', t('ctrlTotal'), totalBetaling, 0, true)}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;">${checkBadge(betalingMatch, t('ctrlMatchVerkoop'))}</div>
+    </div>
+
+    ${diffOmzetBetaling > 0.01 ? `
+    <div class="card" style="background:#ffffff08;border:1px solid #3a3a4a;">
+      <div style="font-size:12px;color:#aaa;text-align:center;line-height:1.6;">
+        💡 <strong>${t('ctrlDiffLabel')}: ${fmtEur(diffOmzetBetaling)}</strong><br>
+        <span style="color:#666;">${t('ctrlDiffNote')}</span>
+      </div>
+    </div>` : ''}
+
+    ${cacheLabel(data)}
+  `);
+}
+
+async function renderControleWeek(forceRefresh = false) {
+  const data = await api(`/api/week?offset=${weekOffset}`, forceRefresh);
+  const days = data.days || [];
+  const today = todayStr();
+
+  const startLabel = new Date(days[0]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+  const endLabel   = new Date(days[6]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+
+  // Aggregate week totals per system
+  let wRollerOmzet = 0, wMyposOmzet = 0, wPayterOmzet = 0, wNayaxPhotoOmzet = 0, wNayaxSpiegelOmzet = 0;
+  let wRollerBet = 0, wMyposBet = 0, wPayterBet = 0, wNayaxPhotoBet = 0, wNayaxSpiegelBet = 0;
+  let wRollerTx = 0, wMyposTx = 0, wPayterTx = 0, wNayaxPhotoTx = 0, wNayaxSpiegelTx = 0;
+
+  for (const day of days) {
+    wRollerOmzet  += day.visit?.netRevenue || 0;
+    wMyposOmzet   += day.mypos?.omzetExclBtw || 0;
+    wPayterOmzet  += day.payter?.omzetExclBtw || 0;
+    wNayaxPhotoOmzet   += day.nayax?.photobooth?.omzetExclBtw || 0;
+    wNayaxSpiegelOmzet += day.nayax?.spiegel?.omzetExclBtw || 0;
+
+    wRollerBet  += day.sales?.fundsReceived || 0;
+    wMyposBet   += day.mypos?.totalInclBtw || 0;
+    wPayterBet  += day.payter?.totalInclBtw || 0;
+    wNayaxPhotoBet   += day.nayax?.photobooth?.totalInclBtw || 0;
+    wNayaxSpiegelBet += day.nayax?.spiegel?.totalInclBtw || 0;
+
+    wRollerTx  += day.visit?.visitors || 0;
+    wMyposTx   += day.mypos?.aantalBetalingen || 0;
+    wPayterTx  += day.payter?.transactions || 0;
+    wNayaxPhotoTx   += day.nayax?.photobooth?.transactions || 0;
+    wNayaxSpiegelTx += day.nayax?.spiegel?.transactions || 0;
+  }
+
+  const wTotalOmzet  = wRollerOmzet + wMyposOmzet + wPayterOmzet + wNayaxPhotoOmzet + wNayaxSpiegelOmzet;
+  const wTotalBet    = wRollerBet + wMyposBet + wPayterBet + wNayaxPhotoBet + wNayaxSpiegelBet;
+  const wDiff = Math.abs(wTotalOmzet - wTotalBet);
+
+  function sysRow(emoji, name, amount, tx, isTotaal = false) {
+    if (!isTotaal && amount === 0 && tx === 0) return '';
+    const style = isTotaal ? 'border-top:2px solid #3a3a4a;' : '';
+    const fw = isTotaal ? '800' : '600';
+    return `<tr style="${style}">
+      <td style="padding:9px 4px;font-size:${isTotaal?'14px':'13px'};font-weight:${fw};">${emoji ? emoji+' ' : ''}${name}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:${isTotaal?'15px':'13px'};font-weight:${fw};">${fmtEur(amount)}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:12px;color:#888;">${tx > 0 ? tx.toLocaleString(locale()) : (isTotaal ? '' : '—')}</td>
+    </tr>`;
+  }
+
+  function tableHead(amountLabel) {
+    return `<thead><tr style="border-bottom:1px solid #3a3a4a;">
+      <th style="text-align:left;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlSystem')}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${amountLabel}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlTx')}</th>
+    </tr></thead>`;
+  }
+
+  // Per-day rows
+  let dayOmzetRows = '';
+  let dayBetRows = '';
+  for (const day of days) {
+    const isToday = day.date === today;
+    const dayLabel = new Date(day.date + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
+    const dRollerOmzet = day.visit?.netRevenue || 0;
+    const dMyposOmzet  = day.mypos?.omzetExclBtw || 0;
+    const dPayterOmzet = day.payter?.omzetExclBtw || 0;
+    const dNayaxOmzet  = (day.nayax?.photobooth?.omzetExclBtw || 0) + (day.nayax?.spiegel?.omzetExclBtw || 0);
+    const dTotalOmzet  = dRollerOmzet + dMyposOmzet + dPayterOmzet + dNayaxOmzet;
+
+    const dRollerBet = day.sales?.fundsReceived || 0;
+    const dMyposBet  = day.mypos?.totalInclBtw || 0;
+    const dPayterBet = day.payter?.totalInclBtw || 0;
+    const dNayaxBet  = (day.nayax?.photobooth?.totalInclBtw || 0) + (day.nayax?.spiegel?.totalInclBtw || 0);
+    const dTotalBet  = dRollerBet + dMyposBet + dPayterBet + dNayaxBet;
+
+    const todayStyle = isToday ? 'color:#a78bfa;font-weight:700;' : '';
+    const rowStyle = isToday ? 'background:#7c3aed10;' : '';
+
+    dayOmzetRows += `<tr style="${rowStyle}" onclick="selectedDate='${day.date}';controleMode='dag';renderControle();" style="cursor:pointer;">
+      <td style="padding:8px 4px;font-size:12px;${todayStyle}">${dayLabel}${isToday?' ·':''}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dRollerOmzet > 0 ? fmtEur(dRollerOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dMyposOmzet > 0 ? fmtEur(dMyposOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dPayterOmzet > 0 ? fmtEur(dPayterOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dNayaxOmzet > 0 ? fmtEur(dNayaxOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;font-weight:700;">${dTotalOmzet > 0 ? fmtEur(dTotalOmzet) : '<span style="color:#555">—</span>'}</td>
+    </tr>`;
+
+    dayBetRows += `<tr style="${rowStyle}" onclick="selectedDate='${day.date}';controleMode='dag';renderControle();">
+      <td style="padding:8px 4px;font-size:12px;${todayStyle}">${dayLabel}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dRollerBet > 0 ? fmtEur(dRollerBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dMyposBet > 0 ? fmtEur(dMyposBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dPayterBet > 0 ? fmtEur(dPayterBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dNayaxBet > 0 ? fmtEur(dNayaxBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;font-weight:700;">${dTotalBet > 0 ? fmtEur(dTotalBet) : '<span style="color:#555">—</span>'}</td>
+    </tr>`;
+  }
+
+  // Totaal row for per-day tables
+  const dayOmzetTotaalRow = `<tr style="border-top:2px solid #3a3a4a;background:#ffffff05;">
+    <td style="padding:9px 4px;font-size:13px;font-weight:800;">${t('ctrlTotal')}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wRollerOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wMyposOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wPayterOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wNayaxPhotoOmzet + wNayaxSpiegelOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:14px;font-weight:800;color:#a78bfa;">${fmtEur(wTotalOmzet)}</td>
+  </tr>`;
+  const dayBetTotaalRow = `<tr style="border-top:2px solid #3a3a4a;background:#ffffff05;">
+    <td style="padding:9px 4px;font-size:13px;font-weight:800;">${t('ctrlTotal')}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wRollerBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wMyposBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wPayterBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wNayaxPhotoBet + wNayaxSpiegelBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:14px;font-weight:800;color:#059669;">${fmtEur(wTotalBet)}</td>
+  </tr>`;
+
+  function dayTableHead() {
+    return `<thead><tr style="border-bottom:1px solid #3a3a4a;">
+      <th style="text-align:left;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">${t('ctrlDate')}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">🎳</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">🎮</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">🔐</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">📸🪞</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">${t('ctrlTotal')}</th>
+    </tr></thead>`;
+  }
+
+  const weekNav = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <button class="nav-btn" onclick="weekOffset--;renderControle()">‹</button>
+    <div style="font-size:15px;font-weight:700;">${startLabel} – ${endLabel}</div>
+    <button class="nav-btn" onclick="weekOffset++;renderControle()">›</button>
+  </div>`;
+
+  const legendHtml = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;font-size:11px;color:#888;">
+    <span>🎳 Roller</span>
+    <span>🎮 MyPOS</span>
+    <span>🔐 Payter</span>
+    <span>📸🪞 Nayax</span>
+  </div>`;
+
+  setContent(`
+    ${controleModeBtns()}
+    ${weekNav}
+
+    <div class="card">
+      <div class="section-title">📊 ${t('ctrlOmzetTitle')} — ${t('ctrlWeekTotal')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlOmzetSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlOmzet'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', wRollerOmzet, wRollerTx)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', wMyposOmzet, wMyposTx)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', wPayterOmzet, wPayterTx)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', wNayaxPhotoOmzet, wNayaxPhotoTx)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', wNayaxSpiegelOmzet, wNayaxSpiegelTx)}
+          ${sysRow('', t('ctrlTotal'), wTotalOmzet, 0, true)}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-title">📊 ${t('ctrlOmzetTitle')} — ${t('ctrlPerDay')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlOmzetSub')})</span></div>
+      ${legendHtml}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:340px;">
+          ${dayTableHead()}
+          <tbody>${dayOmzetRows}${dayOmzetTotaalRow}</tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:#666;margin-top:8px;">↑ Tik op een dag voor uitgebreide weergave</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">💳 ${t('ctrlBetalingTitle')} — ${t('ctrlWeekTotal')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlBetalingSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlBetaling'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', wRollerBet, wRollerTx)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', wMyposBet, wMyposTx)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', wPayterBet, wPayterTx)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', wNayaxPhotoBet, wNayaxPhotoTx)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', wNayaxSpiegelBet, wNayaxSpiegelTx)}
+          ${sysRow('', t('ctrlTotal'), wTotalBet, 0, true)}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-title">💳 ${t('ctrlBetalingTitle')} — ${t('ctrlPerDay')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlBetalingSub')})</span></div>
+      ${legendHtml}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:340px;">
+          ${dayTableHead()}
+          <tbody>${dayBetRows}${dayBetTotaalRow}</tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:#666;margin-top:8px;">↑ Tik op een dag voor uitgebreide weergave</div>
+    </div>
+
+    ${wDiff > 0.01 ? `
+    <div class="card" style="background:#ffffff08;border:1px solid #3a3a4a;">
+      <div style="font-size:12px;color:#aaa;text-align:center;line-height:1.6;">
+        💡 <strong>${t('ctrlDiffLabel')}: ${fmtEur(wDiff)}</strong><br>
+        <span style="color:#666;">${t('ctrlDiffNote')}</span>
+      </div>
+    </div>` : ''}
+
+    ${cacheLabel(data)}
+  `);
+}
+
+// ── PERSONEEL VIEW ────────────────────────────────────────────────────────────
+
+async function renderPersoneel(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    const data = await api(`/api/personeel?date=${persDate}`, forceRefresh);
+    const depts = data.departments || [];
+    const totals = data.totals || {};
+
+    // If a department is expanded, show drill-down view
+    if (expandedDept !== null) {
+      const dept = depts.find(d => d.deptId === expandedDept);
+      if (!dept) { expandedDept = null; return renderPersoneel(forceRefresh); }
+      const people = dept.people || [];
+      let rows = '';
+      for (const p of people) {
+        const hasPlanned = p.plannedH > 0;
+        const hasClocked = p.clockedH > 0;
+        rows += `
+          <div style="background:#12121c;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#e0e0f0;margin-bottom:10px;">${p.name}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">📅 ${t('staffPlanned')}</div>
+                ${hasPlanned ? `
+                  <div style="font-size:13px;font-weight:700;color:#7c3aed;">${p.plannedH.toFixed(1)}u</div>
+                  <div style="font-size:12px;color:#aaa;">${fmtEur(p.plannedCost)}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.plannedStart || '—'} – ${p.plannedEnd || '—'}</div>
+                ` : `<div style="font-size:12px;color:#555;">—</div>`}
+              </div>
+              <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">🕐 ${t('staffClocked')}</div>
+                ${hasClocked ? `
+                  <div style="font-size:13px;font-weight:700;color:#10b981;">${p.clockedH.toFixed(2)}u</div>
+                  <div style="font-size:12px;color:#aaa;">${fmtEur(p.clockedCost)}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.clockedEnter || '—'} – ${p.clockedExit || '—'}</div>
+                ` : `<div style="font-size:12px;color:#555;">—</div>`}
+              </div>
+            </div>
+          </div>`;
+      }
+      setContent(`
+        <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+          <button onclick="expandedDept=null;renderPersoneel()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;">${t('staffBack')}</button>
+          <div style="font-size:16px;font-weight:800;color:#e0e0f0;">${dept.deptName}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">📅 ${t('staffPlanned')}</div>
+            <div class="kpi-value" style="font-size:14px;">${dept.plannedH.toFixed(1)}u</div>
+            <div style="font-size:12px;color:#888;">${fmtEur(dept.plannedCost)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">🕐 ${t('staffClocked')}</div>
+            <div class="kpi-value" style="font-size:14px;">${dept.clockedH.toFixed(2)}u</div>
+            <div style="font-size:12px;color:#888;">${fmtEur(dept.clockedCost)}</div>
+          </div>
+        </div>
+        <div class="section-title">${t('staffName')}</div>
+        ${rows || `<div style="color:#666;text-align:center;padding:20px;">${t('staffNoData')}</div>`}
+        ${cacheLabel(data)}
+      `);
+      return;
+    }
+
+    // Overview: date selector + department table
+    const hasPlanData = depts.some(d => d.plannedH > 0);
+    const hasClockData = depts.some(d => d.clockedH > 0);
+
+    let deptCards = '';
+    for (const dept of depts) {
+      const hasPlan = dept.plannedH > 0;
+      const hasClock = dept.clockedH > 0;
+      if (!hasPlan && !hasClock) continue;
+
+      const diffH = dept.clockedH - dept.plannedH;
+      const diffSign = diffH > 0 ? '+' : '';
+      const diffColor = Math.abs(diffH) < 0.5 ? '#10b981' : diffH > 0 ? '#f59e0b' : '#6b7280';
+
+      deptCards += `
+        <div onclick="expandedDept='${dept.deptId}';renderPersoneel()" style="background:#12121c;border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;border:1px solid #1e1e2a;transition:border-color .2s;" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#1e1e2a'">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#e0e0f0;">${dept.deptName}</div>
+            <div style="font-size:11px;color:#666;">${dept.people.length} pers. ›</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:#888;margin-bottom:3px;">📅 Gepland</div>
+              <div style="font-size:13px;font-weight:700;color:#7c3aed;">${hasPlan ? dept.plannedH.toFixed(1)+'u' : '—'}</div>
+              <div style="font-size:11px;color:#888;">${hasPlan ? fmtEur(dept.plannedCost) : ''}</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:#888;margin-bottom:3px;">🕐 Geklokt</div>
+              <div style="font-size:13px;font-weight:700;color:#10b981;">${hasClock ? dept.clockedH.toFixed(1)+'u' : '—'}</div>
+              <div style="font-size:11px;color:#888;">${hasClock ? fmtEur(dept.clockedCost) : ''}</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:10px;color:#888;margin-bottom:3px;">Δ Verschil</div>
+              <div style="font-size:13px;font-weight:700;color:${diffColor};">${hasPlan && hasClock ? diffSign+diffH.toFixed(1)+'u' : '—'}</div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    if (!deptCards) {
+      deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('staffNoData')}</div>`;
+    }
+
+    setContent(`
+      ${dateNav('personeel')}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        <div class="kpi-card">
+          <div class="kpi-label">📅 Gepland totaal</div>
+          <div class="kpi-value" style="font-size:14px;">${totals.plannedH?.toFixed(1) || '0'}u</div>
+          <div style="font-size:12px;color:#888;">${fmtEur(totals.plannedCost)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">🕐 Geklokt totaal</div>
+          <div class="kpi-value" style="font-size:14px;">${totals.clockedH?.toFixed(1) || '0'}u</div>
+          <div style="font-size:12px;color:#888;">${fmtEur(totals.clockedCost)}</div>
+        </div>
+      </div>
+      <div class="section-title">Per afdeling — tik voor details</div>
+      ${deptCards}
+      ${cacheLabel(data)}
+    `);
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+// ── KPI VIEW ──────────────────────────────────────────────────────────────────
+
+// Department → revenue & KPI config
+const DEPT_KPI = {
+  // Roller reporting categories (actual names from API):
+  //   'Activiteiten', 'Bedrijfsarrangementen', 'F&B', 'Overig', 'Aanpassingen'
+  'Activiteiten': {
+    icon: '🎳', color: '#7c3aed',
+    // Activiteiten + Bedrijfsarrangementen = all activity-based revenue
+    revCats: ['Activiteiten', 'Bedrijfsarrangementen'],
+    revLabelKey: 'kpiActRevLabel'
+  },
+  'Sales & Event': {
+    icon: '🎉', color: '#2563eb',
+    // Primarily corporate arrangements (KF + BF bookings)
+    revCats: ['Bedrijfsarrangementen'],
+    revLabelKey: 'kpiSalesRevLabel'
+  },
+  'Front-Office': {
+    icon: '🎫', color: '#059669',
+    // Uses booking channel count, not direct revenue
+    metric: 'bookings'
+  },
+  'Horeca': {
+    icon: '🍺', color: '#d97706',
+    // F&B revenue (food+drink combined until product-level split available)
+    revCats: ['F&B'],
+    revLabelKey: 'kpiFbRevLabel'
+  },
+  'Keuken': {
+    icon: '🍽️', color: '#dc2626',
+    // F&B food split not yet available at product level
+    fbComing: true
+  },
+  'Facilitair': {
+    icon: '🔧', color: '#6b7280',
+    overhead: true
+  },
+  'Kantoor': {
+    icon: '💼', color: '#6b7280',
+    overhead: true
+  },
+  'Training, Ontwikkeling & Bijeenkomsten': {
+    icon: '📚', color: '#6b7280',
+    overhead: true
+  }
+};
+
+// Color coding for loonkosten % KPI
+function kpiColor(pct) {
+  if (pct == null || isNaN(pct)) return '#6b7280';
+  if (pct < 20) return '#10b981';  // excellent (green)
+  if (pct < 30) return '#84cc16';  // good (light green)
+  if (pct < 40) return '#f59e0b';  // watch (amber)
+  if (pct < 50) return '#f97316';  // high (orange)
+  return '#ef4444';                // too high (red)
+}
+
+function renderDeptKpiCard(dept, totalOmzet, byRc, salesByChannel) {
+  const cfg = DEPT_KPI[dept.deptName] || { icon: '👤', color: '#6b7280', overhead: true };
+  const hasClock = dept.clockedH  > 0;
+  const hasPlan  = dept.plannedH  > 0;
+  if (!hasClock) return '';
+
+  // Calculate revenue relevant to this department
+  let deptOmzet = null;
+  let deptOmzetLabel = '';
+  if (cfg.revCats && byRc) {
+    deptOmzet = cfg.revCats.reduce((s, cat) => s + (byRc[cat]?.revenue || 0), 0);
+    deptOmzetLabel = cfg.revLabelKey ? t(cfg.revLabelKey) : '';
+  }
+
+  // Reference revenue for loonkosten %
+  const refOmzet = (deptOmzet !== null && deptOmzet > 0) ? deptOmzet : totalOmzet;
+  const plannedPct = refOmzet > 0 && hasPlan  ? (dept.plannedCost  / refOmzet * 100) : null;
+  const clockedPct = refOmzet > 0 && hasClock ? (dept.clockedCost  / refOmzet * 100) : null;
+  const pctToShow  = clockedPct !== null ? clockedPct : plannedPct;
+  const pctColor   = kpiColor(pctToShow);
+
+  // KPI badge (big %)
+  const kpiBadge = pctToShow !== null
+    ? `<div style="text-align:right;">
+        <div style="font-size:22px;font-weight:800;color:${pctColor};line-height:1;">${pctToShow.toFixed(1)}%</div>
+        <div style="font-size:10px;color:#666;">${t('kpiLaborPct')}</div>
+      </div>`
+    : '';
+
+  // Revenue context line
+  let revContext = '';
+  if (cfg.fbComing) {
+    revContext = `<div style="font-size:11px;color:#555;font-style:italic;margin-top:6px;">🔗 ${t('kpiFbComing')}</div>`;
+  } else if (cfg.metric === 'bookings' && salesByChannel) {
+    const vmTrans = (salesByChannel['VenueManager']?.count || 0) + (salesByChannel['Venue manager']?.count || 0);
+    const totalTrans = Object.values(salesByChannel).reduce((s, c) => s + (c.count || 0), 0);
+    const costPerBooking = totalTrans > 0 && hasPlan ? (dept.plannedCost / totalTrans) : 0;
+    revContext = `
+      <div style="display:flex;gap:12px;margin-top:6px;">
+        <div style="font-size:11px;color:#888;">${t('kpiVmBoekingen')}: <span style="color:#e0e0f0;font-weight:600;">${vmTrans}</span></div>
+        <div style="font-size:11px;color:#888;">${t('kpiTotaalBoekingen')}: <span style="color:#e0e0f0;font-weight:600;">${totalTrans}</span></div>
+        ${costPerBooking > 0 ? `<div style="font-size:11px;color:#888;">${t('kpiKostenPerBoeking')}: <span style="color:#e0e0f0;font-weight:600;">${fmtEur(costPerBooking)}</span></div>` : ''}
+      </div>`;
+  } else if (deptOmzet !== null && deptOmzet > 0) {
+    revContext = `<div style="font-size:11px;color:#888;margin-top:6px;">${deptOmzetLabel}: <span style="color:#e0e0f0;font-weight:600;">${fmtEur(deptOmzet)}</span></div>`;
+  } else if (cfg.overhead) {
+    const ovhCost = hasClock ? dept.clockedCost : dept.plannedCost;
+    const ovhPct  = totalOmzet > 0 && ovhCost > 0 ? (ovhCost / totalOmzet * 100).toFixed(1) : null;
+    if (ovhPct) revContext = `<div style="font-size:11px;color:#888;margin-top:6px;">${t('kpiOverhead')}: ${ovhPct}% ${t('kpiVanTotaal')}</div>`;
+  }
+
+  // Progress bar
+  const barBlock = pctToShow !== null && refOmzet > 0
+    ? `<div style="height:4px;border-radius:999px;background:#1e1e2a;margin:8px 0 4px;">
+        <div style="height:4px;border-radius:999px;background:${pctColor};width:${Math.min(pctToShow, 100).toFixed(1)}%;transition:width .4s;"></div>
+      </div>`
+    : '';
+
+  return `
+    <div style="background:#12121c;border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:3px solid ${cfg.color};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div style="font-size:15px;font-weight:700;color:#e0e0f0;">${cfg.icon} ${dept.deptName}</div>
+        ${kpiBadge}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:8px;">
+        <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+          <div style="font-size:10px;color:#888;margin-bottom:4px;">${t('kpiClocked')}</div>
+          <div style="display:flex;align-items:baseline;gap:12px;">
+            <div style="font-size:14px;font-weight:700;color:#10b981;">${dept.clockedH.toFixed(1)}u</div>
+            <div style="font-size:12px;color:#aaa;">${fmtEur(dept.clockedCost)}</div>
+            ${clockedPct !== null ? `<div style="font-size:11px;color:${kpiColor(clockedPct)};margin-left:auto;">${clockedPct.toFixed(1)}% omzet</div>` : ''}
+          </div>
+        </div>
+      </div>
+      ${barBlock}${revContext}
+    </div>`;
+}
+
+async function renderKpi(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    // Period selector
+    const periodSel = `
+      <div style="display:flex;gap:6px;margin-bottom:16px;">
+        <button onclick="kpiPeriod='dag';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='dag'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiDag')}</button>
+        <button onclick="kpiPeriod='week';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='week'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiWeek')}</button>
+        <button style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;background:#111118;color:#333;cursor:not-allowed;" title="${t('kpiMaandSoon')}">${t('kpiMaand')} ⏳</button>
+      </div>`;
+
+    if (kpiPeriod === 'dag') {
+      // Date nav
+      const kpiNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,-1);renderKpi()">‹</button>
+          <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-kpi')">
+            <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(kpiDate)}</div>
+            <input type="date" id="dp-kpi" value="${kpiDate}" onchange="kpiDate=this.value;renderKpi()" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
+          </div>
+          <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,1);renderKpi()">›</button>
+        </div>`;
+
+      const [dayD, personnelD, mypos, payter] = await Promise.all([
+        api(`/api/day?date=${kpiDate}`, forceRefresh),
+        api(`/api/personeel?date=${kpiDate}`, forceRefresh).catch(() => ({ departments: [], totals: {} })),
+        api(`/api/mypos?date=${kpiDate}`, forceRefresh).catch(() => null),
+        api(`/api/payter?date=${kpiDate}`, forceRefresh).catch(() => null)
+      ]);
+
+      const depts = personnelD.departments || [];
+      const byRc = dayD.visit?.byReportingCategory || {};
+      const salesByChannel = dayD.sales?.byChannel || {};
+
+      const rollerRev = dayD.visit?.netRevenue || 0;
+      const myposRev  = mypos?.omzetExclBtw || 0;
+      const payterRev = payter?.omzetExclBtw || 0;
+      const totalOmzet = rollerRev + myposRev + payterRev;
+
+      const totP = personnelD.totals || {};
+      const plannedPct = totalOmzet > 0 && totP.plannedCost > 0 ? (totP.plannedCost / totalOmzet * 100) : null;
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, salesByChannel)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      setContent(`
+        ${periodSel}
+        ${kpiNav}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiOmzet')}</div>
+            <div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiClockedPct')}</div>
+            <div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
+          </div>
+        </div>
+        <div class="section-title">${t('kpiPerDept')}</div>
+        ${deptCards}
+        ${cacheLabel(dayD)}
+      `);
+
+    } else if (kpiPeriod === 'week') {
+      const data = await api(`/api/kpi-week?offset=${kpiWeekOffset}`, forceRefresh);
+      const depts = data.personeel?.departments || [];
+      const rev = data.revenue || {};
+      const byRc = rev.byReportingCategory || {};
+      const totalOmzet = rev.totalOmzet || 0;
+
+      const totP = data.personeel?.totals || {};
+      const plannedPct = totalOmzet > 0 && totP.plannedCost > 0 ? (totP.plannedCost / totalOmzet * 100) : null;
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+
+      const dates = data.dates || [];
+      const startLabel = dates[0] ? new Date(dates[0]+'T00:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' }) : '';
+      const endLabel   = dates[6] ? new Date(dates[6]+'T00:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' }) : '';
+
+      const weekNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiWeekOffset--;renderKpi()">‹</button>
+          <div class="date-label">${startLabel} – ${endLabel}</div>
+          <button class="nav-btn" onclick="kpiWeekOffset++;renderKpi()">›</button>
+        </div>`;
+
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, null)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      setContent(`
+        ${periodSel}
+        ${weekNav}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiOmzetWeek')}</div>
+            <div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">${t('kpiClockedPct')}</div>
+            <div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div>
+          </div>
+        </div>
+        <div class="section-title">${t('kpiPerDeptWeek')}</div>
+        ${deptCards}
+        ${cacheLabel(data)}
+      `);
+    }
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+applyLang();
+if (accessCode) render();
+</script>
+</body>
+</html>
