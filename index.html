@@ -146,6 +146,7 @@
     <button class="tab-btn" onclick="switchTab('runsheet')" id="tab-runsheet">📋 Run</button>
     <button class="tab-btn" onclick="switchTab('personeel')" id="tab-personeel">👥 Personeel</button>
     <button class="tab-btn" onclick="switchTab('kpi')" id="tab-kpi">📊 KPI</button>
+    <button class="tab-btn" onclick="switchTab('controle')" id="tab-controle">🔍 Controle</button>
   </div>
 
   <div id="content"></div>
@@ -432,6 +433,27 @@ const TRANSLATIONS = {
     kpiSalesRevLabel: 'Bedrijfsarr. omzet',
     kpiFbRevLabel: 'F&B omzet (gesplitst binnenkort)',
     kpiNoData: 'Geen personeelsdata beschikbaar',
+    // Controle tab
+    tabControle: '🔍 Controle',
+    ctrlDag: '📅 Dag',
+    ctrlWeek: '📆 Week',
+    ctrlOmzetTitle: 'Omzet per systeem',
+    ctrlOmzetSub: 'excl. BTW · boekingsdatum',
+    ctrlBetalingTitle: 'Betalingen per systeem',
+    ctrlBetalingSub: 'incl. BTW · transactiedatum',
+    ctrlSystem: 'Systeem',
+    ctrlOmzet: 'Omzet excl. BTW',
+    ctrlBetaling: 'Betaling incl. BTW',
+    ctrlTx: 'Tx',
+    ctrlTotal: 'Totaal',
+    ctrlMatchBezoek: 'Aansluit met Bezoek tab',
+    ctrlMatchVerkoop: 'Aansluit met Verkoop tab',
+    ctrlDiffNote: '— verwacht door verschil boekings- vs transactiedatum',
+    ctrlDiffLabel: 'Verschil omzet vs betalingen',
+    ctrlWeekTotal: 'Week totaal',
+    ctrlPerDay: 'Per dag',
+    ctrlDate: 'Datum',
+    ctrlNoData: 'Geen data',
   },
   en: {
     tabWeek: '📅 Week',
@@ -542,6 +564,27 @@ const TRANSLATIONS = {
     kpiSalesRevLabel: 'Corporate arr. revenue',
     kpiFbRevLabel: 'F&B revenue (split coming soon)',
     kpiNoData: 'No staff data available',
+    // Controle tab
+    tabControle: '🔍 Control',
+    ctrlDag: '📅 Day',
+    ctrlWeek: '📆 Week',
+    ctrlOmzetTitle: 'Revenue per system',
+    ctrlOmzetSub: 'excl. VAT · booking date',
+    ctrlBetalingTitle: 'Payments per system',
+    ctrlBetalingSub: 'incl. VAT · transaction date',
+    ctrlSystem: 'System',
+    ctrlOmzet: 'Revenue excl. VAT',
+    ctrlBetaling: 'Payment incl. VAT',
+    ctrlTx: 'Tx',
+    ctrlTotal: 'Total',
+    ctrlMatchBezoek: 'Matches Visit tab',
+    ctrlMatchVerkoop: 'Matches Sales tab',
+    ctrlDiffNote: '— expected due to booking vs transaction date difference',
+    ctrlDiffLabel: 'Difference revenue vs payments',
+    ctrlWeekTotal: 'Week total',
+    ctrlPerDay: 'Per day',
+    ctrlDate: 'Date',
+    ctrlNoData: 'No data',
   }
 };
 
@@ -578,6 +621,8 @@ function applyLang() {
   if (tr) tr.textContent = t('tabRun');
   if (tp) tp.textContent = t('tabPersoneel');
   if (tk) tk.textContent = t('tabKpi');
+  const tct = document.getElementById('tab-controle');
+  if (tct) tct.textContent = t('tabControle');
   // Login screen
   const ll = document.getElementById('login-label');
   const lb = document.getElementById('login-btn');
@@ -701,6 +746,9 @@ let expandedDept = null;
 let kpiPeriod = 'dag'; // 'dag' | 'week'
 let kpiDate = todayStr();
 let kpiWeekOffset = 0;
+
+// Controle tab state
+let controleMode = 'dag'; // 'dag' | 'week'
 
 // ── Category colors ───────────────────────────────────────────────────────────
 const CAT_COLORS = {
@@ -1434,6 +1482,341 @@ async function renderCurrentTab(forceRefresh = false) {
   else if (currentTab === 'runsheet') await renderRunsheet(forceRefresh);
   else if (currentTab === 'personeel') await renderPersoneel(forceRefresh);
   else if (currentTab === 'kpi')       await renderKpi(forceRefresh);
+  else if (currentTab === 'controle')  await renderControle(forceRefresh);
+}
+
+// ── CONTROLE VIEW ─────────────────────────────────────────────────────────────
+
+function controleModeBtns() {
+  return `<div style="display:flex;gap:8px;margin-bottom:16px;">
+    <button onclick="controleMode='dag';renderControle()" style="flex:1;padding:9px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;${controleMode==='dag'?'background:#7c3aed;color:#fff;':'background:#1a1a24;color:#aaa;'}">${t('ctrlDag')}</button>
+    <button onclick="controleMode='week';renderControle()" style="flex:1;padding:9px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;${controleMode==='week'?'background:#7c3aed;color:#fff;':'background:#1a1a24;color:#aaa;'}">${t('ctrlWeek')}</button>
+  </div>`;
+}
+
+async function renderControle(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    if (controleMode === 'dag') {
+      await renderControleDay(forceRefresh);
+    } else {
+      await renderControleWeek(forceRefresh);
+    }
+  } catch(e) { setContent(errMsg(e.message)); }
+}
+
+async function renderControleDay(forceRefresh = false) {
+  const [data, mypos, payter, nayax] = await Promise.all([
+    api(`/api/day?date=${selectedDate}`, forceRefresh),
+    api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
+    api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
+    api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null),
+  ]);
+  const { visit, sales } = data;
+
+  // Omzet (excl BTW, boekingsdatum)
+  const rollerOmzet    = visit?.netRevenue || 0;
+  const myposOmzet     = mypos?.omzetExclBtw || 0;
+  const payterOmzet    = payter?.omzetExclBtw || 0;
+  const nayaxPhotoOmzet   = nayax?.photobooth?.omzetExclBtw || 0;
+  const nayaxSpiegelOmzet = nayax?.spiegel?.omzetExclBtw || 0;
+  const totalOmzet = rollerOmzet + myposOmzet + payterOmzet + nayaxPhotoOmzet + nayaxSpiegelOmzet;
+
+  // Betalingen (incl BTW, transactiedatum)
+  const rollerBetaling    = sales?.fundsReceived || 0;
+  const myposBetaling     = mypos?.totalInclBtw || 0;
+  const payterBetaling    = payter?.totalInclBtw || 0;
+  const nayaxPhotoBetaling   = nayax?.photobooth?.totalInclBtw || 0;
+  const nayaxSpiegelBetaling = nayax?.spiegel?.totalInclBtw || 0;
+  const totalBetaling = rollerBetaling + myposBetaling + payterBetaling + nayaxPhotoBetaling + nayaxSpiegelBetaling;
+
+  // Referentie-totalen zoals Bezoek/Verkoop tab ze berekenen
+  const bezoekRef  = rollerOmzet + myposOmzet + payterOmzet + (nayax?.omzetExclBtw || 0);
+  const verkoopRef = rollerBetaling + myposBetaling + payterBetaling + (nayax?.totalInclBtw || 0);
+  const omzetMatch   = Math.abs(totalOmzet - bezoekRef) < 0.02;
+  const betalingMatch = Math.abs(totalBetaling - verkoopRef) < 0.02;
+
+  function sysRow(emoji, name, amount, tx, isTotaal = false) {
+    if (!isTotaal && amount === 0 && tx === 0) return '';
+    const style = isTotaal ? 'border-top:2px solid #3a3a4a;' : '';
+    const fw = isTotaal ? '800' : '600';
+    const fs = isTotaal ? '15px' : '13px';
+    return `<tr style="${style}">
+      <td style="padding:9px 4px;font-size:${isTotaal?'14px':'13px'};font-weight:${fw};">${emoji ? emoji+' ' : ''}${name}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:${fs};font-weight:${fw};">${fmtEur(amount)}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:12px;color:#888;">${tx > 0 ? tx.toLocaleString(locale()) : (isTotaal ? '' : '—')}</td>
+    </tr>`;
+  }
+
+  function checkBadge(ok, label) {
+    if (ok) return `<span style="background:#05966920;color:#059669;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;">✅ ${label}</span>`;
+    return `<span style="background:#ef444420;color:#ef4444;padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;">⚠️ ${t('controleDiff')}</span>`;
+  }
+
+  function tableHead(amountLabel) {
+    return `<thead><tr style="border-bottom:1px solid #3a3a4a;">
+      <th style="text-align:left;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlSystem')}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${amountLabel}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlTx')}</th>
+    </tr></thead>`;
+  }
+
+  const diffOmzetBetaling = Math.abs(totalOmzet - totalBetaling);
+
+  setContent(`
+    ${controleModeBtns()}
+    ${dateNav()}
+
+    <div class="card">
+      <div class="section-title">📊 ${t('ctrlOmzetTitle')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlOmzetSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlOmzet'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', rollerOmzet, visit?.visitors || 0)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', myposOmzet, mypos?.aantalBetalingen || 0)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', payterOmzet, payter?.transactions || 0)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', nayaxPhotoOmzet, nayax?.photobooth?.transactions || 0)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', nayaxSpiegelOmzet, nayax?.spiegel?.transactions || 0)}
+          ${sysRow('', t('ctrlTotal'), totalOmzet, 0, true)}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;">${checkBadge(omzetMatch, t('ctrlMatchBezoek'))}</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">💳 ${t('ctrlBetalingTitle')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlBetalingSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlBetaling'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', rollerBetaling, sales?.transactionCount || 0)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', myposBetaling, mypos?.transactions || 0)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', payterBetaling, payter?.transactions || 0)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', nayaxPhotoBetaling, nayax?.photobooth?.transactions || 0)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', nayaxSpiegelBetaling, nayax?.spiegel?.transactions || 0)}
+          ${sysRow('', t('ctrlTotal'), totalBetaling, 0, true)}
+        </tbody>
+      </table>
+      <div style="margin-top:12px;">${checkBadge(betalingMatch, t('ctrlMatchVerkoop'))}</div>
+    </div>
+
+    ${diffOmzetBetaling > 0.01 ? `
+    <div class="card" style="background:#ffffff08;border:1px solid #3a3a4a;">
+      <div style="font-size:12px;color:#aaa;text-align:center;line-height:1.6;">
+        💡 <strong>${t('ctrlDiffLabel')}: ${fmtEur(diffOmzetBetaling)}</strong><br>
+        <span style="color:#666;">${t('ctrlDiffNote')}</span>
+      </div>
+    </div>` : ''}
+
+    ${cacheLabel(data)}
+  `);
+}
+
+async function renderControleWeek(forceRefresh = false) {
+  const data = await api(`/api/week?offset=${weekOffset}`, forceRefresh);
+  const days = data.days || [];
+  const today = todayStr();
+
+  const startLabel = new Date(days[0]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+  const endLabel   = new Date(days[6]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+
+  // Aggregate week totals per system
+  let wRollerOmzet = 0, wMyposOmzet = 0, wPayterOmzet = 0, wNayaxPhotoOmzet = 0, wNayaxSpiegelOmzet = 0;
+  let wRollerBet = 0, wMyposBet = 0, wPayterBet = 0, wNayaxPhotoBet = 0, wNayaxSpiegelBet = 0;
+  let wRollerTx = 0, wMyposTx = 0, wPayterTx = 0, wNayaxPhotoTx = 0, wNayaxSpiegelTx = 0;
+
+  for (const day of days) {
+    wRollerOmzet  += day.visit?.netRevenue || 0;
+    wMyposOmzet   += day.mypos?.omzetExclBtw || 0;
+    wPayterOmzet  += day.payter?.omzetExclBtw || 0;
+    wNayaxPhotoOmzet   += day.nayax?.photobooth?.omzetExclBtw || 0;
+    wNayaxSpiegelOmzet += day.nayax?.spiegel?.omzetExclBtw || 0;
+
+    wRollerBet  += day.sales?.fundsReceived || 0;
+    wMyposBet   += day.mypos?.totalInclBtw || 0;
+    wPayterBet  += day.payter?.totalInclBtw || 0;
+    wNayaxPhotoBet   += day.nayax?.photobooth?.totalInclBtw || 0;
+    wNayaxSpiegelBet += day.nayax?.spiegel?.totalInclBtw || 0;
+
+    wRollerTx  += day.visit?.visitors || 0;
+    wMyposTx   += day.mypos?.aantalBetalingen || 0;
+    wPayterTx  += day.payter?.transactions || 0;
+    wNayaxPhotoTx   += day.nayax?.photobooth?.transactions || 0;
+    wNayaxSpiegelTx += day.nayax?.spiegel?.transactions || 0;
+  }
+
+  const wTotalOmzet  = wRollerOmzet + wMyposOmzet + wPayterOmzet + wNayaxPhotoOmzet + wNayaxSpiegelOmzet;
+  const wTotalBet    = wRollerBet + wMyposBet + wPayterBet + wNayaxPhotoBet + wNayaxSpiegelBet;
+  const wDiff = Math.abs(wTotalOmzet - wTotalBet);
+
+  function sysRow(emoji, name, amount, tx, isTotaal = false) {
+    if (!isTotaal && amount === 0 && tx === 0) return '';
+    const style = isTotaal ? 'border-top:2px solid #3a3a4a;' : '';
+    const fw = isTotaal ? '800' : '600';
+    return `<tr style="${style}">
+      <td style="padding:9px 4px;font-size:${isTotaal?'14px':'13px'};font-weight:${fw};">${emoji ? emoji+' ' : ''}${name}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:${isTotaal?'15px':'13px'};font-weight:${fw};">${fmtEur(amount)}</td>
+      <td style="padding:9px 4px;text-align:right;font-size:12px;color:#888;">${tx > 0 ? tx.toLocaleString(locale()) : (isTotaal ? '' : '—')}</td>
+    </tr>`;
+  }
+
+  function tableHead(amountLabel) {
+    return `<thead><tr style="border-bottom:1px solid #3a3a4a;">
+      <th style="text-align:left;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlSystem')}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${amountLabel}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:11px;color:#888;font-weight:600;">${t('ctrlTx')}</th>
+    </tr></thead>`;
+  }
+
+  // Per-day rows
+  let dayOmzetRows = '';
+  let dayBetRows = '';
+  for (const day of days) {
+    const isToday = day.date === today;
+    const dayLabel = new Date(day.date + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
+    const dRollerOmzet = day.visit?.netRevenue || 0;
+    const dMyposOmzet  = day.mypos?.omzetExclBtw || 0;
+    const dPayterOmzet = day.payter?.omzetExclBtw || 0;
+    const dNayaxOmzet  = (day.nayax?.photobooth?.omzetExclBtw || 0) + (day.nayax?.spiegel?.omzetExclBtw || 0);
+    const dTotalOmzet  = dRollerOmzet + dMyposOmzet + dPayterOmzet + dNayaxOmzet;
+
+    const dRollerBet = day.sales?.fundsReceived || 0;
+    const dMyposBet  = day.mypos?.totalInclBtw || 0;
+    const dPayterBet = day.payter?.totalInclBtw || 0;
+    const dNayaxBet  = (day.nayax?.photobooth?.totalInclBtw || 0) + (day.nayax?.spiegel?.totalInclBtw || 0);
+    const dTotalBet  = dRollerBet + dMyposBet + dPayterBet + dNayaxBet;
+
+    const todayStyle = isToday ? 'color:#a78bfa;font-weight:700;' : '';
+    const rowStyle = isToday ? 'background:#7c3aed10;' : '';
+
+    dayOmzetRows += `<tr style="${rowStyle}" onclick="selectedDate='${day.date}';controleMode='dag';renderControle();" style="cursor:pointer;">
+      <td style="padding:8px 4px;font-size:12px;${todayStyle}">${dayLabel}${isToday?' ·':''}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dRollerOmzet > 0 ? fmtEur(dRollerOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dMyposOmzet > 0 ? fmtEur(dMyposOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dPayterOmzet > 0 ? fmtEur(dPayterOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dNayaxOmzet > 0 ? fmtEur(dNayaxOmzet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;font-weight:700;">${dTotalOmzet > 0 ? fmtEur(dTotalOmzet) : '<span style="color:#555">—</span>'}</td>
+    </tr>`;
+
+    dayBetRows += `<tr style="${rowStyle}" onclick="selectedDate='${day.date}';controleMode='dag';renderControle();">
+      <td style="padding:8px 4px;font-size:12px;${todayStyle}">${dayLabel}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dRollerBet > 0 ? fmtEur(dRollerBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dMyposBet > 0 ? fmtEur(dMyposBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dPayterBet > 0 ? fmtEur(dPayterBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;">${dNayaxBet > 0 ? fmtEur(dNayaxBet) : '<span style="color:#555">—</span>'}</td>
+      <td style="padding:8px 4px;text-align:right;font-size:12px;font-weight:700;">${dTotalBet > 0 ? fmtEur(dTotalBet) : '<span style="color:#555">—</span>'}</td>
+    </tr>`;
+  }
+
+  // Totaal row for per-day tables
+  const dayOmzetTotaalRow = `<tr style="border-top:2px solid #3a3a4a;background:#ffffff05;">
+    <td style="padding:9px 4px;font-size:13px;font-weight:800;">${t('ctrlTotal')}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wRollerOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wMyposOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wPayterOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wNayaxPhotoOmzet + wNayaxSpiegelOmzet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:14px;font-weight:800;color:#a78bfa;">${fmtEur(wTotalOmzet)}</td>
+  </tr>`;
+  const dayBetTotaalRow = `<tr style="border-top:2px solid #3a3a4a;background:#ffffff05;">
+    <td style="padding:9px 4px;font-size:13px;font-weight:800;">${t('ctrlTotal')}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wRollerBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wMyposBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wPayterBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:13px;font-weight:800;">${fmtEur(wNayaxPhotoBet + wNayaxSpiegelBet)}</td>
+    <td style="padding:9px 4px;text-align:right;font-size:14px;font-weight:800;color:#059669;">${fmtEur(wTotalBet)}</td>
+  </tr>`;
+
+  function dayTableHead() {
+    return `<thead><tr style="border-bottom:1px solid #3a3a4a;">
+      <th style="text-align:left;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">${t('ctrlDate')}</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">🎳</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">🎮</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">🔐</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">📸🪞</th>
+      <th style="text-align:right;padding:6px 4px;font-size:10px;color:#888;font-weight:600;">${t('ctrlTotal')}</th>
+    </tr></thead>`;
+  }
+
+  const weekNav = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <button class="nav-btn" onclick="weekOffset--;renderControle()">‹</button>
+    <div style="font-size:15px;font-weight:700;">${startLabel} – ${endLabel}</div>
+    <button class="nav-btn" onclick="weekOffset++;renderControle()">›</button>
+  </div>`;
+
+  const legendHtml = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;font-size:11px;color:#888;">
+    <span>🎳 Roller</span>
+    <span>🎮 MyPOS</span>
+    <span>🔐 Payter</span>
+    <span>📸🪞 Nayax</span>
+  </div>`;
+
+  setContent(`
+    ${controleModeBtns()}
+    ${weekNav}
+
+    <div class="card">
+      <div class="section-title">📊 ${t('ctrlOmzetTitle')} — ${t('ctrlWeekTotal')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlOmzetSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlOmzet'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', wRollerOmzet, wRollerTx)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', wMyposOmzet, wMyposTx)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', wPayterOmzet, wPayterTx)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', wNayaxPhotoOmzet, wNayaxPhotoTx)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', wNayaxSpiegelOmzet, wNayaxSpiegelTx)}
+          ${sysRow('', t('ctrlTotal'), wTotalOmzet, 0, true)}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-title">📊 ${t('ctrlOmzetTitle')} — ${t('ctrlPerDay')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlOmzetSub')})</span></div>
+      ${legendHtml}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:340px;">
+          ${dayTableHead()}
+          <tbody>${dayOmzetRows}${dayOmzetTotaalRow}</tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:#666;margin-top:8px;">↑ Tik op een dag voor uitgebreide weergave</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">💳 ${t('ctrlBetalingTitle')} — ${t('ctrlWeekTotal')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlBetalingSub')})</span></div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${tableHead(t('ctrlBetaling'))}
+        <tbody>
+          ${sysRow('🎳', 'Roller', wRollerBet, wRollerTx)}
+          ${sysRow('🎮', 'Speelgoed Automaat (MyPOS)', wMyposBet, wMyposTx)}
+          ${sysRow('🔐', 'Kluisjes (Payter)', wPayterBet, wPayterTx)}
+          ${sysRow('📸', 'Photobooth Wit (Nayax)', wNayaxPhotoBet, wNayaxPhotoTx)}
+          ${sysRow('🪞', 'Spiegel Booth (Nayax)', wNayaxSpiegelBet, wNayaxSpiegelTx)}
+          ${sysRow('', t('ctrlTotal'), wTotalBet, 0, true)}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-title">💳 ${t('ctrlBetalingTitle')} — ${t('ctrlPerDay')} <span style="font-size:11px;color:#888;font-weight:400;">(${t('ctrlBetalingSub')})</span></div>
+      ${legendHtml}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:340px;">
+          ${dayTableHead()}
+          <tbody>${dayBetRows}${dayBetTotaalRow}</tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:#666;margin-top:8px;">↑ Tik op een dag voor uitgebreide weergave</div>
+    </div>
+
+    ${wDiff > 0.01 ? `
+    <div class="card" style="background:#ffffff08;border:1px solid #3a3a4a;">
+      <div style="font-size:12px;color:#aaa;text-align:center;line-height:1.6;">
+        💡 <strong>${t('ctrlDiffLabel')}: ${fmtEur(wDiff)}</strong><br>
+        <span style="color:#666;">${t('ctrlDiffNote')}</span>
+      </div>
+    </div>` : ''}
+
+    ${cacheLabel(data)}
+  `);
 }
 
 // ── PERSONEEL VIEW ────────────────────────────────────────────────────────────
