@@ -233,7 +233,7 @@ async function doLogin() {
   errorEl.textContent = '';
   
   try {
-    const r = await fetch(`${WORKER}/api/auth?code=${encodeURIComponent(code)}`);
+    const r = await fetch(`${WORKER}/api/auth`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
     const data = await r.json();
     
     if (data.error) {
@@ -281,7 +281,10 @@ if (savedSession) {
   try {
     session = JSON.parse(savedSession);
     // Re-validate session in background
-    fetch(`${WORKER}/api/auth?code=${encodeURIComponent(session.code)}`)
+    // Check session expiry
+    if (session.expiresAt && Date.now() > session.expiresAt) { doLogout(); return; }
+    // Re-validate session in background
+    fetch(`${WORKER}/api/auth`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: session.code }) })
       .then(r => r.json())
       .then(data => {
         if (data.error) { doLogout(); return; }

@@ -181,7 +181,8 @@ function setLang(newLang) {
 
 // ── SSO Auth (via landing page) ───────────────────────────────────────────────
 const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
-if (!_session || !_session.code) {
+if (!_session || !_session.code || (_session.expiresAt && Date.now() > _session.expiresAt)) {
+  localStorage.removeItem('au_session');
   window.location.href = 'index.html';
 }
 const accessCode = _session ? _session.code : '';
