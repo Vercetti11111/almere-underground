@@ -310,9 +310,9 @@ function render() {
     <button class="refresh-btn" onclick="loadData()">${t('refresh')}</button>
   </div>`;
 
-  // Past bookings
+  // Past bookings — grouped by month (collapsible)
   if (past.length > 0) {
-    html += renderSection(t('pastBookings'), past, pastOwing, true);
+    html += renderPastGrouped(past, pastOwing);
   }
 
   // Future bookings — grouped by month
@@ -345,6 +345,77 @@ function getMonthLabel(key) {
   };
   const names = monthNames[lang] || monthNames.nl;
   return `${names[m - 1]} ${y}`;
+}
+
+function renderPastGrouped(bookings, totalOwing) {
+  // Group by bookingDate month
+  const groups = new Map();
+  for (const b of bookings) {
+    const key = getMonthKey(b.bookingDate);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(b);
+  }
+
+  // Sort groups descending (newest month first)
+  const sortedGroups = [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  // Current month open by default, rest collapsed
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  let html = `<div class="section">
+    <div class="section-header">
+      <div>
+        <span class="section-title">${t('pastBookings')}</span>
+        <span class="section-count"> · ${bookings.length} ${t('bookings')}</span>
+      </div>
+      <span class="section-total">${fmtEur(totalOwing)}</span>
+    </div>`;
+
+  let groupIdx = 0;
+  for (const [monthKey, monthBookings] of sortedGroups) {
+    const monthOwing = monthBookings.reduce((s, b) => s + (b.owing || 0), 0);
+    const isOpen = monthKey === curKey;
+    const gid = `pg-${groupIdx++}`;
+
+    // Sort within group by createdDate descending
+    monthBookings.sort((a, b) => (b.createdDate || '').localeCompare(a.createdDate || ''));
+
+    html += `<div class="month-group">
+      <div class="month-header" onclick="toggleMonth('${gid}', this)">
+        <div class="month-left">
+          <span class="chevron ${isOpen ? 'open' : ''}" id="${gid}-chev">▶</span>
+          <span class="month-name">${getMonthLabel(monthKey)}</span>
+          <span class="month-count">(${monthBookings.length})</span>
+        </div>
+        <span class="month-total">${fmtEur(monthOwing)}</span>
+      </div>
+      <div class="month-body ${isOpen ? '' : 'collapsed'}" id="${gid}">`;
+
+    for (const b of monthBookings) {
+      const badgeClass = b.status === 'PendingPayment' ? 'overdue' : (b.status === 'PartiallyPaid' ? 'partial' : 'pending');
+      const badgeText = b.status === 'PendingPayment' ? t('overdue') : (b.status === 'PartiallyPaid' ? t('partial') : t('pending'));
+
+      html += `<div class="booking-row">
+        <div class="booking-info">
+          <div class="booking-name">${escHtml(b.name || '–')}</div>
+          <div class="booking-meta">
+            <span class="badge ${badgeClass}">${badgeText}</span>
+            ${t('created')}: ${fmtDateShort(b.createdDate ? b.createdDate.split('T')[0] : null)} · ${t('visit')}: ${fmtDateShort(b.bookingDate)}
+          </div>
+        </div>
+        <div class="booking-amounts">
+          <div class="booking-owing">${fmtEur(b.owing)}</div>
+          <div class="booking-total">/ ${fmtEur(b.total)}</div>
+        </div>
+      </div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function renderFutureGrouped(bookings, totalOwing) {
