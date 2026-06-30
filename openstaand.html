@@ -398,7 +398,7 @@ function renderPastGrouped(bookings, totalOwing) {
 
       html += `<div class="booking-row">
         <div class="booking-info">
-          <div class="booking-name">${escHtml(b.name || '–')}</div>
+          <div class="booking-name">${escHtml(b.name || '–')} <span style="font-weight:400;color:#888;font-size:11px">#${b.id}</span></div>
           <div class="booking-meta">
             <span class="badge ${badgeClass}">${badgeText}</span>
             ${t('created')}: ${fmtDateShort(b.createdDate ? b.createdDate.split('T')[0] : null)} · ${t('visit')}: ${fmtDateShort(b.bookingDate)}
@@ -465,7 +465,7 @@ function renderFutureGrouped(bookings, totalOwing) {
 
       html += `<div class="booking-row">
         <div class="booking-info">
-          <div class="booking-name">${escHtml(b.name || '–')}</div>
+          <div class="booking-name">${escHtml(b.name || '–')} <span style="font-weight:400;color:#888;font-size:11px">#${b.id}</span></div>
           <div class="booking-meta">
             <span class="badge ${badgeClass}">${badgeText}</span>
             ${t('visit')}: ${fmtDateShort(b.bookingDate)}
@@ -522,7 +522,7 @@ function renderSection(title, bookings, totalOwing, isPast) {
 
     html += `<div class="booking-row">
       <div class="booking-info">
-        <div class="booking-name">${escHtml(b.name || '–')}</div>
+        <div class="booking-name">${escHtml(b.name || '–')} <span style="font-weight:400;color:#888;font-size:11px">#${b.id}</span></div>
         <div class="booking-meta">
           <span class="badge ${badgeClass}">${badgeText}</span>
           ${metaDate}
