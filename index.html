@@ -282,18 +282,21 @@ if (savedSession) {
     session = JSON.parse(savedSession);
     // Re-validate session in background
     // Check session expiry
-    if (session.expiresAt && Date.now() > session.expiresAt) { doLogout(); return; }
-    // Re-validate session in background
-    fetch(`${WORKER}/api/auth`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: session.code }) })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) { doLogout(); return; }
-        session = data;
-        localStorage.setItem('au_session', JSON.stringify(session));
-        renderMenu();
-      })
-      .catch(() => {}); // offline = keep cached session
-    showMain();
+    if (session.expiresAt && Date.now() > session.expiresAt) {
+      doLogout();
+    } else {
+      // Re-validate session in background
+      fetch(`${WORKER}/api/auth`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: session.code }) })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) { doLogout(); return; }
+          session = data;
+          localStorage.setItem('au_session', JSON.stringify(session));
+          renderMenu();
+        })
+        .catch(() => {}); // offline = keep cached session
+      showMain();
+    }
   } catch { /* invalid JSON, show login */ }
 }
 
