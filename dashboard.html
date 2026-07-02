@@ -29,7 +29,7 @@
     @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
 
     /* App */
-    #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; }
+    #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; transition:max-width .3s; }
 
     /* Common */
     .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
@@ -101,6 +101,43 @@
     .pay-paid { background:#166534; }
     .pay-unpaid { background:#92400e; }
     .rs-empty { text-align:center; padding:32px; color:#555; font-size:13px; background:#1a1a24; border-radius:12px; }
+
+    /* ── Responsive / Desktop ─────────────────────── */
+    @media (min-width: 768px) {
+      body.desktop-mode #app-screen { max-width:1100px; padding:24px 32px 60px; }
+      body.desktop-mode .tab-bar { gap:6px; }
+      body.desktop-mode .tab-btn { font-size:13px; padding:10px 6px; }
+      body.desktop-mode .kpi-grid { grid-template-columns:repeat(4,1fr); }
+      body.desktop-mode .kpi-card { padding:16px 12px; }
+      body.desktop-mode .kpi-value { font-size:20px; }
+    }
+    body.force-desktop #app-screen { max-width:1100px !important; padding:24px 32px 60px !important; }
+    body.force-desktop .tab-bar { gap:6px; }
+    body.force-desktop .tab-btn { font-size:13px; padding:10px 6px; }
+    body.force-mobile #app-screen { max-width:480px !important; }
+
+    /* View toggle */
+    .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+    .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
+
+    /* ── Gantt Chart ──────────────────────────────── */
+    .gantt-container { overflow-x:auto; margin-bottom:24px; }
+    .gantt-wrap { min-width:600px; }
+    .gantt-header { display:flex; align-items:center; margin-bottom:4px; padding-left:140px; }
+    .gantt-hour { flex:1; text-align:center; font-size:10px; color:#555; font-weight:600; }
+    .gantt-dept-label { font-size:13px; font-weight:700; color:#7c3aed; margin:16px 0 6px; padding:6px 0; border-bottom:1px solid #1e1e2a; }
+    .gantt-row { display:flex; align-items:center; margin-bottom:3px; min-height:28px; }
+    .gantt-name { width:140px; flex-shrink:0; font-size:12px; color:#ccc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px; }
+    .gantt-track { flex:1; position:relative; height:22px; background:#12121c; border-radius:4px; }
+    .gantt-bar { position:absolute; height:16px; top:3px; border-radius:3px; min-width:3px; }
+    .gantt-bar.planned { background:rgba(124,58,237,0.5); border:1px solid #7c3aed; }
+    .gantt-bar.clocked { background:rgba(16,185,129,0.5); border:1px solid #10b981; }
+    .gantt-grid-line { position:absolute; top:0; bottom:0; width:1px; background:#1e1e2a; }
+    .gantt-legend { display:flex; gap:16px; justify-content:center; margin:12px 0 8px; font-size:11px; color:#888; }
+    .gantt-legend-dot { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:middle; }
+    .gantt-now-line { position:absolute; top:-2px; bottom:-2px; width:2px; background:#ef4444; z-index:5; }
+    .gantt-now-label { position:absolute; top:-16px; font-size:9px; color:#ef4444; font-weight:700; transform:translateX(-50%); }
+  
   </style>
 </head>
 <body>
@@ -121,6 +158,7 @@
         <option value="nl">🇳🇱 NL</option>
         <option value="en">🇬🇧 EN</option>
       </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
       <div id="live-dot" style="width:8px;height:8px;border-radius:50%;background:#10b981;" title="Live data"></div>
       <button id="refresh-btn" onclick="refreshAll()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
     </div>
@@ -142,6 +180,34 @@
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
 const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
+
+// ── View Mode Toggle ─────────────────────────────────────────────────────────
+function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
+function applyViewMode() {
+  const mode = getViewMode();
+  document.body.classList.remove('desktop-mode','force-desktop','force-mobile');
+  if (mode === 'desktop') document.body.classList.add('force-desktop');
+  else if (mode === 'mobile') document.body.classList.add('force-mobile');
+  else if (window.innerWidth >= 768) document.body.classList.add('desktop-mode');
+  const btn = document.getElementById('view-toggle-btn');
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
+  if (btn) btn.title = {auto:'Automatisch — klik om te wisselen', desktop:'Desktop geforceerd', mobile:'Mobiel geforceerd'}[mode];
+}
+function toggleViewMode() {
+  const modes = ['auto','desktop','mobile'];
+  const cur = getViewMode();
+  const next = modes[(modes.indexOf(cur)+1)%3];
+  localStorage.setItem('au_view_mode', next);
+  applyViewMode();
+  // Re-render current tab for layout changes
+  if (typeof renderCurrentTab === 'function') renderCurrentTab();
+}
+function isWideView() {
+  const m = getViewMode();
+  return m === 'desktop' || (m === 'auto' && window.innerWidth >= 768);
+}
+window.addEventListener('resize', applyViewMode);
+
 
 // ── BMI Historical Data ────────────────────────────────────────────────────
 let bmiData = null;
@@ -1307,6 +1373,11 @@ function goToDay(date) {
   switchTab('bezoek');
 }
 
+
+function renderCurrentTab() {
+  switchTab(currentTab, false);
+}
+
 function switchTab(tab) {
   currentTab = tab;
   expandedDept = null;
@@ -1673,12 +1744,16 @@ async function renderPersoneel(forceRefresh = false) {
     const data = await api(`/api/personeel?date=${persDate}`, forceRefresh);
     const depts = data.departments || [];
     const totals = data.totals || {};
+    const wide = isWideView();
 
     // If a department is expanded, show drill-down view
     if (expandedDept !== null) {
       const dept = depts.find(d => d.deptId === expandedDept);
       if (!dept) { expandedDept = null; return renderPersoneel(forceRefresh); }
       const people = dept.people || [];
+
+      // Desktop: wider grid for people
+      const cols = wide ? 'grid-template-columns:1fr 1fr;' : '';
       let rows = '';
       for (const p of people) {
         const hasPlanned = p.plannedH > 0;
@@ -1724,28 +1799,30 @@ async function renderPersoneel(forceRefresh = false) {
           </div>
         </div>
         <div class="section-title">${t('staffName')}</div>
-        ${rows || `<div style="color:#666;text-align:center;padding:20px;">${t('staffNoData')}</div>`}
+        <div style="${cols}">${rows || `<div style="color:#666;text-align:center;padding:20px;">${t('staffNoData')}</div>`}</div>
         ${cacheLabel(data)}
       `);
       return;
     }
 
-    // Overview: date selector + department table
+    // Overview: date selector + department cards + Gantt chart
     const hasPlanData = depts.some(d => d.plannedH > 0);
     const hasClockData = depts.some(d => d.clockedH > 0);
 
+    // Build department cards
     let deptCards = '';
-    for (const dept of depts) {
+    const activeDepts = depts.filter(d => d.plannedH > 0 || d.clockedH > 0);
+    const cardCols = wide ? 'display:grid;grid-template-columns:1fr 1fr;gap:8px;' : '';
+
+    for (const dept of activeDepts) {
       const hasPlan = dept.plannedH > 0;
       const hasClock = dept.clockedH > 0;
-      if (!hasPlan && !hasClock) continue;
-
       const diffH = dept.clockedH - dept.plannedH;
       const diffSign = diffH > 0 ? '+' : '';
       const diffColor = Math.abs(diffH) < 0.5 ? '#10b981' : diffH > 0 ? '#f59e0b' : '#6b7280';
 
       deptCards += `
-        <div onclick="expandedDept='${dept.deptId}';renderPersoneel()" style="background:#12121c;border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer;border:1px solid #1e1e2a;transition:border-color .2s;" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#1e1e2a'">
+        <div onclick="expandedDept='${dept.deptId}';renderPersoneel()" style="background:#12121c;border-radius:10px;padding:14px 16px;cursor:pointer;border:1px solid #1e1e2a;transition:border-color .2s;${wide ? '' : 'margin-bottom:8px;'}" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#1e1e2a'">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <div style="font-size:14px;font-weight:700;color:#e0e0f0;">${dept.deptName}</div>
             <div style="font-size:11px;color:#666;">${dept.people.length} pers. ›</div>
@@ -1773,8 +1850,11 @@ async function renderPersoneel(forceRefresh = false) {
       deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('staffNoData')}</div>`;
     }
 
-    setContent(`
-      ${dateNav('personeel')}
+    // Build Gantt chart
+    const ganttHtml = buildGanttChart(activeDepts);
+
+    // Desktop: two-column layout (KPI + depts left, Gantt right)
+    const topKpis = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
         <div class="kpi-card">
           <div class="kpi-label">📅 Gepland totaal</div>
@@ -1786,12 +1866,163 @@ async function renderPersoneel(forceRefresh = false) {
           <div class="kpi-value" style="font-size:14px;">${totals.clockedH?.toFixed(1) || '0'}u</div>
           <div style="font-size:12px;color:#888;">${fmtEur(totals.clockedCost)}</div>
         </div>
-      </div>
-      <div class="section-title">Per afdeling — tik voor details</div>
-      ${deptCards}
-      ${cacheLabel(data)}
-    `);
+      </div>`;
+
+    if (wide) {
+      setContent(`
+        ${dateNav('personeel')}
+        ${topKpis}
+        <div style="margin-bottom:24px;">
+          <div class="section-title">📊 Dagplanning — tijdlijn</div>
+          ${ganttHtml}
+        </div>
+        <div class="section-title">Per afdeling — tik voor details</div>
+        <div style="${cardCols}">${deptCards}</div>
+        ${cacheLabel(data)}
+      `);
+    } else {
+      // Mobile: tabs to switch between list and gantt
+      setContent(`
+        ${dateNav('personeel')}
+        ${topKpis}
+        <div style="display:flex;gap:4px;margin-bottom:16px;">
+          <button id="pers-view-list" onclick="togglePersView('list')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:#7c3aed;color:white;">📋 Overzicht</button>
+          <button id="pers-view-gantt" onclick="togglePersView('gantt')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:#1a1a24;color:#888;">📊 Tijdlijn</button>
+        </div>
+        <div id="pers-list-view">
+          <div class="section-title">Per afdeling — tik voor details</div>
+          ${deptCards}
+        </div>
+        <div id="pers-gantt-view" style="display:none;">
+          ${ganttHtml}
+        </div>
+        ${cacheLabel(data)}
+      `);
+    }
   } catch (e) { setContent(errMsg(e.message)); }
+}
+
+function togglePersView(view) {
+  const listEl = document.getElementById('pers-list-view');
+  const ganttEl = document.getElementById('pers-gantt-view');
+  const btnList = document.getElementById('pers-view-list');
+  const btnGantt = document.getElementById('pers-view-gantt');
+  if (!listEl || !ganttEl) return;
+  if (view === 'gantt') {
+    listEl.style.display = 'none';
+    ganttEl.style.display = 'block';
+    btnList.style.background = '#1a1a24'; btnList.style.color = '#888';
+    btnGantt.style.background = '#7c3aed'; btnGantt.style.color = 'white';
+  } else {
+    listEl.style.display = 'block';
+    ganttEl.style.display = 'none';
+    btnList.style.background = '#7c3aed'; btnList.style.color = 'white';
+    btnGantt.style.background = '#1a1a24'; btnGantt.style.color = '#888';
+  }
+}
+
+function buildGanttChart(activeDepts) {
+  // Determine time range: find earliest start and latest end
+  let minH = 24, maxH = 0;
+  for (const dept of activeDepts) {
+    for (const p of dept.people) {
+      if (p.plannedStart) { const h = parseTimeToH(p.plannedStart); if (h < minH) minH = h; }
+      if (p.plannedEnd) { const h = parseTimeToH(p.plannedEnd); if (h > maxH) maxH = h; }
+      if (p.clockedEnter) { const h = parseTimeToH(p.clockedEnter); if (h < minH) minH = h; }
+      if (p.clockedExit && p.clockedExit !== '00:00') { const h = parseTimeToH(p.clockedExit); if (h > maxH) maxH = h; }
+    }
+  }
+  // Default range if no data
+  if (minH >= maxH) { minH = 8; maxH = 24; }
+  // Round to full hours with padding
+  minH = Math.floor(minH);
+  maxH = Math.ceil(maxH);
+  if (maxH <= minH) maxH = minH + 1;
+  const rangeH = maxH - minH;
+
+  // Hour header labels
+  let hourLabels = '';
+  let gridLines = '';
+  for (let h = minH; h <= maxH; h++) {
+    hourLabels += `<div class="gantt-hour">${String(h).padStart(2,'0')}:00</div>`;
+    const pct = ((h - minH) / rangeH * 100).toFixed(2);
+    gridLines += `<div class="gantt-grid-line" style="left:${pct}%"></div>`;
+  }
+
+  // Now line
+  const now = new Date();
+  const nowH = now.getHours() + now.getMinutes() / 60;
+  let nowLine = '';
+  if (nowH >= minH && nowH <= maxH) {
+    const nowPct = ((nowH - minH) / rangeH * 100).toFixed(2);
+    nowLine = `<div class="gantt-now-line" style="left:${nowPct}%"><div class="gantt-now-label">Nu</div></div>`;
+  }
+
+  // Build rows per department
+  let ganttRows = '';
+  for (const dept of activeDepts) {
+    const activePeople = dept.people.filter(p => p.plannedH > 0 || p.clockedH > 0);
+    if (activePeople.length === 0) continue;
+
+    ganttRows += `<div class="gantt-dept-label">${dept.deptName} (${activePeople.length})</div>`;
+
+    for (const p of activePeople) {
+      let bars = '';
+      // Planned bar
+      if (p.plannedStart && p.plannedEnd) {
+        const s = parseTimeToH(p.plannedStart);
+        const e = parseTimeToH(p.plannedEnd);
+        const left = ((s - minH) / rangeH * 100).toFixed(2);
+        const width = ((e - s) / rangeH * 100).toFixed(2);
+        bars += `<div class="gantt-bar planned" style="left:${left}%;width:${width}%" title="Gepland: ${p.plannedStart}–${p.plannedEnd} (${p.plannedH.toFixed(1)}u)"></div>`;
+      }
+      // Clocked bar
+      if (p.clockedEnter && p.clockedExit && p.clockedExit !== '00:00' && p.clockedH > 0) {
+        const s = parseTimeToH(p.clockedEnter);
+        const e = parseTimeToH(p.clockedExit);
+        if (e > s) {
+          const left = ((s - minH) / rangeH * 100).toFixed(2);
+          const width = ((e - s) / rangeH * 100).toFixed(2);
+          bars += `<div class="gantt-bar clocked" style="left:${left}%;width:${width}%" title="Geklokt: ${p.clockedEnter}–${p.clockedExit} (${p.clockedH.toFixed(2)}u)"></div>`;
+        }
+      }
+      // Currently clocked in (no exit yet)
+      if (p.clockedEnter && (!p.clockedExit || p.clockedExit === '00:00') && p.clockedH > 0) {
+        const s = parseTimeToH(p.clockedEnter);
+        const e = Math.min(nowH, maxH);
+        if (e > s) {
+          const left = ((s - minH) / rangeH * 100).toFixed(2);
+          const width = ((e - s) / rangeH * 100).toFixed(2);
+          bars += `<div class="gantt-bar clocked" style="left:${left}%;width:${width}%;border-right:2px dashed #10b981;" title="Ingeklokt sinds ${p.clockedEnter} (${p.clockedH.toFixed(2)}u)"></div>`;
+        }
+      }
+
+      ganttRows += `
+        <div class="gantt-row">
+          <div class="gantt-name" title="${p.name}">${p.name.split(' ')[0]}</div>
+          <div class="gantt-track">${gridLines}${nowLine}${bars}</div>
+        </div>`;
+    }
+  }
+
+  return `
+    <div class="gantt-container">
+      <div class="gantt-wrap">
+        <div class="gantt-legend">
+          <span><span class="gantt-legend-dot" style="background:rgba(124,58,237,0.5);border:1px solid #7c3aed;"></span> Gepland</span>
+          <span><span class="gantt-legend-dot" style="background:rgba(16,185,129,0.5);border:1px solid #10b981;"></span> Geklokt</span>
+          <span style="color:#ef4444;">▏Nu</span>
+        </div>
+        <div class="gantt-header">${hourLabels}</div>
+        ${ganttRows}
+      </div>
+    </div>`;
+}
+
+function parseTimeToH(timeStr) {
+  if (!timeStr || timeStr === '—') return 0;
+  const parts = timeStr.split(':');
+  return parseInt(parts[0]) + (parseInt(parts[1] || 0) / 60);
 }
 
 // ── KPI VIEW ──────────────────────────────────────────────────────────────────
