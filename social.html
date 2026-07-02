@@ -249,9 +249,11 @@ function starsHtml(rating, cssClass) {
 
 async function loadData() {
   try {
-    const code = localStorage.getItem('au_access_code') || '';
+    const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+    if (!_session || !_session.code) { window.location.href = 'index.html'; return; }
+    const code = _session.code;
     const r = await fetch(`${API}/api/social-stats`, {
-      headers: code ? { 'X-Access-Code': code } : {}
+      headers: { 'X-Access-Code': code }
     });
     const data = await r.json();
     if (!Array.isArray(data) || data.length === 0) {
