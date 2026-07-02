@@ -214,13 +214,33 @@
     margin-top: 12px;
     padding: 8px;
   }
-</style>
+
+    /* ── Desktop / View Mode ────────────────────────── */
+    body.desktop-mode .cards,
+    body.force-desktop .cards { max-width:900px; grid-template-columns: repeat(4, 1fr); }
+    body.desktop-mode .section-title,
+    body.force-desktop .section-title { max-width:900px; }
+    body.desktop-mode .chart-container,
+    body.force-desktop .chart-container { max-width:900px; }
+    body.desktop-mode .header,
+    body.force-desktop .header { max-width:900px; margin-left:auto; margin-right:auto; }
+    body.force-mobile .cards { max-width:400px !important; grid-template-columns: 1fr !important; }
+    body.force-mobile .section-title,
+    body.force-mobile .chart-container,
+    body.force-mobile .header { max-width:400px !important; }
+
+    /* View toggle */
+    .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+    .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
+
+  </style>
 </head>
 <body>
 
-<div class="header">
+<div class="header" style="position:relative;">
   <h1>📊 Social Stats</h1>
-  <div class="subtitle">Almere Underground — Social Media & Reviews</div>
+  <div style="position:absolute;top:20px;right:0;display:flex;gap:8px;align-items:center;"><button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button></div>
+    <div class="subtitle">Almere Underground — Social Media & Reviews</div>
 </div>
 
 <div id="app">
@@ -232,6 +252,33 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
+
+// ── View Mode Toggle ─────────────────────────────────────────────────────────
+function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
+function applyViewMode() {
+  const mode = getViewMode();
+  document.body.classList.remove('desktop-mode','force-desktop','force-mobile');
+  if (mode === 'desktop') document.body.classList.add('force-desktop');
+  else if (mode === 'mobile') document.body.classList.add('force-mobile');
+  else if (window.innerWidth >= 768) document.body.classList.add('desktop-mode');
+  const btn = document.getElementById('view-toggle-btn');
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
+  if (btn) btn.title = {auto:'Automatisch — klik om te wisselen', desktop:'Desktop geforceerd', mobile:'Mobiel geforceerd'}[mode];
+}
+function toggleViewMode() {
+  const modes = ['auto','desktop','mobile'];
+  const cur = getViewMode();
+  const next = modes[(modes.indexOf(cur)+1)%3];
+  localStorage.setItem('au_view_mode', next);
+  applyViewMode();
+}
+function isWideView() {
+  const m = getViewMode();
+  return m === 'desktop' || (m === 'auto' && window.innerWidth >= 768);
+}
+window.addEventListener('resize', applyViewMode);
+
+
 const API = 'https://almere-underground.frankkeijzer.workers.dev';
 
 function fmt(n) {
