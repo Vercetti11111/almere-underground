@@ -19,6 +19,7 @@
     --yt-red: #ff0000;
     --tp-green: #00b67a;
     --ta-green: #34e0a1;
+    --dw-orange: #ff8c00;
     --green: #22c55e;
     --red: #ef4444;
   }
@@ -75,6 +76,7 @@
   .card.youtube::before { background: var(--yt-red); }
   .card.trustpilot::before { background: var(--tp-green); }
   .card.tripadvisor::before { background: var(--ta-green); }
+  .card.dagjeweg::before { background: var(--dw-orange); }
 
   .card-header {
     display: flex;
@@ -175,6 +177,7 @@
   .stars { color: var(--google-gold); }
   .stars-tp { color: var(--tp-green); }
   .stars-ta { color: var(--ta-green); }
+  .stars-dw { color: var(--dw-orange); }
   .last-update {
     text-align: center;
     color: var(--muted);
@@ -272,6 +275,7 @@ function render(data) {
   const yt = latest.youtube || {};
   const tp = latest.trustpilot || {};
   const ta = latest.tripadvisor || {};
+  const dw = latest.dagjeweg || {};
   const igY = yesterday?.instagram || {};
   const ttY = yesterday?.tiktok || {};
   const grY = yesterday?.google_reviews || {};
@@ -279,6 +283,7 @@ function render(data) {
   const ytY = yesterday?.youtube || {};
   const tpY = yesterday?.trustpilot || {};
   const taY = yesterday?.tripadvisor || {};
+  const dwY = yesterday?.dagjeweg || {};
 
   document.getElementById('app').innerHTML = `
     <div class="cards">
@@ -416,6 +421,26 @@ function render(data) {
           </div>
         </div>
       </div>
+
+      <!-- Dagjeweg -->
+      <div class="card dagjeweg">
+        <div class="card-header">
+          <span class="card-icon">🎡</span>
+          <div class="card-title">Dagjeweg.nl<small>Uitjes & Reviews</small></div>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-value">${dw.rating || '—'}</div>
+            <div class="metric-label">${dw.rating ? '<span class="stars-dw">' + '★'.repeat(Math.round(dw.rating/2)) + '☆'.repeat(5-Math.round(dw.rating/2)) + '</span> /10' : ''}</div>
+            ${chg(dw.rating, dwY.rating)}
+          </div>
+          <div class="metric">
+            <div class="metric-value">${fmt(dw.reviews)}</div>
+            <div class="metric-label">Reviews</div>
+            ${chg(dw.reviews, dwY.reviews)}
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Followers trend chart -->
@@ -445,7 +470,7 @@ function render(data) {
     </div>
 
     <div class="last-update">Laatste update: ${latest.date}</div>
-    <a class="back-link" href="dashboard.html">← Terug naar dashboard</a>
+    <a class="back-link" href="index.html">← Terug naar menu</a>
   `;
 
   window._socialData = data;
@@ -521,6 +546,7 @@ function setReviewDays(days, btn) {
         { label: 'Google', data: slice.map(d => d.google_reviews?.review_count || null), borderColor: '#fbbc04', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
         { label: 'TripAdvisor', data: slice.map(d => d.tripadvisor?.review_count || null), borderColor: '#34e0a1', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
         { label: 'Trustpilot', data: slice.map(d => d.trustpilot?.review_count || null), borderColor: '#00b67a', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
+        { label: 'Dagjeweg', data: slice.map(d => d.dagjeweg?.reviews || null), borderColor: '#ff8c00', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
       ]
     },
     options: {
