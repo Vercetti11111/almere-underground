@@ -35,25 +35,34 @@
     text-align: center;
     padding: 20px 0;
   }
-  .header h1 {
-    font-size: 1.5rem;
+  .header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
+  .header .subtitle { color: var(--muted); font-size: 0.85rem; }
+
+  .section-title {
+    max-width: 600px;
+    margin: 20px auto 10px;
+    font-size: 1.1rem;
     font-weight: 700;
-    margin-bottom: 4px;
+    padding-left: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
-  .header .subtitle {
-    color: var(--muted);
-    font-size: 0.85rem;
+  .section-title .line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
   }
+
   .cards {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
     max-width: 600px;
-    margin: 0 auto 24px;
+    margin: 0 auto 8px;
   }
   @media (min-width: 500px) {
     .cards { grid-template-columns: 1fr 1fr; }
-    .card.wide { grid-column: 1 / -1; }
   }
   .card {
     background: var(--card);
@@ -82,48 +91,73 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .card-icon { font-size: 1.5rem; }
-  .card-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
+  .card-title { font-size: 0.9rem; font-weight: 600; }
   .card-title small {
     display: block;
     color: var(--muted);
     font-size: 0.7rem;
     font-weight: 400;
   }
-  .metrics {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+  .main-metric {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 8px;
   }
-  .metrics.single { grid-template-columns: 1fr; }
-  .metric { text-align: center; }
-  .metric-value {
-    font-size: 1.4rem;
+  .main-value {
+    font-size: 1.6rem;
     font-weight: 700;
     line-height: 1.2;
   }
-  .metric-label {
+  .main-label {
     color: var(--muted);
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
-  .metric-change {
-    font-size: 0.75rem;
-    margin-top: 2px;
+  .secondary-metric {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-bottom: 10px;
   }
-  .metric-change.up { color: var(--green); }
-  .metric-change.down { color: var(--red); }
-  .metric-change.neutral { color: var(--muted); }
+  .secondary-metric span { color: var(--text); font-weight: 600; }
+  .stars { color: var(--google-gold); font-size: 0.8rem; }
+  .stars-tp { color: var(--tp-green); font-size: 0.8rem; }
+  .stars-ta { color: var(--ta-green); font-size: 0.8rem; }
+  .stars-dw { color: var(--dw-orange); font-size: 0.8rem; }
+
+  .growth-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px;
+    padding: 8px 4px;
+  }
+  .growth-item {
+    text-align: center;
+  }
+  .growth-label {
+    color: var(--muted);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
+  }
+  .growth-val {
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .growth-val.up { color: var(--green); }
+  .growth-val.down { color: var(--red); }
+  .growth-val.neutral { color: var(--muted); }
 
   .chart-container {
     max-width: 600px;
-    margin: 0 auto 20px;
+    margin: 12px auto;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -135,14 +169,8 @@
     align-items: center;
     margin-bottom: 12px;
   }
-  .chart-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
-  .period-btns {
-    display: flex;
-    gap: 4px;
-  }
+  .chart-title { font-size: 0.95rem; font-weight: 600; }
+  .period-btns { display: flex; gap: 4px; }
   .period-btn {
     background: var(--border);
     border: none;
@@ -152,12 +180,9 @@
     font-size: 0.72rem;
     cursor: pointer;
   }
-  .period-btn.active {
-    background: #3b82f6;
-    color: white;
-  }
+  .period-btn.active { background: #3b82f6; color: white; }
   canvas { width: 100% !important; height: 200px !important; }
-  
+
   .loading {
     text-align: center;
     padding: 60px 20px;
@@ -174,10 +199,6 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .stars { color: var(--google-gold); }
-  .stars-tp { color: var(--tp-green); }
-  .stars-ta { color: var(--ta-green); }
-  .stars-dw { color: var(--dw-orange); }
   .last-update {
     text-align: center;
     color: var(--muted);
@@ -220,24 +241,59 @@ function fmt(n) {
   return n.toLocaleString('nl-NL');
 }
 
-function changeText(current, previous, suffix = '') {
-  if (previous == null || current == null) return '<span class="metric-change neutral">—</span>';
-  const diff = current - previous;
-  if (diff === 0) return '<span class="metric-change neutral">0</span>';
-  const cls = diff > 0 ? 'up' : 'down';
-  const sign = diff > 0 ? '+' : '';
-  const display = typeof current === 'number' && current < 10 ? diff.toFixed(1) : fmt(Math.abs(diff));
-  return `<span class="metric-change ${cls}">${sign}${typeof current === 'number' && current < 10 ? diff.toFixed(1) : (diff > 0 ? '+' : '') + fmt(Math.abs(diff))}${suffix}</span>`;
+// Find data entry closest to N days ago
+function getAgo(data, latestIdx, daysAgo) {
+  if (daysAgo === 0) return data[latestIdx];
+  const latestDate = new Date(data[latestIdx].date + 'T12:00:00');
+  const targetDate = new Date(latestDate);
+  targetDate.setDate(targetDate.getDate() - daysAgo);
+  const targetStr = targetDate.toISOString().slice(0, 10);
+
+  // Find exact or closest earlier entry
+  for (let i = latestIdx; i >= 0; i--) {
+    if (data[i].date <= targetStr) return data[i];
+  }
+  return null;
 }
 
-function chg(current, previous) {
-  if (previous == null || current == null) return '<span class="metric-change neutral">—</span>';
-  const diff = current - previous;
-  if (diff === 0) return '<span class="metric-change neutral">0</span>';
+function growthHtml(current, compare) {
+  if (current == null || compare == null) return '<span class="growth-val neutral">—</span>';
+  const diff = current - compare;
+  if (diff === 0) return '<span class="growth-val neutral">0</span>';
   const cls = diff > 0 ? 'up' : 'down';
   const sign = diff > 0 ? '+' : '';
-  if (Number.isInteger(diff)) return `<span class="metric-change ${cls}">${sign}${diff}</span>`;
-  return `<span class="metric-change ${cls}">${sign}${diff.toFixed(1)}</span>`;
+  // For ratings (small numbers with decimals)
+  if (!Number.isInteger(diff) || (Math.abs(current) < 10 && !Number.isInteger(current))) {
+    return `<span class="growth-val ${cls}">${sign}${diff.toFixed(1)}</span>`;
+  }
+  return `<span class="growth-val ${cls}">${sign}${diff}</span>`;
+}
+
+function growthRow(data, latestIdx, getValue) {
+  const current = getValue(data[latestIdx]);
+  const d1 = getAgo(data, latestIdx, 1);
+  const d7 = getAgo(data, latestIdx, 7);
+  const d14 = getAgo(data, latestIdx, 14);
+  const d30 = getAgo(data, latestIdx, 30);
+
+  return `<div class="growth-row">
+    <div class="growth-item">
+      <div class="growth-label">1d</div>
+      ${growthHtml(current, d1 ? getValue(d1) : null)}
+    </div>
+    <div class="growth-item">
+      <div class="growth-label">7d</div>
+      ${growthHtml(current, d7 ? getValue(d7) : null)}
+    </div>
+    <div class="growth-item">
+      <div class="growth-label">14d</div>
+      ${growthHtml(current, d14 ? getValue(d14) : null)}
+    </div>
+    <div class="growth-item">
+      <div class="growth-label">30d</div>
+      ${growthHtml(current, d30 ? getValue(d30) : null)}
+    </div>
+  </div>`;
 }
 
 function starsHtml(rating, cssClass) {
@@ -267,27 +323,20 @@ async function loadData() {
 }
 
 function render(data) {
-  const latest = data[data.length - 1];
-  const yesterday = data.length > 1 ? data[data.length - 2] : null;
-
+  const li = data.length - 1;
+  const latest = data[li];
   const ig = latest.instagram || {};
   const tt = latest.tiktok || {};
-  const gr = latest.google_reviews || {};
   const fb = latest.facebook || {};
   const yt = latest.youtube || {};
+  const gr = latest.google_reviews || {};
   const tp = latest.trustpilot || {};
   const ta = latest.tripadvisor || {};
   const dw = latest.dagjeweg || {};
-  const igY = yesterday?.instagram || {};
-  const ttY = yesterday?.tiktok || {};
-  const grY = yesterday?.google_reviews || {};
-  const fbY = yesterday?.facebook || {};
-  const ytY = yesterday?.youtube || {};
-  const tpY = yesterday?.trustpilot || {};
-  const taY = yesterday?.tripadvisor || {};
-  const dwY = yesterday?.dagjeweg || {};
 
   document.getElementById('app').innerHTML = `
+    <!-- SOCIALS SECTION -->
+    <div class="section-title">📱 Socials <span class="line"></span></div>
     <div class="cards">
       <!-- Instagram -->
       <div class="card instagram">
@@ -295,18 +344,12 @@ function render(data) {
           <span class="card-icon">📸</span>
           <div class="card-title">Instagram<small>@almereunderground</small></div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">${fmt(ig.followers)}</div>
-            <div class="metric-label">Volgers</div>
-            ${chg(ig.followers, igY.followers)}
-          </div>
-          <div class="metric">
-            <div class="metric-value">${fmt(ig.posts)}</div>
-            <div class="metric-label">Posts</div>
-            ${chg(ig.posts, igY.posts)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${fmt(ig.followers)}</span>
+          <span class="main-label">volgers</span>
         </div>
+        <div class="secondary-metric"><span>${fmt(ig.posts)}</span> posts</div>
+        ${growthRow(data, li, d => d.instagram?.followers)}
       </div>
 
       <!-- TikTok -->
@@ -315,18 +358,12 @@ function render(data) {
           <span class="card-icon">🎵</span>
           <div class="card-title">TikTok<small>@almereunderground</small></div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">${fmt(tt.followers)}</div>
-            <div class="metric-label">Volgers</div>
-            ${chg(tt.followers, ttY.followers)}
-          </div>
-          <div class="metric">
-            <div class="metric-value">${fmt(tt.likes)}</div>
-            <div class="metric-label">Likes</div>
-            ${chg(tt.likes, ttY.likes)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${fmt(tt.followers)}</span>
+          <span class="main-label">volgers</span>
         </div>
+        <div class="secondary-metric"><span>${fmt(tt.likes)}</span> likes</div>
+        ${growthRow(data, li, d => d.tiktok?.followers)}
       </div>
 
       <!-- Facebook -->
@@ -335,13 +372,11 @@ function render(data) {
           <span class="card-icon">👍</span>
           <div class="card-title">Facebook<small>Almere Underground</small></div>
         </div>
-        <div class="metrics single">
-          <div class="metric">
-            <div class="metric-value">${fmt(fb.followers)}</div>
-            <div class="metric-label">Volgers</div>
-            ${chg(fb.followers, fbY.followers)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${fmt(fb.followers)}</span>
+          <span class="main-label">volgers</span>
         </div>
+        ${growthRow(data, li, d => d.facebook?.followers)}
       </div>
 
       <!-- YouTube -->
@@ -350,38 +385,30 @@ function render(data) {
           <span class="card-icon">▶️</span>
           <div class="card-title">YouTube<small>@AlmereUnderground</small></div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">${fmt(yt.subscribers)}</div>
-            <div class="metric-label">Subs</div>
-            ${chg(yt.subscribers, ytY.subscribers)}
-          </div>
-          <div class="metric">
-            <div class="metric-value">${fmt(yt.videos)}</div>
-            <div class="metric-label">Video's</div>
-            ${chg(yt.videos, ytY.videos)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${fmt(yt.subscribers)}</span>
+          <span class="main-label">subs</span>
         </div>
+        <div class="secondary-metric"><span>${fmt(yt.videos)}</span> video's</div>
+        ${growthRow(data, li, d => d.youtube?.subscribers)}
       </div>
+    </div>
 
+    <!-- REVIEWS SECTION -->
+    <div class="section-title">⭐ Reviews <span class="line"></span></div>
+    <div class="cards">
       <!-- Google Reviews -->
       <div class="card google">
         <div class="card-header">
           <span class="card-icon">⭐</span>
           <div class="card-title">Google Reviews<small>Maps & Zoeken</small></div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">${gr.rating || '—'}</div>
-            <div class="metric-label">${starsHtml(gr.rating, 'stars')}</div>
-            ${chg(gr.rating, grY.rating)}
-          </div>
-          <div class="metric">
-            <div class="metric-value">${fmt(gr.review_count)}</div>
-            <div class="metric-label">Reviews</div>
-            ${chg(gr.review_count, grY.review_count)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${gr.rating || '—'}</span>
+          <span class="main-label">${starsHtml(gr.rating, 'stars')}</span>
         </div>
+        <div class="secondary-metric"><span>${fmt(gr.review_count)}</span> reviews</div>
+        ${growthRow(data, li, d => d.google_reviews?.review_count)}
       </div>
 
       <!-- Trustpilot -->
@@ -390,18 +417,12 @@ function render(data) {
           <span class="card-icon">🟢</span>
           <div class="card-title">Trustpilot<small>almereunderground.nl</small></div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">${tp.rating || '—'}</div>
-            <div class="metric-label">${starsHtml(tp.rating, 'stars-tp')}</div>
-            ${chg(tp.rating, tpY.rating)}
-          </div>
-          <div class="metric">
-            <div class="metric-value">${fmt(tp.review_count)}</div>
-            <div class="metric-label">Reviews</div>
-            ${chg(tp.review_count, tpY.review_count)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${tp.rating || '—'}</span>
+          <span class="main-label">${starsHtml(tp.rating, 'stars-tp')}</span>
         </div>
+        <div class="secondary-metric"><span>${fmt(tp.review_count)}</span> reviews</div>
+        ${growthRow(data, li, d => d.trustpilot?.review_count)}
       </div>
 
       <!-- TripAdvisor -->
@@ -410,18 +431,12 @@ function render(data) {
           <span class="card-icon">🦉</span>
           <div class="card-title">TripAdvisor<small>Family Entertainment Center</small></div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">${ta.rating || '—'}</div>
-            <div class="metric-label">${starsHtml(ta.rating, 'stars-ta')}</div>
-            ${chg(ta.rating, taY.rating)}
-          </div>
-          <div class="metric">
-            <div class="metric-value">${fmt(ta.review_count)}</div>
-            <div class="metric-label">Reviews</div>
-            ${chg(ta.review_count, taY.review_count)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${ta.rating || '—'}</span>
+          <span class="main-label">${starsHtml(ta.rating, 'stars-ta')}</span>
         </div>
+        <div class="secondary-metric"><span>${fmt(ta.review_count)}</span> reviews</div>
+        ${growthRow(data, li, d => d.tripadvisor?.review_count)}
       </div>
 
       <!-- Dagjeweg -->
@@ -430,18 +445,12 @@ function render(data) {
           <span class="card-icon">🎡</span>
           <div class="card-title">Dagjeweg.nl<small>Uitjes & Reviews</small></div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-value">${dw.rating || '—'}</div>
-            <div class="metric-label">${dw.rating ? '<span class="stars-dw">' + '★'.repeat(Math.round(dw.rating/2)) + '☆'.repeat(5-Math.round(dw.rating/2)) + '</span> /10' : ''}</div>
-            ${chg(dw.rating, dwY.rating)}
-          </div>
-          <div class="metric">
-            <div class="metric-value">${fmt(dw.reviews)}</div>
-            <div class="metric-label">Reviews</div>
-            ${chg(dw.reviews, dwY.reviews)}
-          </div>
+        <div class="main-metric">
+          <span class="main-value">${dw.rating || '—'}</span>
+          <span class="main-label">${dw.rating ? '<span class="stars-dw">' + '★'.repeat(Math.round(dw.rating/2)) + '☆'.repeat(5-Math.round(dw.rating/2)) + '</span> /10' : ''}</span>
         </div>
+        <div class="secondary-metric"><span>${fmt(dw.reviews)}</span> reviews</div>
+        ${growthRow(data, li, d => d.dagjeweg?.reviews)}
       </div>
     </div>
 
@@ -487,7 +496,7 @@ function setDays(days, btn) {
   const data = window._socialData;
   if (!data) return;
   const slice = days > 0 ? data.slice(-days) : data;
-  
+
   if (btn) {
     btn.closest('.period-btns').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
