@@ -151,7 +151,7 @@
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
     <div>
       <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
-      <div style="font-size:20px;font-weight:800;">Analytics</div>
+      <div style="font-size:20px;font-weight:800;">Omzet Dashboard</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
@@ -169,8 +169,6 @@
     <button class="tab-btn active" onclick="switchTab('week')" id="tab-week">📅 Week</button>
     <button class="tab-btn" onclick="switchTab('bezoek')" id="tab-bezoek">🏟️ Bezoek</button>
     <button class="tab-btn" onclick="switchTab('verkoop')" id="tab-verkoop">💳 Verkoop</button>
-    <button class="tab-btn" onclick="switchTab('personeel')" id="tab-personeel">👥 Personeel</button>
-    <button class="tab-btn" onclick="switchTab('kpi')" id="tab-kpi">📊 KPI</button>
     <button class="tab-btn" onclick="switchTab('controle')" id="tab-controle">🔍 Controle</button>
   </div>
 
@@ -665,13 +663,9 @@ function applyLang() {
   const tw = document.getElementById('tab-week');
   const tb = document.getElementById('tab-bezoek');
   const tv = document.getElementById('tab-verkoop');
-  const tp = document.getElementById('tab-personeel');
-  const tk = document.getElementById('tab-kpi');
   if (tw) tw.textContent = t('tabWeek');
   if (tb) tb.textContent = t('tabBezoek');
   if (tv) tv.textContent = t('tabVerkoop');
-  if (tp) tp.textContent = t('tabPersoneel');
-  if (tk) tk.textContent = t('tabKpi');
   const tct = document.getElementById('tab-controle');
   if (tct) tct.textContent = t('tabControle');
   // Login removed (SSO)
@@ -1397,8 +1391,6 @@ async function renderCurrentTab(forceRefresh = false) {
   if (currentTab === 'week')      await renderWeek(forceRefresh);
   else if (currentTab === 'bezoek')   await renderBezoek(forceRefresh);
   else if (currentTab === 'verkoop')  await renderVerkoop(forceRefresh);
-  else if (currentTab === 'personeel') await renderPersoneel(forceRefresh);
-  else if (currentTab === 'kpi')       await renderKpi(forceRefresh);
   else if (currentTab === 'controle')  await renderControle(forceRefresh);
 }
 
