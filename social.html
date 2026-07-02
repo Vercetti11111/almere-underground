@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Social Stats — Almere Underground</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e4e4e7;
+    --muted: #9ca3af;
+    --ig-gradient: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    --tt-cyan: #00f2ea;
+    --tt-pink: #ff0050;
+    --google-gold: #fbbc04;
+    --green: #22c55e;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .header {
+    text-align: center;
+    padding: 20px 0;
+  }
+  .header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .header .subtitle {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    max-width: 600px;
+    margin: 0 auto 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .card.instagram::before { background: var(--ig-gradient); }
+  .card.tiktok::before { background: linear-gradient(90deg, var(--tt-cyan), var(--tt-pink)); }
+  .card.google::before { background: var(--google-gold); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .card-icon {
+    font-size: 1.8rem;
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .card-title small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .metric {
+    text-align: center;
+  }
+  .metric-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .metric-label {
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .metric-change {
+    font-size: 0.8rem;
+    margin-top: 2px;
+  }
+  .metric-change.up { color: var(--green); }
+  .metric-change.down { color: var(--red); }
+  .metric-change.neutral { color: var(--muted); }
+
+  .chart-container {
+    max-width: 600px;
+    margin: 0 auto 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .chart-title {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .period-btns {
+    display: flex;
+    gap: 4px;
+  }
+  .period-btn {
+    background: var(--border);
+    border: none;
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .period-btn.active {
+    background: #3b82f6;
+    color: white;
+  }
+  canvas { width: 100% !important; height: 200px !important; }
+  
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .loading .spinner {
+    display: inline-block;
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .stars { color: var(--google-gold); }
+  .last-update {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-top: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📊 Social Stats</h1>
+  <div class="subtitle">Almere Underground — Social Media & Reviews</div>
+</div>
+
+<div id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    <div>Data laden...</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+const API = 'https://almere-underground.frankkeijzer.workers.dev';
+
+function fmt(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return n.toLocaleString('nl-NL');
+}
+
+function changeText(current, previous, suffix = '') {
+  if (previous == null || previous === 0) return '<span class="metric-change neutral">—</span>';
+  const diff = current - previous;
+  const cls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral';
+  const sign = diff > 0 ? '+' : '';
+  return `<span class="metric-change ${cls}">${sign}${fmt(diff)}${suffix}</span>`;
+}
+
+async function loadData() {
+  try {
+    const code = localStorage.getItem('au_access_code') || '';
+    const r = await fetch(`${API}/api/social-stats`, {
+      headers: code ? { 'X-Access-Code': code } : {}
+    });
+    const data = await r.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      document.getElementById('app').innerHTML = '<div class="loading">Nog geen data beschikbaar. De eerste scrape draait vannacht om 02:00.</div>';
+      return;
+    }
+    render(data);
+  } catch (e) {
+    document.getElementById('app').innerHTML = `<div class="loading">Fout bij laden: ${e.message}</div>`;
+  }
+}
+
+function render(data) {
+  const latest = data[data.length - 1];
+  const yesterday = data.length > 1 ? data[data.length - 2] : null;
+  const weekAgo = data.length > 7 ? data[data.length - 8] : null;
+
+  const ig = latest.instagram || {};
+  const tt = latest.tiktok || {};
+  const gr = latest.google_reviews || {};
+  const igY = yesterday?.instagram || {};
+  const ttY = yesterday?.tiktok || {};
+  const grY = yesterday?.google_reviews || {};
+
+  let starsHtml = '';
+  if (gr.rating) {
+    const full = Math.floor(gr.rating);
+    const half = gr.rating % 1 >= 0.3;
+    starsHtml = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(5 - full - (half ? 1 : 0));
+  }
+
+  document.getElementById('app').innerHTML = `
+    <div class="cards">
+      <div class="card instagram">
+        <div class="card-header">
+          <span class="card-icon">📸</span>
+          <div class="card-title">Instagram<small>@almereunderground</small></div>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-value">${fmt(ig.followers || 0)}</div>
+            <div class="metric-label">Volgers</div>
+            ${changeText(ig.followers, igY.followers)}
+          </div>
+          <div class="metric">
+            <div class="metric-value">${fmt(ig.posts || 0)}</div>
+            <div class="metric-label">Posts</div>
+            ${changeText(ig.posts, igY.posts)}
+          </div>
+        </div>
+      </div>
+
+      <div class="card tiktok">
+        <div class="card-header">
+          <span class="card-icon">🎵</span>
+          <div class="card-title">TikTok<small>@almereunderground</small></div>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-value">${fmt(tt.followers || 0)}</div>
+            <div class="metric-label">Volgers</div>
+            ${changeText(tt.followers, ttY.followers)}
+          </div>
+          <div class="metric">
+            <div class="metric-value">${fmt(tt.likes || 0)}</div>
+            <div class="metric-label">Likes</div>
+            ${changeText(tt.likes, ttY.likes)}
+          </div>
+        </div>
+      </div>
+
+      <div class="card google">
+        <div class="card-header">
+          <span class="card-icon">⭐</span>
+          <div class="card-title">Google Reviews<small>Family Entertainment Center</small></div>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-value">${gr.rating || '—'}</div>
+            <div class="metric-label"><span class="stars">${starsHtml}</span></div>
+            ${changeText(gr.rating, grY.rating)}
+          </div>
+          <div class="metric">
+            <div class="metric-value">${fmt(gr.review_count || 0)}</div>
+            <div class="metric-label">Reviews</div>
+            ${changeText(gr.review_count, grY.review_count)}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <span class="chart-title">📈 Volgers trend</span>
+        <div class="period-btns">
+          <button class="period-btn active" onclick="setDays(30)">30d</button>
+          <button class="period-btn" onclick="setDays(90)">90d</button>
+          <button class="period-btn" onclick="setDays(0)">Alles</button>
+        </div>
+      </div>
+      <canvas id="followersChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <span class="chart-title">⭐ Reviews trend</span>
+      </div>
+      <canvas id="reviewsChart"></canvas>
+    </div>
+
+    <div class="last-update">Laatste update: ${latest.date}</div>
+  `;
+
+  window._socialData = data;
+  setDays(30);
+  drawReviewsChart(data);
+}
+
+let followersChartInstance = null;
+let reviewsChartInstance = null;
+
+function setDays(days) {
+  const data = window._socialData;
+  if (!data) return;
+  const slice = days > 0 ? data.slice(-days) : data;
+  
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  event?.target?.classList.add('active');
+
+  const labels = slice.map(d => d.date.substring(5));
+  const igData = slice.map(d => d.instagram?.followers || null);
+  const ttData = slice.map(d => d.tiktok?.followers || null);
+
+  if (followersChartInstance) followersChartInstance.destroy();
+  const ctx = document.getElementById('followersChart').getContext('2d');
+  followersChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Instagram', data: igData, borderColor: '#e1306c', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+        { label: 'TikTok', data: ttData, borderColor: '#00f2ea', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#9ca3af', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: '#2a2d3a' } },
+        y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: '#2a2d3a' } }
+      }
+    }
+  });
+}
+
+function drawReviewsChart(data) {
+  const labels = data.map(d => d.date.substring(5));
+  const ratingData = data.map(d => d.google_reviews?.rating || null);
+  const countData = data.map(d => d.google_reviews?.review_count || null);
+
+  const ctx = document.getElementById('reviewsChart').getContext('2d');
+  reviewsChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Score', data: ratingData, borderColor: '#fbbc04', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+        { label: 'Aantal', data: countData, borderColor: '#60a5fa', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#9ca3af', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: '#2a2d3a' } },
+        y: { position: 'left', min: 4.0, max: 5.0, ticks: { color: '#fbbc04', font: { size: 10 } }, grid: { color: '#2a2d3a' } },
+        y1: { position: 'right', ticks: { color: '#60a5fa', font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+loadData();
+</script>
+</body>
+</html>
