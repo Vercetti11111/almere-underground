@@ -218,7 +218,7 @@ async function renderPersoneel(forceRefresh = false) {
                 ${hasPlanned ? `
                   <div style="font-size:13px;font-weight:700;color:#7c3aed;">${p.plannedH.toFixed(1)}u</div>
                   <div style="font-size:12px;color:#aaa;">${fmtEur(p.plannedCost)}</div>
-                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.plannedStart || '—'} – ${p.plannedEnd || '—'}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${fmtTime(p.plannedStart)} – ${fmtTime(p.plannedEnd)}</div>
                 ` : `<div style="font-size:12px;color:#555;">—</div>`}
               </div>
               <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
@@ -226,7 +226,7 @@ async function renderPersoneel(forceRefresh = false) {
                 ${hasClocked ? `
                   <div style="font-size:13px;font-weight:700;color:#10b981;">${p.clockedH.toFixed(2)}u</div>
                   <div style="font-size:12px;color:#aaa;">${fmtEur(p.clockedCost)}</div>
-                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.clockedEnter || '—'} – ${p.clockedExit || '—'}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${fmtTime(p.clockedEnter)} – ${fmtTime(p.clockedExit)}</div>
                 ` : `<div style="font-size:12px;color:#555;">—</div>`}
               </div>
             </div>
@@ -318,6 +318,16 @@ function parseTimeToH(timeStr) {
   return parseInt(parts[0]) + (parseInt(parts[1] || 0) / 60);
 }
 
+// Format time strings like "26:00" → "02:00" (overnight normalization)
+function fmtTime(timeStr) {
+  if (!timeStr || timeStr === '—') return '—';
+  const parts = timeStr.split(':');
+  let h = parseInt(parts[0]);
+  const m = parts[1] || '00';
+  if (h >= 24) h -= 24;
+  return String(h).padStart(2, '0') + ':' + m;
+}
+
 function buildGanttChart(activeDepts) {
   let minH = 24, maxH = 0;
   for (const dept of activeDepts) {
@@ -335,7 +345,7 @@ function buildGanttChart(activeDepts) {
 
   let hourLabels = '', gridLines = '';
   for (let h = minH; h <= maxH; h++) {
-    hourLabels += `<div class="gantt-hour">${String(h).padStart(2,'0')}:00</div>`;
+    hourLabels += `<div class="gantt-hour">${String(h >= 24 ? h - 24 : h).padStart(2,'0')}:00</div>`;
     gridLines += `<div class="gantt-grid-line" style="left:${((h - minH) / rangeH * 100).toFixed(2)}%"></div>`;
   }
 
@@ -355,15 +365,15 @@ function buildGanttChart(activeDepts) {
       let bars = '';
       if (p.plannedStart && p.plannedEnd) {
         const s = parseTimeToH(p.plannedStart), e = parseTimeToH(p.plannedEnd);
-        bars += `<div class="gantt-bar planned" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%" title="Gepland: ${p.plannedStart}–${p.plannedEnd} (${p.plannedH.toFixed(1)}u)"></div>`;
+        bars += `<div class="gantt-bar planned" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%" title="Gepland: ${fmtTime(p.plannedStart)}–${fmtTime(p.plannedEnd)} (${p.plannedH.toFixed(1)}u)"></div>`;
       }
       if (p.clockedEnter && p.clockedExit && p.clockedExit !== '00:00' && p.clockedH > 0) {
         const s = parseTimeToH(p.clockedEnter), e = parseTimeToH(p.clockedExit);
-        if (e > s) bars += `<div class="gantt-bar clocked" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%" title="Geklokt: ${p.clockedEnter}–${p.clockedExit} (${p.clockedH.toFixed(2)}u)"></div>`;
+        if (e > s) bars += `<div class="gantt-bar clocked" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%" title="Geklokt: ${fmtTime(p.clockedEnter)}–${fmtTime(p.clockedExit)} (${p.clockedH.toFixed(2)}u)"></div>`;
       }
       if (p.clockedEnter && (!p.clockedExit || p.clockedExit === '00:00') && p.clockedH > 0) {
         const s = parseTimeToH(p.clockedEnter), e = Math.min(nowH, maxH);
-        if (e > s) bars += `<div class="gantt-bar clocked" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%;border-right:2px dashed #10b981;" title="Ingeklokt sinds ${p.clockedEnter} (${p.clockedH.toFixed(2)}u)"></div>`;
+        if (e > s) bars += `<div class="gantt-bar clocked" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%;border-right:2px dashed #10b981;" title="Ingeklokt sinds ${fmtTime(p.clockedEnter)} (${p.clockedH.toFixed(2)}u)"></div>`;
       }
       ganttRows += `<div class="gantt-row"><div class="gantt-name" title="${p.name}">${p.name.split(' ')[0]}</div><div class="gantt-track">${gridLines}${nowLine}${bars}</div></div>`;
     }
