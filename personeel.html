@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Almere Underground – Personeel</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  ::-webkit-scrollbar { display: none; }
+  body { margin: 0; background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; transition:max-width .3s; }
+  .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
+  .kpi-card { background:#1a1a24; border-radius:12px; padding:12px 8px; text-align:center; }
+  .kpi-label { font-size:11px; color:#888; margin-bottom:2px; }
+  .kpi-value { font-size:16px; font-weight:700; }
+  .section-title { font-size:12px; font-weight:700; color:#aaa; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.05em; }
+  .spinner { width:32px; height:32px; border:3px solid #2a2a38; border-top-color:#7c3aed; border-radius:50%; animation:spin 0.8s linear infinite; margin:48px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .nav-btn { background:#1a1a24; border:none; color:#aaa; border-radius:10px; padding:8px 14px; font-size:18px; cursor:pointer; }
+  .nav-btn:active { background:#2a2a38; }
+  .date-label { font-size:15px; font-weight:700; text-align:center; flex:1; }
+  .err-msg { text-align:center; padding:40px 20px; color:#ef4444; font-size:13px; line-height:1.6; }
+  #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+
+  @media (min-width: 768px) {
+    body.desktop-mode #app-screen { max-width:1100px; padding:24px 32px 60px; }
+    body.desktop-mode .kpi-card { padding:16px 12px; }
+    body.desktop-mode .kpi-value { font-size:20px; }
+  }
+  body.force-desktop #app-screen { max-width:1100px !important; padding:24px 32px 60px !important; }
+  body.force-mobile #app-screen { max-width:480px !important; }
+
+  .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+  .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
+
+  /* Gantt Chart */
+  .gantt-container { overflow-x:auto; margin-bottom:24px; }
+  .gantt-wrap { min-width:600px; }
+  .gantt-header { display:flex; align-items:center; margin-bottom:4px; padding-left:140px; }
+  .gantt-hour { flex:1; text-align:center; font-size:10px; color:#555; font-weight:600; }
+  .gantt-dept-label { font-size:13px; font-weight:700; color:#7c3aed; margin:16px 0 6px; padding:6px 0; border-bottom:1px solid #1e1e2a; }
+  .gantt-row { display:flex; align-items:center; margin-bottom:3px; min-height:28px; }
+  .gantt-name { width:140px; flex-shrink:0; font-size:12px; color:#ccc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px; }
+  .gantt-track { flex:1; position:relative; height:22px; background:#12121c; border-radius:4px; }
+  .gantt-bar { position:absolute; height:16px; top:3px; border-radius:3px; min-width:3px; }
+  .gantt-bar.planned { background:rgba(124,58,237,0.5); border:1px solid #7c3aed; }
+  .gantt-bar.clocked { background:rgba(16,185,129,0.5); border:1px solid #10b981; }
+  .gantt-grid-line { position:absolute; top:0; bottom:0; width:1px; background:#1e1e2a; }
+  .gantt-legend { display:flex; gap:16px; justify-content:center; margin:12px 0 8px; font-size:11px; color:#888; }
+  .gantt-legend-dot { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:middle; }
+  .gantt-now-line { position:absolute; top:-2px; bottom:-2px; width:2px; background:#ef4444; z-index:5; }
+  .gantt-now-label { position:absolute; top:-16px; font-size:9px; color:#ef4444; font-weight:700; transform:translateX(-50%); }
+</style>
+</head>
+<body>
+<div id="app-screen">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;" id="page-title">👥 Personeel</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
+      <div style="width:8px;height:8px;border-radius:50%;background:#10b981;" title="Live data"></div>
+      <button id="refresh-btn" onclick="doRefresh()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Verversen">🔄</button>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
+
+// ── SSO ──
+const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_session || !_session.code || (_session.expiresAt && Date.now() > _session.expiresAt)) {
+  localStorage.removeItem('au_session');
+  window.location.href = 'index.html';
+}
+const accessCode = _session ? _session.code : '';
+
+// ── View Mode ──
+function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
+function applyViewMode() {
+  const mode = getViewMode();
+  document.body.classList.remove('desktop-mode','force-desktop','force-mobile');
+  if (mode === 'desktop') document.body.classList.add('force-desktop');
+  else if (mode === 'mobile') document.body.classList.add('force-mobile');
+  else if (window.innerWidth >= 768) document.body.classList.add('desktop-mode');
+  const btn = document.getElementById('view-toggle-btn');
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
+}
+function toggleViewMode() {
+  const modes = ['auto','desktop','mobile'];
+  const cur = getViewMode();
+  localStorage.setItem('au_view_mode', modes[(modes.indexOf(cur)+1)%3]);
+  applyViewMode();
+  renderPersoneel();
+}
+function isWideView() {
+  const m = getViewMode();
+  return m === 'desktop' || (m === 'auto' && window.innerWidth >= 768);
+}
+window.addEventListener('resize', applyViewMode);
+
+// ── i18n ──
+const TRANSLATIONS = {
+  nl: {
+    pageTitle: '👥 Personeel',
+    staffPlanned: 'Gepland', staffClocked: 'Geklokt', staffName: 'Naam',
+    staffNoData: 'Geen planning of uren beschikbaar voor deze datum.',
+    staffBack: '← Terug naar overzicht',
+    fromCache: 'Uit cache', liveData: 'Live data', agoSec: 's geleden', agoMin: 'm geleden',
+  },
+  en: {
+    pageTitle: '👥 Staff',
+    staffPlanned: 'Planned', staffClocked: 'Clocked', staffName: 'Name',
+    staffNoData: 'No planning or hours available for this date.',
+    staffBack: '← Back to overview',
+    fromCache: 'From cache', liveData: 'Live data', agoSec: 's ago', agoMin: 'm ago',
+  }
+};
+let lang = localStorage.getItem('au_lang') || 'nl';
+function t(key) { return (TRANSLATIONS[lang] || TRANSLATIONS.nl)[key] || TRANSLATIONS.nl[key] || key; }
+function locale() { return lang === 'en' ? 'en-GB' : 'nl-NL'; }
+function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('lang-select').value = l; document.getElementById('page-title').textContent = t('pageTitle'); renderPersoneel(); }
+
+// ── API ──
+const cache = {};
+async function api(path, forceRefresh = false) {
+  if (!forceRefresh && cache[path]) return cache[path];
+  const sep = path.includes('?') ? '&' : '?';
+  const url = forceRefresh ? `${WORKER}${path}${sep}refresh=1` : `${WORKER}${path}`;
+  const r = await fetch(url, { headers: { 'X-Access-Code': accessCode } });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  cache[path] = data;
+  if (!forceRefresh) setTimeout(() => delete cache[path], 5 * 60 * 1000);
+  return data;
+}
+
+// ── Helpers ──
+function todayStr() { return new Date().toLocaleDateString('sv-SE'); }
+function addDays(s, n) { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); }
+function fmtEur(v) { if (v == null || isNaN(v)) return '—'; return '€\u00a0' + v.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtDateLong(s) { return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }); }
+function setContent(html) { document.getElementById('content').innerHTML = html; }
+function spinner() { return '<div class="spinner"></div>'; }
+function errMsg(m) { return `<div class="err-msg">⚠️ ${m}</div>`; }
+function cacheLabel(data) {
+  if (!data) return '';
+  const at = data._cachedAt || data.generatedAt;
+  const fromCache = data._cached;
+  const age = data._cacheAge;
+  const timeStr = at ? new Date(at).toLocaleString(locale(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const ageStr = age != null ? (age < 60 ? `${age}${t('agoSec')}` : `${Math.floor(age/60)}${t('agoMin')}`) : '';
+  const icon = fromCache ? '📦' : '⚡';
+  const label = fromCache ? `${t('fromCache')} · ${ageStr}` : t('liveData');
+  return `<div style="font-size:10px;color:#444;text-align:center;margin-top:12px;">${icon} ${label}${timeStr ? ` · ${timeStr}` : ''}</div>`;
+}
+
+// ── State ──
+let persDate = todayStr();
+let expandedDept = null;
+
+function shiftPers(n) { persDate = addDays(persDate, n); expandedDept = null; renderPersoneel(); }
+function onPersDateChange(val) { persDate = val; expandedDept = null; renderPersoneel(); }
+function triggerDatePicker(id) { const el = document.getElementById(id); if (!el) return; try { if (el.showPicker) el.showPicker(); else el.click(); } catch(e) { el.click(); } }
+
+function dateNav() {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <button class="nav-btn" onclick="shiftPers(-1)">‹</button>
+      <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-pers')">
+        <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(persDate)}</div>
+        <input type="date" id="dp-pers" value="${persDate}" onchange="onPersDateChange(this.value)" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
+      </div>
+      <button class="nav-btn" onclick="shiftPers(1)">›</button>
+    </div>`;
+}
+
+async function doRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  Object.keys(cache).forEach(k => delete cache[k]);
+  try { await renderPersoneel(true); } finally { if (btn) { btn.disabled = false; btn.textContent = '🔄'; } }
+}
+
+// ── Render ──
+async function renderPersoneel(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    const data = await api(`/api/personeel?date=${persDate}`, forceRefresh);
+    const depts = data.departments || [];
+    const totals = data.totals || {};
+    const wide = isWideView();
+
+    if (expandedDept !== null) {
+      const dept = depts.find(d => d.deptId === expandedDept);
+      if (!dept) { expandedDept = null; return renderPersoneel(forceRefresh); }
+      const people = dept.people || [];
+      let rows = '';
+      for (const p of people) {
+        const hasPlanned = p.plannedH > 0;
+        const hasClocked = p.clockedH > 0;
+        rows += `
+          <div style="background:#12121c;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#e0e0f0;margin-bottom:10px;">${p.name}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">📅 ${t('staffPlanned')}</div>
+                ${hasPlanned ? `
+                  <div style="font-size:13px;font-weight:700;color:#7c3aed;">${p.plannedH.toFixed(1)}u</div>
+                  <div style="font-size:12px;color:#aaa;">${fmtEur(p.plannedCost)}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.plannedStart || '—'} – ${p.plannedEnd || '—'}</div>
+                ` : `<div style="font-size:12px;color:#555;">—</div>`}
+              </div>
+              <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+                <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">🕐 ${t('staffClocked')}</div>
+                ${hasClocked ? `
+                  <div style="font-size:13px;font-weight:700;color:#10b981;">${p.clockedH.toFixed(2)}u</div>
+                  <div style="font-size:12px;color:#aaa;">${fmtEur(p.clockedCost)}</div>
+                  <div style="font-size:11px;color:#666;margin-top:4px;">${p.clockedEnter || '—'} – ${p.clockedExit || '—'}</div>
+                ` : `<div style="font-size:12px;color:#555;">—</div>`}
+              </div>
+            </div>
+          </div>`;
+      }
+      setContent(`
+        <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+          <button onclick="expandedDept=null;renderPersoneel()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;">${t('staffBack')}</button>
+          <div style="font-size:16px;font-weight:800;color:#e0e0f0;">${dept.deptName}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div class="kpi-card"><div class="kpi-label">📅 ${t('staffPlanned')}</div><div class="kpi-value" style="font-size:14px;">${dept.plannedH.toFixed(1)}u</div><div style="font-size:12px;color:#888;">${fmtEur(dept.plannedCost)}</div></div>
+          <div class="kpi-card"><div class="kpi-label">🕐 ${t('staffClocked')}</div><div class="kpi-value" style="font-size:14px;">${dept.clockedH.toFixed(2)}u</div><div style="font-size:12px;color:#888;">${fmtEur(dept.clockedCost)}</div></div>
+        </div>
+        <div class="section-title">${t('staffName')}</div>
+        <div style="${wide ? 'display:grid;grid-template-columns:1fr 1fr;gap:8px;' : ''}">${rows || `<div style="color:#666;text-align:center;padding:20px;">${t('staffNoData')}</div>`}</div>
+        ${cacheLabel(data)}
+      `);
+      return;
+    }
+
+    const activeDepts = depts.filter(d => d.plannedH > 0 || d.clockedH > 0);
+    const cardCols = wide ? 'display:grid;grid-template-columns:1fr 1fr;gap:8px;' : '';
+    let deptCards = '';
+    for (const dept of activeDepts) {
+      const hasPlan = dept.plannedH > 0, hasClock = dept.clockedH > 0;
+      const diffH = dept.clockedH - dept.plannedH;
+      const diffSign = diffH > 0 ? '+' : '';
+      const diffColor = Math.abs(diffH) < 0.5 ? '#10b981' : diffH > 0 ? '#f59e0b' : '#6b7280';
+      deptCards += `
+        <div onclick="expandedDept='${dept.deptId}';renderPersoneel()" style="background:#12121c;border-radius:10px;padding:14px 16px;cursor:pointer;border:1px solid #1e1e2a;transition:border-color .2s;${wide ? '' : 'margin-bottom:8px;'}" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='#1e1e2a'">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#e0e0f0;">${dept.deptName}</div>
+            <div style="font-size:11px;color:#666;">${dept.people.length} pers. ›</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;margin-bottom:3px;">📅 Gepland</div><div style="font-size:13px;font-weight:700;color:#7c3aed;">${hasPlan ? dept.plannedH.toFixed(1)+'u' : '—'}</div><div style="font-size:11px;color:#888;">${hasPlan ? fmtEur(dept.plannedCost) : ''}</div></div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;margin-bottom:3px;">🕐 Geklokt</div><div style="font-size:13px;font-weight:700;color:#10b981;">${hasClock ? dept.clockedH.toFixed(1)+'u' : '—'}</div><div style="font-size:11px;color:#888;">${hasClock ? fmtEur(dept.clockedCost) : ''}</div></div>
+            <div style="text-align:center;"><div style="font-size:10px;color:#888;margin-bottom:3px;">Δ Verschil</div><div style="font-size:13px;font-weight:700;color:${diffColor};">${hasPlan && hasClock ? diffSign+diffH.toFixed(1)+'u' : '—'}</div></div>
+          </div>
+        </div>`;
+    }
+    if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('staffNoData')}</div>`;
+
+    const ganttHtml = buildGanttChart(activeDepts);
+    const topKpis = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">📅 Gepland totaal</div><div class="kpi-value" style="font-size:14px;">${totals.plannedH?.toFixed(1) || '0'}u</div><div style="font-size:12px;color:#888;">${fmtEur(totals.plannedCost)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">🕐 Geklokt totaal</div><div class="kpi-value" style="font-size:14px;">${totals.clockedH?.toFixed(1) || '0'}u</div><div style="font-size:12px;color:#888;">${fmtEur(totals.clockedCost)}</div></div>
+      </div>`;
+
+    if (wide) {
+      setContent(`${dateNav()}${topKpis}
+        <div style="margin-bottom:24px;"><div class="section-title">📊 Dagplanning — tijdlijn</div>${ganttHtml}</div>
+        <div class="section-title">Per afdeling — tik voor details</div>
+        <div style="${cardCols}">${deptCards}</div>${cacheLabel(data)}`);
+    } else {
+      setContent(`${dateNav()}${topKpis}
+        <div style="display:flex;gap:4px;margin-bottom:16px;">
+          <button id="pers-view-list" onclick="togglePersView('list')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:#7c3aed;color:white;">📋 Overzicht</button>
+          <button id="pers-view-gantt" onclick="togglePersView('gantt')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:#1a1a24;color:#888;">📊 Tijdlijn</button>
+        </div>
+        <div id="pers-list-view"><div class="section-title">Per afdeling — tik voor details</div>${deptCards}</div>
+        <div id="pers-gantt-view" style="display:none;">${ganttHtml}</div>${cacheLabel(data)}`);
+    }
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+function togglePersView(view) {
+  const listEl = document.getElementById('pers-list-view');
+  const ganttEl = document.getElementById('pers-gantt-view');
+  const btnList = document.getElementById('pers-view-list');
+  const btnGantt = document.getElementById('pers-view-gantt');
+  if (!listEl || !ganttEl) return;
+  if (view === 'gantt') {
+    listEl.style.display = 'none'; ganttEl.style.display = 'block';
+    btnList.style.background = '#1a1a24'; btnList.style.color = '#888';
+    btnGantt.style.background = '#7c3aed'; btnGantt.style.color = 'white';
+  } else {
+    listEl.style.display = 'block'; ganttEl.style.display = 'none';
+    btnList.style.background = '#7c3aed'; btnList.style.color = 'white';
+    btnGantt.style.background = '#1a1a24'; btnGantt.style.color = '#888';
+  }
+}
+
+function parseTimeToH(timeStr) {
+  if (!timeStr || timeStr === '—') return 0;
+  const parts = timeStr.split(':');
+  return parseInt(parts[0]) + (parseInt(parts[1] || 0) / 60);
+}
+
+function buildGanttChart(activeDepts) {
+  let minH = 24, maxH = 0;
+  for (const dept of activeDepts) {
+    for (const p of dept.people) {
+      if (p.plannedStart) { const h = parseTimeToH(p.plannedStart); if (h < minH) minH = h; }
+      if (p.plannedEnd) { const h = parseTimeToH(p.plannedEnd); if (h > maxH) maxH = h; }
+      if (p.clockedEnter) { const h = parseTimeToH(p.clockedEnter); if (h < minH) minH = h; }
+      if (p.clockedExit && p.clockedExit !== '00:00') { const h = parseTimeToH(p.clockedExit); if (h > maxH) maxH = h; }
+    }
+  }
+  if (minH >= maxH) { minH = 8; maxH = 24; }
+  minH = Math.floor(minH); maxH = Math.ceil(maxH);
+  if (maxH <= minH) maxH = minH + 1;
+  const rangeH = maxH - minH;
+
+  let hourLabels = '', gridLines = '';
+  for (let h = minH; h <= maxH; h++) {
+    hourLabels += `<div class="gantt-hour">${String(h).padStart(2,'0')}:00</div>`;
+    gridLines += `<div class="gantt-grid-line" style="left:${((h - minH) / rangeH * 100).toFixed(2)}%"></div>`;
+  }
+
+  const now = new Date();
+  const nowH = now.getHours() + now.getMinutes() / 60;
+  let nowLine = '';
+  if (nowH >= minH && nowH <= maxH) {
+    nowLine = `<div class="gantt-now-line" style="left:${((nowH - minH) / rangeH * 100).toFixed(2)}%"><div class="gantt-now-label">Nu</div></div>`;
+  }
+
+  let ganttRows = '';
+  for (const dept of activeDepts) {
+    const activePeople = dept.people.filter(p => p.plannedH > 0 || p.clockedH > 0);
+    if (activePeople.length === 0) continue;
+    ganttRows += `<div class="gantt-dept-label">${dept.deptName} (${activePeople.length})</div>`;
+    for (const p of activePeople) {
+      let bars = '';
+      if (p.plannedStart && p.plannedEnd) {
+        const s = parseTimeToH(p.plannedStart), e = parseTimeToH(p.plannedEnd);
+        bars += `<div class="gantt-bar planned" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%" title="Gepland: ${p.plannedStart}–${p.plannedEnd} (${p.plannedH.toFixed(1)}u)"></div>`;
+      }
+      if (p.clockedEnter && p.clockedExit && p.clockedExit !== '00:00' && p.clockedH > 0) {
+        const s = parseTimeToH(p.clockedEnter), e = parseTimeToH(p.clockedExit);
+        if (e > s) bars += `<div class="gantt-bar clocked" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%" title="Geklokt: ${p.clockedEnter}–${p.clockedExit} (${p.clockedH.toFixed(2)}u)"></div>`;
+      }
+      if (p.clockedEnter && (!p.clockedExit || p.clockedExit === '00:00') && p.clockedH > 0) {
+        const s = parseTimeToH(p.clockedEnter), e = Math.min(nowH, maxH);
+        if (e > s) bars += `<div class="gantt-bar clocked" style="left:${((s-minH)/rangeH*100).toFixed(2)}%;width:${((e-s)/rangeH*100).toFixed(2)}%;border-right:2px dashed #10b981;" title="Ingeklokt sinds ${p.clockedEnter} (${p.clockedH.toFixed(2)}u)"></div>`;
+      }
+      ganttRows += `<div class="gantt-row"><div class="gantt-name" title="${p.name}">${p.name.split(' ')[0]}</div><div class="gantt-track">${gridLines}${nowLine}${bars}</div></div>`;
+    }
+  }
+
+  return `<div class="gantt-container"><div class="gantt-wrap">
+    <div class="gantt-legend"><span><span class="gantt-legend-dot" style="background:rgba(124,58,237,0.5);border:1px solid #7c3aed;"></span> Gepland</span><span><span class="gantt-legend-dot" style="background:rgba(16,185,129,0.5);border:1px solid #10b981;"></span> Geklokt</span><span style="color:#ef4444;">▏Nu</span></div>
+    <div class="gantt-header">${hourLabels}</div>${ganttRows}</div></div>`;
+}
+
+// ── Start ──
+applyViewMode();
+document.getElementById('lang-select').value = lang;
+if (lang === 'en') document.getElementById('page-title').textContent = t('pageTitle');
+if (accessCode) renderPersoneel();
+</script>
+</body>
+</html>
