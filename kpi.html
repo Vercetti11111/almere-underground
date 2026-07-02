@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Almere Underground – KPI</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  ::-webkit-scrollbar { display: none; }
+  body { margin: 0; background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; transition:max-width .3s; }
+  .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
+  .kpi-card { background:#1a1a24; border-radius:12px; padding:12px 8px; text-align:center; }
+  .kpi-label { font-size:11px; color:#888; margin-bottom:2px; }
+  .kpi-value { font-size:16px; font-weight:700; }
+  .section-title { font-size:12px; font-weight:700; color:#aaa; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.05em; }
+  .spinner { width:32px; height:32px; border:3px solid #2a2a38; border-top-color:#7c3aed; border-radius:50%; animation:spin 0.8s linear infinite; margin:48px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .nav-btn { background:#1a1a24; border:none; color:#aaa; border-radius:10px; padding:8px 14px; font-size:18px; cursor:pointer; }
+  .nav-btn:active { background:#2a2a38; }
+  .date-label { font-size:15px; font-weight:700; text-align:center; flex:1; }
+  .err-msg { text-align:center; padding:40px 20px; color:#ef4444; font-size:13px; line-height:1.6; }
+  #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+
+  @media (min-width: 768px) {
+    body.desktop-mode #app-screen { max-width:1100px; padding:24px 32px 60px; }
+    body.desktop-mode .kpi-card { padding:16px 12px; }
+    body.desktop-mode .kpi-value { font-size:20px; }
+  }
+  body.force-desktop #app-screen { max-width:1100px !important; padding:24px 32px 60px !important; }
+  body.force-mobile #app-screen { max-width:480px !important; }
+
+  .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+  .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
+</style>
+</head>
+<body>
+<div id="app-screen">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;" id="page-title">📊 KPI Dashboard</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
+      <div style="width:8px;height:8px;border-radius:50%;background:#10b981;" title="Live data"></div>
+      <button id="refresh-btn" onclick="doRefresh()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Verversen">🔄</button>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const WORKER = 'https://almere-underground.frankkeijzer.workers.dev';
+
+// ── SSO ──
+const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_session || !_session.code || (_session.expiresAt && Date.now() > _session.expiresAt)) {
+  localStorage.removeItem('au_session');
+  window.location.href = 'index.html';
+}
+const accessCode = _session ? _session.code : '';
+
+// ── View Mode ──
+function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
+function applyViewMode() {
+  const mode = getViewMode();
+  document.body.classList.remove('desktop-mode','force-desktop','force-mobile');
+  if (mode === 'desktop') document.body.classList.add('force-desktop');
+  else if (mode === 'mobile') document.body.classList.add('force-mobile');
+  else if (window.innerWidth >= 768) document.body.classList.add('desktop-mode');
+  const btn = document.getElementById('view-toggle-btn');
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
+}
+function toggleViewMode() {
+  const modes = ['auto','desktop','mobile'];
+  const cur = getViewMode();
+  localStorage.setItem('au_view_mode', modes[(modes.indexOf(cur)+1)%3]);
+  applyViewMode();
+  renderKpi();
+}
+function isWideView() {
+  const m = getViewMode();
+  return m === 'desktop' || (m === 'auto' && window.innerWidth >= 768);
+}
+window.addEventListener('resize', applyViewMode);
+
+// ── i18n ──
+const TRANSLATIONS = {
+  nl: {
+    pageTitle: '📊 KPI Dashboard',
+    kpiDag: '📅 Dag', kpiWeek: '📆 Week', kpiMaand: '📅 Maand',
+    kpiOmzet: '💰 Omzet', kpiOmzetWeek: '💰 Omzet week',
+    kpiClockedPct: '🕐 Geklokt %', kpiPerDept: '🏢 Per afdeling',
+    kpiPerDeptWeek: '🏢 Per afdeling — week',
+    kpiClocked: '🕐 Geklokt', kpiLaborPct: 'loonkosten',
+    kpiFbComing: 'F&B koppeling binnenkort',
+    kpiOverhead: 'Overhead', kpiVanTotaal: 'van totaal',
+    kpiVmBoekingen: 'VM boekingen', kpiTotaalBoekingen: 'Totaal boekingen',
+    kpiKostenPerBoeking: 'Kosten/boeking',
+    kpiActRevLabel: 'Activiteiten omzet', kpiSalesRevLabel: 'Bedrijfsarr. omzet',
+    kpiFbRevLabel: 'F&B omzet (gesplitst binnenkort)',
+    kpiNoData: 'Geen personeelsdata beschikbaar',
+    fromCache: 'Uit cache', liveData: 'Live data', agoSec: 's geleden', agoMin: 'm geleden',
+    omzetMaand: '💰 Omzet maand', perAfdMaand: '🏢 Per afdeling — maand',
+    dagenData: 'dagen met data',
+  },
+  en: {
+    pageTitle: '📊 KPI Dashboard',
+    kpiDag: '📅 Day', kpiWeek: '📆 Week', kpiMaand: '📅 Month',
+    kpiOmzet: '💰 Revenue', kpiOmzetWeek: '💰 Weekly revenue',
+    kpiClockedPct: '🕐 Clocked %', kpiPerDept: '🏢 Per department',
+    kpiPerDeptWeek: '🏢 Per department — week',
+    kpiClocked: '🕐 Clocked', kpiLaborPct: 'labor cost',
+    kpiFbComing: 'F&B link coming soon',
+    kpiOverhead: 'Overhead', kpiVanTotaal: 'of total',
+    kpiVmBoekingen: 'VM bookings', kpiTotaalBoekingen: 'Total bookings',
+    kpiKostenPerBoeking: 'Cost/booking',
+    kpiActRevLabel: 'Activities revenue', kpiSalesRevLabel: 'Corporate arr. revenue',
+    kpiFbRevLabel: 'F&B revenue (split coming soon)',
+    kpiNoData: 'No staff data available',
+    fromCache: 'From cache', liveData: 'Live data', agoSec: 's ago', agoMin: 'm ago',
+    omzetMaand: '💰 Revenue month', perAfdMaand: '🏢 Per department — month',
+    dagenData: 'days with data',
+  }
+};
+let lang = localStorage.getItem('au_lang') || 'nl';
+function t(key) { return (TRANSLATIONS[lang] || TRANSLATIONS.nl)[key] || TRANSLATIONS.nl[key] || key; }
+function locale() { return lang === 'en' ? 'en-GB' : 'nl-NL'; }
+function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('lang-select').value = l; document.getElementById('page-title').textContent = t('pageTitle'); renderKpi(); }
+
+// ── API ──
+const cache = {};
+async function api(path, forceRefresh = false) {
+  if (!forceRefresh && cache[path]) return cache[path];
+  const sep = path.includes('?') ? '&' : '?';
+  const url = forceRefresh ? `${WORKER}${path}${sep}refresh=1` : `${WORKER}${path}`;
+  const r = await fetch(url, { headers: { 'X-Access-Code': accessCode } });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  cache[path] = data;
+  if (!forceRefresh) setTimeout(() => delete cache[path], 5 * 60 * 1000);
+  return data;
+}
+
+// ── Helpers ──
+function todayStr() { return new Date().toLocaleDateString('sv-SE'); }
+function addDays(s, n) { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); }
+function fmtEur(v) { if (v == null || isNaN(v)) return '—'; return '€\u00a0' + v.toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtDateLong(s) { return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }); }
+function setContent(html) { document.getElementById('content').innerHTML = html; }
+function spinner() { return '<div class="spinner"></div>'; }
+function errMsg(m) { return `<div class="err-msg">⚠️ ${m}</div>`; }
+function cacheLabel(data) {
+  if (!data) return '';
+  const at = data._cachedAt || data.generatedAt;
+  const fromCache = data._cached;
+  const age = data._cacheAge;
+  const timeStr = at ? new Date(at).toLocaleString(locale(),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const ageStr = age != null ? (age < 60 ? `${age}${t('agoSec')}` : `${Math.floor(age/60)}${t('agoMin')}`) : '';
+  const icon = fromCache ? '📦' : '⚡';
+  const label = fromCache ? `${t('fromCache')} · ${ageStr}` : t('liveData');
+  return `<div style="font-size:10px;color:#444;text-align:center;margin-top:12px;">${icon} ${label}${timeStr ? ` · ${timeStr}` : ''}</div>`;
+}
+
+function triggerDatePicker(id) { const el = document.getElementById(id); if (!el) return; try { if (el.showPicker) el.showPicker(); else el.click(); } catch(e) { el.click(); } }
+
+async function doRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  Object.keys(cache).forEach(k => delete cache[k]);
+  try { await renderKpi(true); } finally { if (btn) { btn.disabled = false; btn.textContent = '🔄'; } }
+}
+
+// ── KPI State ──
+let kpiPeriod = 'dag';
+let kpiDate = todayStr();
+let kpiWeekOffset = 0;
+let kpiMonthYear = new Date().getFullYear();
+let kpiMonth = new Date().getMonth() + 1;
+
+// ── Department KPI Config ──
+const DEPT_KPI = {
+  'Activiteiten': { icon: '🎳', color: '#7c3aed', revCats: ['Activiteiten', 'Bedrijfsarrangementen'], revLabelKey: 'kpiActRevLabel' },
+  'Sales & Event': { icon: '🎉', color: '#2563eb', revCats: ['Bedrijfsarrangementen'], revLabelKey: 'kpiSalesRevLabel' },
+  'Front-Office': { icon: '🎫', color: '#059669', metric: 'bookings' },
+  'Horeca': { icon: '🍺', color: '#d97706', revCats: ['F&B'], revLabelKey: 'kpiFbRevLabel' },
+  'Keuken': { icon: '🍽️', color: '#dc2626', fbComing: true },
+  'Facilitair': { icon: '🔧', color: '#6b7280', overhead: true },
+  'Kantoor': { icon: '💼', color: '#6b7280', overhead: true },
+  'Training, Ontwikkeling & Bijeenkomsten': { icon: '📚', color: '#6b7280', overhead: true }
+};
+
+function kpiColor(pct) {
+  if (pct == null || isNaN(pct)) return '#6b7280';
+  if (pct < 20) return '#10b981';
+  if (pct < 30) return '#84cc16';
+  if (pct < 40) return '#f59e0b';
+  if (pct < 50) return '#f97316';
+  return '#ef4444';
+}
+
+function renderDeptKpiCard(dept, totalOmzet, byRc, salesByChannel) {
+  const cfg = DEPT_KPI[dept.deptName] || { icon: '👤', color: '#6b7280', overhead: true };
+  const hasClock = dept.clockedH > 0;
+  const hasPlan = dept.plannedH > 0;
+  if (!hasClock) return '';
+
+  let deptOmzet = null, deptOmzetLabel = '';
+  if (cfg.revCats && byRc) {
+    deptOmzet = cfg.revCats.reduce((s, cat) => s + (byRc[cat]?.revenue || 0), 0);
+    deptOmzetLabel = cfg.revLabelKey ? t(cfg.revLabelKey) : '';
+  }
+
+  const refOmzet = (deptOmzet !== null && deptOmzet > 0) ? deptOmzet : totalOmzet;
+  const plannedPct = refOmzet > 0 && hasPlan ? (dept.plannedCost / refOmzet * 100) : null;
+  const clockedPct = refOmzet > 0 && hasClock ? (dept.clockedCost / refOmzet * 100) : null;
+  const pctToShow = clockedPct !== null ? clockedPct : plannedPct;
+  const pctColor = kpiColor(pctToShow);
+
+  const kpiBadge = pctToShow !== null
+    ? `<div style="text-align:right;"><div style="font-size:22px;font-weight:800;color:${pctColor};line-height:1;">${pctToShow.toFixed(1)}%</div><div style="font-size:10px;color:#666;">${t('kpiLaborPct')}</div></div>` : '';
+
+  let revContext = '';
+  if (cfg.fbComing) {
+    revContext = `<div style="font-size:11px;color:#555;font-style:italic;margin-top:6px;">🔗 ${t('kpiFbComing')}</div>`;
+  } else if (cfg.metric === 'bookings' && salesByChannel) {
+    const vmTrans = (salesByChannel['VenueManager']?.count || 0) + (salesByChannel['Venue manager']?.count || 0);
+    const totalTrans = Object.values(salesByChannel).reduce((s, c) => s + (c.count || 0), 0);
+    const costPerBooking = totalTrans > 0 && hasPlan ? (dept.plannedCost / totalTrans) : 0;
+    revContext = `<div style="display:flex;gap:12px;margin-top:6px;">
+      <div style="font-size:11px;color:#888;">${t('kpiVmBoekingen')}: <span style="color:#e0e0f0;font-weight:600;">${vmTrans}</span></div>
+      <div style="font-size:11px;color:#888;">${t('kpiTotaalBoekingen')}: <span style="color:#e0e0f0;font-weight:600;">${totalTrans}</span></div>
+      ${costPerBooking > 0 ? `<div style="font-size:11px;color:#888;">${t('kpiKostenPerBoeking')}: <span style="color:#e0e0f0;font-weight:600;">${fmtEur(costPerBooking)}</span></div>` : ''}
+    </div>`;
+  } else if (deptOmzet !== null && deptOmzet > 0) {
+    revContext = `<div style="font-size:11px;color:#888;margin-top:6px;">${deptOmzetLabel}: <span style="color:#e0e0f0;font-weight:600;">${fmtEur(deptOmzet)}</span></div>`;
+  } else if (cfg.overhead) {
+    const ovhCost = hasClock ? dept.clockedCost : dept.plannedCost;
+    const ovhPct = totalOmzet > 0 && ovhCost > 0 ? (ovhCost / totalOmzet * 100).toFixed(1) : null;
+    if (ovhPct) revContext = `<div style="font-size:11px;color:#888;margin-top:6px;">${t('kpiOverhead')}: ${ovhPct}% ${t('kpiVanTotaal')}</div>`;
+  }
+
+  const barBlock = pctToShow !== null && refOmzet > 0
+    ? `<div style="height:4px;border-radius:999px;background:#1e1e2a;margin:8px 0 4px;"><div style="height:4px;border-radius:999px;background:${pctColor};width:${Math.min(pctToShow, 100).toFixed(1)}%;transition:width .4s;"></div></div>` : '';
+
+  return `<div style="background:#12121c;border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:3px solid ${cfg.color};">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+      <div style="font-size:15px;font-weight:700;color:#e0e0f0;">${cfg.icon} ${dept.deptName}</div>${kpiBadge}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr;gap:8px;">
+      <div style="background:#1a1a2e;border-radius:8px;padding:10px;">
+        <div style="font-size:10px;color:#888;margin-bottom:4px;">${t('kpiClocked')}</div>
+        <div style="display:flex;align-items:baseline;gap:12px;">
+          <div style="font-size:14px;font-weight:700;color:#10b981;">${dept.clockedH.toFixed(1)}u</div>
+          <div style="font-size:12px;color:#aaa;">${fmtEur(dept.clockedCost)}</div>
+          ${clockedPct !== null ? `<div style="font-size:11px;color:${kpiColor(clockedPct)};margin-left:auto;">${clockedPct.toFixed(1)}% omzet</div>` : ''}
+        </div>
+      </div>
+    </div>
+    ${barBlock}${revContext}
+  </div>`;
+}
+
+async function renderKpi(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    const periodSel = `
+      <div style="display:flex;gap:6px;margin-bottom:16px;">
+        <button onclick="kpiPeriod='dag';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='dag'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiDag')}</button>
+        <button onclick="kpiPeriod='week';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='week'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiWeek')}</button>
+        <button onclick="kpiPeriod='maand';renderKpi()" style="flex:1;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;${kpiPeriod==='maand'?'background:#7c3aed;color:white;':'background:#1a1a24;color:#888;'}">${t('kpiMaand')}</button>
+      </div>`;
+
+    if (kpiPeriod === 'dag') {
+      const kpiNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,-1);renderKpi()">‹</button>
+          <div style="flex:1;text-align:center;cursor:pointer;position:relative;min-height:38px;display:flex;align-items:center;justify-content:center;" onclick="triggerDatePicker('dp-kpi')">
+            <div class="date-label" style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;pointer-events:none;">${fmtDateLong(kpiDate)}</div>
+            <input type="date" id="dp-kpi" value="${kpiDate}" onchange="kpiDate=this.value;renderKpi()" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;z-index:10;background:transparent;">
+          </div>
+          <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,1);renderKpi()">›</button>
+        </div>`;
+
+      const [dayD, personnelD, mypos, payter] = await Promise.all([
+        api(`/api/day?date=${kpiDate}`, forceRefresh),
+        api(`/api/personeel?date=${kpiDate}`, forceRefresh).catch(() => ({ departments: [], totals: {} })),
+        api(`/api/mypos?date=${kpiDate}`, forceRefresh).catch(() => null),
+        api(`/api/payter?date=${kpiDate}`, forceRefresh).catch(() => null)
+      ]);
+
+      const depts = personnelD.departments || [];
+      const byRc = dayD.visit?.byReportingCategory || {};
+      const salesByChannel = dayD.sales?.byChannel || {};
+      const rollerRev = dayD.visit?.netRevenue || 0;
+      const myposRev = mypos?.omzetExclBtw || 0;
+      const payterRev = payter?.omzetExclBtw || 0;
+      const totalOmzet = rollerRev + myposRev + payterRev;
+      const totP = personnelD.totals || {};
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, salesByChannel)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      setContent(`${periodSel}${kpiNav}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card"><div class="kpi-label">${t('kpiOmzet')}</div><div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div></div>
+          <div class="kpi-card"><div class="kpi-label">${t('kpiClockedPct')}</div><div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div></div>
+        </div>
+        <div class="section-title">${t('kpiPerDept')}</div>${deptCards}${cacheLabel(dayD)}`);
+
+    } else if (kpiPeriod === 'week') {
+      const data = await api(`/api/kpi-week?offset=${kpiWeekOffset}`, forceRefresh);
+      const depts = data.personeel?.departments || [];
+      const rev = data.revenue || {};
+      const byRc = rev.byReportingCategory || {};
+      const totalOmzet = rev.totalOmzet || 0;
+      const totP = data.personeel?.totals || {};
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+
+      const dates = data.dates || [];
+      const startLabel = dates[0] ? new Date(dates[0]+'T00:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' }) : '';
+      const endLabel = dates[6] ? new Date(dates[6]+'T00:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' }) : '';
+
+      const weekNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiWeekOffset--;renderKpi()">‹</button>
+          <div class="date-label">${startLabel} – ${endLabel}</div>
+          <button class="nav-btn" onclick="kpiWeekOffset++;renderKpi()">›</button>
+        </div>`;
+
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, null)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      setContent(`${periodSel}${weekNav}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card"><div class="kpi-label">${t('kpiOmzetWeek')}</div><div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div></div>
+          <div class="kpi-card"><div class="kpi-label">${t('kpiClockedPct')}</div><div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div></div>
+        </div>
+        <div class="section-title">${t('kpiPerDeptWeek')}</div>${deptCards}${cacheLabel(data)}`);
+
+    } else if (kpiPeriod === 'maand') {
+      const monthNames = lang === 'en'
+        ? ['January','February','March','April','May','June','July','August','September','October','November','December']
+        : ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+
+      const monthNav = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <button class="nav-btn" onclick="kpiMonth--;if(kpiMonth<1){kpiMonth=12;kpiMonthYear--;}renderKpi()">‹</button>
+          <div class="date-label">${monthNames[kpiMonth - 1]} ${kpiMonthYear}</div>
+          <button class="nav-btn" onclick="kpiMonth++;if(kpiMonth>12){kpiMonth=1;kpiMonthYear++;}renderKpi()">›</button>
+        </div>`;
+
+      const data = await api(`/api/kpi-month?year=${kpiMonthYear}&month=${kpiMonth}`, forceRefresh);
+      const rev = data.revenue || {};
+      const byRc = rev.byReportingCategory || {};
+      const totalOmzet = rev.totalOmzet || 0;
+      const daysWithData = data.daysWithData || 0;
+      const totalDays = data.totalDays || 0;
+      const totP = data.personeel?.totals || {};
+      const clockedPct = totalOmzet > 0 && totP.clockedCost > 0 ? (totP.clockedCost / totalOmzet * 100) : null;
+      const depts = data.personeel?.departments || [];
+
+      let deptCards = depts.map(d => renderDeptKpiCard(d, totalOmzet, byRc, null)).join('');
+      if (!deptCards) deptCards = `<div style="color:#666;text-align:center;padding:40px;">${t('kpiNoData')}</div>`;
+
+      const dataCoverage = daysWithData < totalDays
+        ? `<div style="text-align:center;font-size:11px;color:#888;margin-bottom:12px;">📊 ${daysWithData}/${totalDays} ${t('dagenData')}</div>` : '';
+
+      setContent(`${periodSel}${monthNav}${dataCoverage}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
+          <div class="kpi-card"><div class="kpi-label">${t('omzetMaand')}</div><div class="kpi-value" style="font-size:13px;">${fmtEur(totalOmzet)}</div></div>
+          <div class="kpi-card"><div class="kpi-label">${t('kpiClockedPct')}</div><div class="kpi-value" style="font-size:18px;color:${kpiColor(clockedPct)};">${clockedPct !== null ? clockedPct.toFixed(1)+'%' : '—'}</div></div>
+        </div>
+        <div class="section-title">${t('perAfdMaand')}</div>${deptCards}${cacheLabel(data)}`);
+    }
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+// ── Start ──
+applyViewMode();
+document.getElementById('lang-select').value = lang;
+if (lang === 'en') document.getElementById('page-title').textContent = t('pageTitle');
+if (accessCode) renderKpi();
+</script>
+</body>
+</html>
