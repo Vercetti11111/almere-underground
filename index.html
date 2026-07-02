@@ -144,7 +144,11 @@ const TRANSLATIONS = {
     loginBtn: 'Inloggen',
     logoutBtn: 'Uitloggen',
     dashTitle: 'Omzet Dashboard',
-    dashDesc: 'Bezoek, Verkoop, Week, KPI, Personeel & Controle',
+    dashDesc: 'Bezoek, Verkoop, Week & Controle',
+    persTitle: 'Personeelsplanning',
+    persDesc: 'Dagplanning, geklokte uren & Gantt tijdlijn per afdeling',
+    kpiTitle: 'KPI Dashboard',
+    kpiDesc: 'Loonkosten vs omzet per afdeling — dag, week & maand',
     runTitle: 'Run Sheet',
     runDesc: 'Dagelijkse runsheet voor Kinderfeestjes (KF) & Bedrijfsfeesten (BF)',
     openTitle: 'Openstaande Posten',
@@ -161,7 +165,11 @@ const TRANSLATIONS = {
     loginBtn: 'Sign in',
     logoutBtn: 'Sign out',
     dashTitle: 'Revenue Dashboard',
-    dashDesc: 'Visit, Sales, Week, KPI, Staff & Control',
+    dashDesc: 'Visit, Sales, Week & Control',
+    persTitle: 'Staff Planning',
+    persDesc: 'Daily schedule, clocked hours & Gantt timeline per department',
+    kpiTitle: 'KPI Dashboard',
+    kpiDesc: 'Labor costs vs revenue per department — day, week & month',
     runTitle: 'Run Sheet',
     runDesc: 'Daily run sheet for Birthday Parties (KF) & Corporate Events (BF)',
     openTitle: 'Outstanding Bookings',
@@ -192,10 +200,12 @@ function setLang(newLang) {
 }
 
 const PAGES = [
-  { id: 'dashboard',  icon: '📊', titleKey: 'dashTitle',   descKey: 'dashDesc',   href: 'dashboard.html' },
-  { id: 'runsheet',   icon: '📋', titleKey: 'runTitle',    descKey: 'runDesc',    href: 'runsheet.html' },
-  { id: 'openstaand', icon: '💰', titleKey: 'openTitle',   descKey: 'openDesc',   href: 'openstaand.html' },
+  { id: 'dashboard',  icon: '📊', titleKey: 'dashTitle',    descKey: 'dashDesc',    href: 'dashboard.html' },
+  { id: 'personeel',  icon: '👥', titleKey: 'persTitle',    descKey: 'persDesc',    href: 'personeel.html' },
+  { id: 'kpi',        icon: '📈', titleKey: 'kpiTitle',     descKey: 'kpiDesc',     href: 'kpi.html' },
   { id: 'social',     icon: '📱', titleKey: 'socialTitle',  descKey: 'socialDesc',  href: 'social.html' },
+  { id: 'runsheet',   icon: '📋', titleKey: 'runTitle',     descKey: 'runDesc',     href: 'runsheet.html' },
+  { id: 'openstaand', icon: '💰', titleKey: 'openTitle',    descKey: 'openDesc',    href: 'openstaand.html' },
   { id: 'rechten',    icon: '🔐', titleKey: 'rechtenTitle', descKey: 'rechtenDesc', href: 'rechten.html' },
 ];
 
