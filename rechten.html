@@ -194,10 +194,12 @@
         <label class="form-label" id="lbl-pages">Paginatoegang</label>
         <div class="checkbox-group" id="pages-checkboxes">
           <label class="checkbox-item"><input type="checkbox" value="dashboard" /> 📊 Omzet Dashboard</label>
+          <label class="checkbox-item"><input type="checkbox" value="personeel" /> 👥 Personeelsplanning</label>
+          <label class="checkbox-item"><input type="checkbox" value="kpi" /> 📈 KPI Dashboard</label>
+          <label class="checkbox-item"><input type="checkbox" value="social" /> 📱 Social Stats</label>
           <label class="checkbox-item"><input type="checkbox" value="runsheet" /> 📋 Run Sheet</label>
           <label class="checkbox-item"><input type="checkbox" value="openstaand" /> 💰 Openstaande Posten</label>
           <label class="checkbox-item"><input type="checkbox" value="rechten" /> 🔐 Gebruikersrechten</label>
-          <label class="checkbox-item"><input type="checkbox" value="social" /> 📱 Social Stats</label>
         </div>
       </div>
       
@@ -276,6 +278,9 @@ function updateLabels() {
 
 const PAGE_LABELS = {
   dashboard: () => t('pageDashboard'),
+  personeel: () => t('pagePersoneel'),
+  kpi: () => t('pageKpi'),
+  social: () => t('pageSocial'),
   runsheet: () => t('pageRunsheet'),
   openstaand: () => t('pageOpenstaand'),
   rechten: () => t('pageRechten'),
@@ -322,7 +327,7 @@ function openModal(code) {
   
   // Update checkbox labels
   const checkboxes = document.querySelectorAll('#pages-checkboxes .checkbox-item');
-  const pageIds = ['dashboard', 'runsheet', 'openstaand', 'rechten'];
+  const pageIds = ['dashboard', 'personeel', 'kpi', 'social', 'runsheet', 'openstaand', 'rechten'];
   checkboxes.forEach((cb, i) => {
     cb.querySelector('input').checked = false;
     const label = cb.childNodes[cb.childNodes.length - 1];
