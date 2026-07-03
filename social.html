@@ -283,9 +283,7 @@ const API = 'https://almere-underground.frankkeijzer.workers.dev';
 
 function fmt(n) {
   if (n == null) return '—';
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return n.toLocaleString('nl-NL');
+  return Number(n).toLocaleString('nl-NL');
 }
 
 // Find data entry closest to N days ago
