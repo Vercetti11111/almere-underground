@@ -194,7 +194,6 @@ if (!CODE) {
   });
 } else {
   document.getElementById('main-content').style.display = 'block';
-  init();
 }
 
 // ── View toggle ───────────────────────────────────────────────────────────────
@@ -487,6 +486,9 @@ async function doRefresh() {
     btn.textContent = t('refresh');
   }
 }
+
+// ── Auto-init (after all declarations) ────────────────────────────────────────
+if (CODE) init();
 </script>
 </body>
 </html>
