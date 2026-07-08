@@ -164,6 +164,13 @@
 const API = 'https://almere-underground.frankkeijzer.workers.dev';
 const ROLLER_BASE = 'https://almereunderground.roller.app/bookings/edit/';
 
+// ── State ─────────────────────────────────────────────────────────────────
+let allBookings = [];
+let activeTab = 'reservations';
+let activeSubTab = 'all';
+let openDetailId = null;
+let generatedAt = '';
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 const session = JSON.parse(localStorage.getItem('au_session') || 'null');
 const CODE = session?.code || '';
@@ -268,13 +275,6 @@ let lang = localStorage.getItem('au_lang') || 'nl';
 function t(key) { return (T[lang] || T.nl)[key] || key; }
 function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('langSwitch').value = l; renderAll(); }
 document.getElementById('langSwitch').value = lang;
-
-// ── State ─────────────────────────────────────────────────────────────────────
-let allBookings = [];
-let activeTab = 'reservations';
-let activeSubTab = 'all';
-let openDetailId = null;
-let generatedAt = '';
 
 async function init() {
   renderLoading();
