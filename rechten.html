@@ -214,6 +214,7 @@
           <label class="checkbox-item"><input type="checkbox" value="social" /> 📱 Social Stats</label>
           <label class="checkbox-item"><input type="checkbox" value="runsheet" /> 📋 Run Sheet</label>
           <label class="checkbox-item"><input type="checkbox" value="openstaand" /> 💰 Openstaande Posten</label>
+          <label class="checkbox-item"><input type="checkbox" value="leads" /> 🎯 Leads & Reserveringen</label>
           <label class="checkbox-item"><input type="checkbox" value="rechten" /> 🔐 Gebruikersrechten</label>
         </div>
       </div>
@@ -274,7 +275,8 @@ const TR = {
     pageDashboard: '📊 Omzet Dashboard', pagePersoneel: '👥 Personeelsplanning',
     pageKpi: '📈 KPI Dashboard', pageSocial: '📱 Social Stats',
     pageRunsheet: '📋 Run Sheet',
-    pageOpenstaand: '💰 Openstaande Posten', pageRechten: '🔐 Gebruikersrechten',
+    pageOpenstaand: '💰 Openstaande Posten', pageLeads: '🎯 Leads & Reserveringen',
+    pageRechten: '🔐 Gebruikersrechten',
   },
   en: {
     pageTitle: 'User Permissions',
@@ -294,7 +296,8 @@ const TR = {
     pageDashboard: '📊 Revenue Dashboard', pagePersoneel: '👥 Staff Planning',
     pageKpi: '📈 KPI Dashboard', pageSocial: '📱 Social Stats',
     pageRunsheet: '📋 Run Sheet',
-    pageOpenstaand: '💰 Outstanding Bookings', pageRechten: '🔐 User Permissions',
+    pageOpenstaand: '💰 Outstanding Bookings', pageLeads: '🎯 Leads & Bookings',
+    pageRechten: '🔐 User Permissions',
   }
 };
 
@@ -329,6 +332,7 @@ const PAGE_LABELS = {
   social: () => t('pageSocial'),
   runsheet: () => t('pageRunsheet'),
   openstaand: () => t('pageOpenstaand'),
+  leads: () => t('pageLeads'),
   rechten: () => t('pageRechten'),
 };
 
@@ -373,7 +377,7 @@ function openModal(code) {
   
   // Update checkbox labels
   const checkboxes = document.querySelectorAll('#pages-checkboxes .checkbox-item');
-  const pageIds = ['dashboard', 'personeel', 'kpi', 'social', 'runsheet', 'openstaand', 'rechten'];
+  const pageIds = ['dashboard', 'personeel', 'kpi', 'social', 'runsheet', 'openstaand', 'leads', 'rechten'];
   checkboxes.forEach((cb, i) => {
     cb.querySelector('input').checked = false;
     const label = cb.childNodes[cb.childNodes.length - 1];
