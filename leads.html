@@ -323,8 +323,8 @@ function getFilteredBookings() {
     // Future VM bookings that are KF or BF
     return allBookings.filter(b => b.isKF || b.isBF);
   } else {
-    // Leads: unpaid VM bookings
-    let leads = allBookings.filter(b => b.amountOwing > 0);
+    // Leads: unpaid VM bookings, exclude confirmed (partial payment received)
+    let leads = allBookings.filter(b => b.amountOwing > 0 && b.leadCategory !== 'Bevestigd');
     if (activeSubTab === 'opvolgen') {
       leads = leads.filter(b => b.leadCategory === 'Op te volgen');
     } else if (activeSubTab === 'offerte') {
@@ -346,7 +346,7 @@ function renderAll() {
   document.getElementById('refreshBtn').textContent = t('refresh');
 
   // Counts for subtabs
-  const allLeads = allBookings.filter(b => b.amountOwing > 0);
+  const allLeads = allBookings.filter(b => b.amountOwing > 0 && b.leadCategory !== 'Bevestigd');
   const opvolgen = allLeads.filter(b => b.leadCategory === 'Op te volgen');
   const offerte = allLeads.filter(b => b.leadCategory === 'Offerte Akkoord');
   document.getElementById('countAll').textContent = allLeads.length;
@@ -492,3 +492,4 @@ if (CODE) init();
 </script>
 </body>
 </html>
+
