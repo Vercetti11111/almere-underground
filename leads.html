@@ -106,6 +106,19 @@
     /* Roller link */
     .roller-link { display: inline-block; background: #7c3aed22; color: #7c3aed; font-size: 11px; padding: 3px 8px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 4px; }
     .roller-link:hover { background: #7c3aed33; }
+    .notes-section { margin-top: 8px; padding: 8px; background: #ffffff08; border-radius: 6px; border-left: 3px solid #f59e0b; }
+    .notes-label { font-size: 11px; color: #f59e0b; font-weight: 600; margin-bottom: 4px; }
+    .notes-content { font-size: 12px; color: #ccc; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .changelog-panel { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .changelog-panel.open { max-height: 600px; overflow-y: auto; margin-top: 8px; padding: 6px; background: #ffffff06; border-radius: 6px; }
+    .changelog-title { font-size: 11px; color: #888; font-weight: 600; margin-bottom: 6px; border-bottom: 1px solid #ffffff10; padding-bottom: 4px; }
+    .changelog-entry { font-size: 11px; color: #aaa; padding: 3px 0; border-bottom: 1px solid #ffffff06; }
+    .cl-date { color: #888; margin-right: 6px; }
+    .cl-field { color: #7c3aed; font-weight: 600; }
+    .cl-from { color: #f87171; text-decoration: line-through; }
+    .cl-to { color: #22c55e; }
+    .cl-new { color: #3b82f6; }
+    .changelog-btn { background: #3b82f622 !important; color: #3b82f6 !important; }
   </style>
 </head>
 <body>
@@ -240,8 +253,15 @@ const T = {
     total: 'Totaal',
     date: 'Datum',
     created: 'Aangemaakt',
+    lastPayment: 'Laatste betaling',
     openInRoller: 'Open in Roller',
     loading: 'Laden...',
+    bookingNotes: 'Boekingsnotities',
+    posNotes: 'POS notities',
+    changelog: 'Wijzigingen',
+    changelogLoading: 'Laden...',
+    changelogEmpty: 'Geen wijzigingen',
+    showChangelog: '📋 Wijzigingen',
   },
   en: {
     pageTitle: '📋 Leads & Reservations',
@@ -266,14 +286,59 @@ const T = {
     total: 'Total',
     date: 'Date',
     created: 'Created',
+    lastPayment: 'Last payment',
     openInRoller: 'Open in Roller',
     loading: 'Loading...',
+    bookingNotes: 'Booking notes',
+    posNotes: 'POS notes',
+    changelog: 'Changes',
+    changelogLoading: 'Loading...',
+    changelogEmpty: 'No changes',
+    showChangelog: '📋 Changes',
   }
 };
 let lang = localStorage.getItem('au_lang') || 'nl';
 function t(key) { return (T[lang] || T.nl)[key] || key; }
 function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('langSwitch').value = l; renderAll(); }
 document.getElementById('langSwitch').value = lang;
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+const changelogFieldLabels = {
+  status: 'Status', total: 'Totaal', amountOwing: 'Openstaand', amountPaid: 'Betaald',
+  bookingDate: 'Datum', leadCategory: 'Categorie', bookingNotes: 'Boekingsnotities', posNotes: 'POS notities'
+};
+
+async function loadChangelog(bookingId) {
+  const el = document.getElementById('changelog-' + bookingId);
+  if (!el) return;
+  if (el.classList.contains('open')) { el.classList.remove('open'); el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="padding:8px;color:#888;font-size:12px;">${t('changelogLoading')}</div>`;
+  el.classList.add('open');
+  try {
+    const r = await fetch(`${API}/api/leads/changelog?bookingId=${bookingId}`, { headers: { 'X-Access-Code': CODE } });
+    const data = await r.json();
+    const entries = (data.changelog || []).reverse();
+    if (entries.length === 0) {
+      el.innerHTML = `<div style="padding:8px;color:#888;font-size:12px;">${t('changelogEmpty')}</div>`;
+      return;
+    }
+    el.innerHTML = `<div class="changelog-title">${t('changelog')}</div>` +
+      entries.map(e => {
+        const d = new Date(e.ts);
+        const ds = d.toLocaleDateString('nl-NL', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+        if (e.type === 'new') return `<div class="changelog-entry"><span class="cl-date">${ds}</span> <span class="cl-new">➕ ${e.detail}</span></div>`;
+        const label = changelogFieldLabels[e.field] || e.field;
+        const from = e.from || '—';
+        const to = e.to || '—';
+        return `<div class="changelog-entry"><span class="cl-date">${ds}</span> <span class="cl-field">${label}</span>: <span class="cl-from">${escHtml(from.substring(0,60))}</span> → <span class="cl-to">${escHtml(to.substring(0,60))}</span></div>`;
+      }).join('');
+  } catch(err) {
+    el.innerHTML = `<div style="padding:8px;color:#f87171;font-size:12px;">Fout: ${err.message}</div>`;
+  }
+}
 
 async function init() {
   renderLoading();
@@ -438,7 +503,8 @@ function renderList() {
       </div>
       <div class="detail-panel ${isOpen ? 'open' : ''}" id="detail-${b.id}">
         <div class="detail-row"><span class="detail-label">${t('date')}</span><span class="detail-value">${fmtDate(b.bookingDate)}</span></div>
-        <div class="detail-row"><span class="detail-label">${t('created')}</span><span class="detail-value">${fmtDate(b.createdAt)}</span></div>
+        <div class="detail-row"><span class="detail-label">${t('created')}</span><span class="detail-value">${fmtDate(b.createdDate || b.createdAt)}</span></div>
+        ${b.lastPaymentDate ? `<div class="detail-row"><span class="detail-label">${t('lastPayment')}</span><span class="detail-value">${fmtDate(b.lastPaymentDate)}</span></div>` : ''}
         <div class="detail-row"><span class="detail-label">${t('total')}</span><span class="detail-value">${fmtEur(b.total)}</span></div>
         <div class="detail-row"><span class="detail-label">${t('paid')}</span><span class="detail-value" style="color:#22c55e">${fmtEur(b.amountPaid)}</span></div>
         <div class="detail-row"><span class="detail-label">${t('owing')}</span><span class="detail-value" style="color:#f59e0b">${fmtEur(b.amountOwing)}</span></div>
@@ -449,7 +515,23 @@ function renderList() {
             ${b.products.map(p => `<div class="product-item">• ${p}</div>`).join('')}
           </div>
         ` : ''}
-        <div style="margin-top:8px;"><a class="roller-link" href="${ROLLER_BASE}${b.id}" target="_blank">🔗 ${t('openInRoller')}</a></div>
+        ${b.bookingNotes ? `
+          <div class="notes-section">
+            <div class="notes-label">📝 ${t('bookingNotes')}</div>
+            <div class="notes-content">${escHtml(b.bookingNotes)}</div>
+          </div>
+        ` : ''}
+        ${b.posNotes ? `
+          <div class="notes-section">
+            <div class="notes-label">🏷️ ${t('posNotes')}</div>
+            <div class="notes-content">${escHtml(b.posNotes)}</div>
+          </div>
+        ` : ''}
+        <div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <a class="roller-link" href="${ROLLER_BASE}${b.id}" target="_blank">🔗 ${t('openInRoller')}</a>
+          <a class="roller-link changelog-btn" href="#" onclick="event.preventDefault();event.stopPropagation();loadChangelog('${b.id}')">${t('showChangelog')}</a>
+        </div>
+        <div class="changelog-panel" id="changelog-${b.id}"></div>
       </div>
     `;
   }
