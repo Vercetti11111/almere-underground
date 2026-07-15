@@ -1516,11 +1516,12 @@ async function renderControle(forceRefresh = false) {
 }
 
 async function renderControleDay(forceRefresh = false) {
-  const [data, mypos, payter, nayax] = await Promise.all([
+  const [data, mypos, payter, nayax, untill] = await Promise.all([
     api(`/api/day?date=${selectedDate}`, forceRefresh),
     api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
     api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
     api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null),
+    api(`/api/untill/turnover?date=${selectedDate}`, forceRefresh).catch(() => null),
   ]);
   const { visit, sales } = data;
 
@@ -1530,7 +1531,8 @@ async function renderControleDay(forceRefresh = false) {
   const payterOmzet    = payter?.omzetExclBtw || 0;
   const nayaxPhotoOmzet   = nayax?.photobooth?.omzetExclBtw || 0;
   const nayaxSpiegelOmzet = nayax?.spiegel?.omzetExclBtw || 0;
-  const totalOmzet = rollerOmzet + myposOmzet + payterOmzet + nayaxPhotoOmzet + nayaxSpiegelOmzet;
+  const untillOmzet      = untill?.totalRevenue ? untill.totalRevenue / 1.21 : 0;  // Untill is incl BTW, convert to excl for Bezoek
+  const totalOmzet = rollerOmzet + myposOmzet + payterOmzet + nayaxPhotoOmzet + nayaxSpiegelOmzet + untillOmzet;
 
   // Betalingen (incl BTW, transactiedatum)
   const rollerBetaling    = sales?.fundsReceived || 0;
@@ -1538,11 +1540,12 @@ async function renderControleDay(forceRefresh = false) {
   const payterBetaling    = payter?.totalInclBtw || 0;
   const nayaxPhotoBetaling   = nayax?.photobooth?.totalInclBtw || 0;
   const nayaxSpiegelBetaling = nayax?.spiegel?.totalInclBtw || 0;
-  const totalBetaling = rollerBetaling + myposBetaling + payterBetaling + nayaxPhotoBetaling + nayaxSpiegelBetaling;
+  const untillBetaling      = untill?.totalRevenue || 0;  // Untill totalRevenue is incl BTW
+  const totalBetaling = rollerBetaling + myposBetaling + payterBetaling + nayaxPhotoBetaling + nayaxSpiegelBetaling + untillBetaling;
 
   // Referentie-totalen zoals Bezoek/Verkoop tab ze berekenen
-  const bezoekRef  = rollerOmzet + myposOmzet + payterOmzet + (nayax?.omzetExclBtw || 0);
-  const verkoopRef = rollerBetaling + myposBetaling + payterBetaling + (nayax?.totalInclBtw || 0);
+  const bezoekRef  = rollerOmzet + myposOmzet + payterOmzet + (nayax?.omzetExclBtw || 0) + untillOmzet;
+  const verkoopRef = rollerBetaling + myposBetaling + payterBetaling + (nayax?.totalInclBtw || 0) + untillBetaling;
   const omzetMatch   = Math.abs(totalOmzet - bezoekRef) < 0.02;
   const betalingMatch = Math.abs(totalBetaling - verkoopRef) < 0.02;
 
@@ -1587,6 +1590,7 @@ async function renderControleDay(forceRefresh = false) {
           ${sysRow('🔐', 'Kluisjes (Payter)', payterOmzet, payter?.transactions || 0)}
           ${sysRow('📸', 'Photobooth Wit (Nayax)', nayaxPhotoOmzet, nayax?.photobooth?.transactions || 0)}
           ${sysRow('🪞', 'Spiegel Booth (Nayax)', nayaxSpiegelOmzet, nayax?.spiegel?.transactions || 0)}
+          ${sysRow('🍽️', 'Untill F&B', untillOmzet, untill?.totalBills || 0)}
           ${sysRow('', t('ctrlTotal'), totalOmzet, 0, true)}
         </tbody>
       </table>
@@ -1603,6 +1607,7 @@ async function renderControleDay(forceRefresh = false) {
           ${sysRow('🔐', 'Kluisjes (Payter)', payterBetaling, payter?.transactions || 0)}
           ${sysRow('📸', 'Photobooth Wit (Nayax)', nayaxPhotoBetaling, nayax?.photobooth?.transactions || 0)}
           ${sysRow('🪞', 'Spiegel Booth (Nayax)', nayaxSpiegelBetaling, nayax?.spiegel?.transactions || 0)}
+          ${sysRow('🍽️', 'Untill F&B', untillBetaling, untill?.totalBills || 0)}
           ${sysRow('', t('ctrlTotal'), totalBetaling, 0, true)}
         </tbody>
       </table>
@@ -1630,9 +1635,9 @@ async function renderControleWeek(forceRefresh = false) {
   const endLabel   = new Date(days[6]?.date + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 
   // Aggregate week totals per system
-  let wRollerOmzet = 0, wMyposOmzet = 0, wPayterOmzet = 0, wNayaxPhotoOmzet = 0, wNayaxSpiegelOmzet = 0;
-  let wRollerBet = 0, wMyposBet = 0, wPayterBet = 0, wNayaxPhotoBet = 0, wNayaxSpiegelBet = 0;
-  let wRollerTx = 0, wMyposTx = 0, wPayterTx = 0, wNayaxPhotoTx = 0, wNayaxSpiegelTx = 0;
+  let wRollerOmzet = 0, wMyposOmzet = 0, wPayterOmzet = 0, wNayaxPhotoOmzet = 0, wNayaxSpiegelOmzet = 0, wUntillOmzet = 0;
+  let wRollerBet = 0, wMyposBet = 0, wPayterBet = 0, wNayaxPhotoBet = 0, wNayaxSpiegelBet = 0, wUntillBet = 0;
+  let wRollerTx = 0, wMyposTx = 0, wPayterTx = 0, wNayaxPhotoTx = 0, wNayaxSpiegelTx = 0, wUntillTx = 0;
 
   for (const day of days) {
     wRollerOmzet  += day.visit?.netRevenue || 0;
@@ -1640,22 +1645,25 @@ async function renderControleWeek(forceRefresh = false) {
     wPayterOmzet  += day.payter?.omzetExclBtw || 0;
     wNayaxPhotoOmzet   += day.nayax?.photobooth?.omzetExclBtw || 0;
     wNayaxSpiegelOmzet += day.nayax?.spiegel?.omzetExclBtw || 0;
+    wUntillOmzet += day.untill?.totalRevenue ? day.untill.totalRevenue / 1.21 : 0;
 
     wRollerBet  += day.sales?.fundsReceived || 0;
     wMyposBet   += day.mypos?.totalInclBtw || 0;
     wPayterBet  += day.payter?.totalInclBtw || 0;
     wNayaxPhotoBet   += day.nayax?.photobooth?.totalInclBtw || 0;
     wNayaxSpiegelBet += day.nayax?.spiegel?.totalInclBtw || 0;
+    wUntillBet += day.untill?.totalRevenue || 0;
 
     wRollerTx  += day.visit?.visitors || 0;
     wMyposTx   += day.mypos?.aantalBetalingen || 0;
     wPayterTx  += day.payter?.transactions || 0;
     wNayaxPhotoTx   += day.nayax?.photobooth?.transactions || 0;
     wNayaxSpiegelTx += day.nayax?.spiegel?.transactions || 0;
+    wUntillTx += day.untill?.totalBills || 0;
   }
 
-  const wTotalOmzet  = wRollerOmzet + wMyposOmzet + wPayterOmzet + wNayaxPhotoOmzet + wNayaxSpiegelOmzet;
-  const wTotalBet    = wRollerBet + wMyposBet + wPayterBet + wNayaxPhotoBet + wNayaxSpiegelBet;
+  const wTotalOmzet  = wRollerOmzet + wMyposOmzet + wPayterOmzet + wNayaxPhotoOmzet + wNayaxSpiegelOmzet + wUntillOmzet;
+  const wTotalBet    = wRollerBet + wMyposBet + wPayterBet + wNayaxPhotoBet + wNayaxSpiegelBet + wUntillBet;
   const wDiff = Math.abs(wTotalOmzet - wTotalBet);
 
   function sysRow(emoji, name, amount, tx, isTotaal = false) {
@@ -1687,13 +1695,15 @@ async function renderControleWeek(forceRefresh = false) {
     const dMyposOmzet  = day.mypos?.omzetExclBtw || 0;
     const dPayterOmzet = day.payter?.omzetExclBtw || 0;
     const dNayaxOmzet  = (day.nayax?.photobooth?.omzetExclBtw || 0) + (day.nayax?.spiegel?.omzetExclBtw || 0);
-    const dTotalOmzet  = dRollerOmzet + dMyposOmzet + dPayterOmzet + dNayaxOmzet;
+    const dUntillOmzet = day.untill?.totalRevenue ? day.untill.totalRevenue / 1.21 : 0;
+    const dTotalOmzet  = dRollerOmzet + dMyposOmzet + dPayterOmzet + dNayaxOmzet + dUntillOmzet;
 
     const dRollerBet = day.sales?.fundsReceived || 0;
     const dMyposBet  = day.mypos?.totalInclBtw || 0;
     const dPayterBet = day.payter?.totalInclBtw || 0;
     const dNayaxBet  = (day.nayax?.photobooth?.totalInclBtw || 0) + (day.nayax?.spiegel?.totalInclBtw || 0);
-    const dTotalBet  = dRollerBet + dMyposBet + dPayterBet + dNayaxBet;
+    const dUntillBet = day.untill?.totalRevenue || 0;
+    const dTotalBet  = dRollerBet + dMyposBet + dPayterBet + dNayaxBet + dUntillBet;
 
     const todayStyle = isToday ? 'color:#a78bfa;font-weight:700;' : '';
     const rowStyle = isToday ? 'background:#7c3aed10;' : '';
@@ -1757,6 +1767,7 @@ async function renderControleWeek(forceRefresh = false) {
     <span>🎮 MyPOS</span>
     <span>🔐 Payter</span>
     <span>📸🪞 Nayax</span>
+    <span>🍽️ Untill</span>
   </div>`;
 
   setContent(`
@@ -1773,6 +1784,7 @@ async function renderControleWeek(forceRefresh = false) {
           ${sysRow('🔐', 'Kluisjes (Payter)', wPayterOmzet, wPayterTx)}
           ${sysRow('📸', 'Photobooth Wit (Nayax)', wNayaxPhotoOmzet, wNayaxPhotoTx)}
           ${sysRow('🪞', 'Spiegel Booth (Nayax)', wNayaxSpiegelOmzet, wNayaxSpiegelTx)}
+          ${sysRow('🍽️', 'Untill F&B', wUntillOmzet, wUntillTx)}
           ${sysRow('', t('ctrlTotal'), wTotalOmzet, 0, true)}
         </tbody>
       </table>
@@ -1800,6 +1812,7 @@ async function renderControleWeek(forceRefresh = false) {
           ${sysRow('🔐', 'Kluisjes (Payter)', wPayterBet, wPayterTx)}
           ${sysRow('📸', 'Photobooth Wit (Nayax)', wNayaxPhotoBet, wNayaxPhotoTx)}
           ${sysRow('🪞', 'Spiegel Booth (Nayax)', wNayaxSpiegelBet, wNayaxSpiegelTx)}
+          ${sysRow('🍽️', 'Untill F&B', wUntillBet, wUntillTx)}
           ${sysRow('', t('ctrlTotal'), wTotalBet, 0, true)}
         </tbody>
       </table>
