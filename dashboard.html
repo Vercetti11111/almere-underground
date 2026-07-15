@@ -475,6 +475,8 @@ const TRANSLATIONS = {
     kpiLaborPct: 'loonkosten',
     kpiOmzetWeek: '💰 Omzet week',
     kpiFbComing: 'F&B koppeling binnenkort',
+    kpiDrankRevLabel: 'Dranken omzet (Untill)',
+    kpiFoodRevLabel: 'Keuken omzet (Untill)',
     kpiOverhead: 'Overhead',
     kpiVanTotaal: 'van totaal',
     kpiVmBoekingen: 'VM boekingen',
@@ -483,6 +485,7 @@ const TRANSLATIONS = {
     kpiActRevLabel: 'Activiteiten omzet',
     kpiSalesRevLabel: 'Bedrijfsarr. omzet',
     kpiFbRevLabel: 'F&B omzet (gesplitst binnenkort)',
+
     kpiNoData: 'Geen personeelsdata beschikbaar',
     // Controle tab
     tabControle: '🔍 Controle',
@@ -606,6 +609,8 @@ const TRANSLATIONS = {
     kpiLaborPct: 'labor cost',
     kpiOmzetWeek: '💰 Weekly revenue',
     kpiFbComing: 'F&B link coming soon',
+    kpiDrankRevLabel: 'Drinks revenue (Untill)',
+    kpiFoodRevLabel: 'Kitchen revenue (Untill)',
     kpiOverhead: 'Overhead',
     kpiVanTotaal: 'of total',
     kpiVmBoekingen: 'VM bookings',
@@ -854,6 +859,20 @@ async function renderWeek(forceRefresh = false) {
         weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'].revenue += dayNayaxSpiegelRev;
         weekRcData['Overig'].subcategories['Spiegel Booth (Nayax)'].visitors += day.nayax?.spiegel?.transactions || 0;
       }
+      // Untill F&B (excl BTW for Bezoek-context week view)
+      const dayUntillDrankExcl = (day.untill?.drank || 0) / 1.21;
+      const dayUntillFoodExcl = (day.untill?.food || 0) / 1.09;
+      const dayUntillDivExcl = (day.untill?.diversen || 0) / 1.21;
+      const dayUntillRevExcl = dayUntillDrankExcl + dayUntillFoodExcl + dayUntillDivExcl;
+      if (dayUntillRevExcl > 0) {
+        weekTotalRev += dayUntillRevExcl;
+        if (!weekRcData['F&B']) weekRcData['F&B'] = { revenue: 0, visitors: 0, subcategories: {} };
+        weekRcData['F&B'].revenue += dayUntillRevExcl;
+        if (!weekRcData['F&B'].subcategories['🍺 Dranken']) weekRcData['F&B'].subcategories['🍺 Dranken'] = { revenue: 0, visitors: 0 };
+        weekRcData['F&B'].subcategories['🍺 Dranken'].revenue += dayUntillDrankExcl;
+        if (!weekRcData['F&B'].subcategories['🍽️ Keuken']) weekRcData['F&B'].subcategories['🍽️ Keuken'] = { revenue: 0, visitors: 0 };
+        weekRcData['F&B'].subcategories['🍽️ Keuken'].revenue += dayUntillFoodExcl;
+      }
     }
     const RC_COLORS_W = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#6b7280'];
     const weekRcEntries = Object.entries(weekRcData).sort((a,b) => b[1].revenue - a[1].revenue).filter(([,d]) => d.revenue > 0);
@@ -1022,11 +1041,12 @@ async function renderBezoek(forceRefresh = false) {
   try {
     await loadBmiData();
     const bmiDatePre = dateMinusYear(selectedDate);
-    const [data, mypos, payter, nayax, weatherToday, weatherLastYear, myposLY, payterLY, nayaxLY] = await Promise.all([
+    const [data, mypos, payter, nayax, untill, weatherToday, weatherLastYear, myposLY, payterLY, nayaxLY] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
       api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
       api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/untill/turnover?date=${selectedDate}`, forceRefresh).catch(() => null),
       fetchWeather(selectedDate).catch(() => null),
       fetchWeather(bmiDatePre).catch(() => null),
       api(`/api/mypos?date=${bmiDatePre}`, false).catch(() => null),
@@ -1037,7 +1057,12 @@ async function renderBezoek(forceRefresh = false) {
     const myposRev = mypos?.omzetExclBtw || 0;
     const payterRev = payter?.omzetExclBtw || 0;
     const nayaxRev = nayax?.omzetExclBtw || 0;
-    const totalRev = visit.netRevenue + myposRev + payterRev + nayaxRev;
+    // Untill F&B: drank = 21% BTW, food = 9% BTW → excl BTW for Bezoek tab
+    const untillDrankExcl = (untill?.drank || 0) / 1.21;
+    const untillFoodExcl = (untill?.food || 0) / 1.09;
+    const untillDiversenExcl = (untill?.diversen || 0) / 1.21;
+    const untillRevExcl = untillDrankExcl + untillFoodExcl + untillDiversenExcl;
+    const totalRev = visit.netRevenue + myposRev + payterRev + nayaxRev + untillRevExcl;
     const avg = visit.visitors > 0 ? totalRev / visit.visitors : 0;
 
     const cats = CAT_ORDER.filter(c => visit.byCategory?.[c]);
@@ -1093,6 +1118,17 @@ async function renderBezoek(forceRefresh = false) {
         rcData['Overig'].revenue = (rcData['Overig'].revenue || 0) + spiegelRev;
         rcData['Overig'].subcategories['Spiegel Booth (Nayax)'] = { revenue: spiegelRev, visitors: nayax.spiegel.transactions || 0 };
       }
+    }
+    // Untill F&B as reporting category
+    if (untillRevExcl > 0) {
+      rcData['F&B'] = {
+        revenue: Math.round(untillRevExcl * 100) / 100,
+        visitors: untill?.totalBills || 0,
+        subcategories: {}
+      };
+      if (untillDrankExcl > 0) rcData['F&B'].subcategories['🍺 Dranken'] = { revenue: Math.round(untillDrankExcl * 100) / 100, visitors: 0 };
+      if (untillFoodExcl > 0) rcData['F&B'].subcategories['🍽️ Keuken'] = { revenue: Math.round(untillFoodExcl * 100) / 100, visitors: 0 };
+      if (untillDiversenExcl > 0) rcData['F&B'].subcategories['📦 Diversen'] = { revenue: Math.round(untillDiversenExcl * 100) / 100, visitors: 0 };
     }
     const rcEntries = Object.entries(rcData).sort((a,b) => b[1].revenue - a[1].revenue);
     let rcRows = '';
@@ -1209,19 +1245,21 @@ async function renderBezoek(forceRefresh = false) {
 async function renderVerkoop(forceRefresh = false) {
   setContent(spinner());
   try {
-    const [data, mypos, payter, nayax] = await Promise.all([
+    const [data, mypos, payter, nayax, untillV] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
       api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
-      api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null)
+      api(`/api/nayax?date=${selectedDate}`, forceRefresh).catch(() => null),
+      api(`/api/untill/turnover?date=${selectedDate}`, forceRefresh).catch(() => null)
     ]);
     const { sales } = data;
     const myposSalesAmount = mypos?.totalInclBtw || 0;
     const myposRev = mypos?.omzetExclBtw || 0;
     const payterSalesAmount = payter?.totalInclBtw || 0;
     const nayaxSalesAmount = nayax?.totalInclBtw || 0;
-    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount + payterSalesAmount + nayaxSalesAmount;
-    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0) + (payter?.transactions || 0) + (nayax?.transactions || 0);
+    const untillSalesAmount = untillV?.totalRevenue || 0; // Untill prices are incl BTW
+    const grandTotal = (sales.fundsReceived || 0) + myposSalesAmount + payterSalesAmount + nayaxSalesAmount + untillSalesAmount;
+    const totalTrans = (sales.transactionCount || 0) + (mypos?.transactions || 0) + (payter?.transactions || 0) + (nayax?.transactions || 0) + (untillV?.totalBills || 0);
     const avg = totalTrans > 0 ? grandTotal / totalTrans : 0;
 
     const chEntries = Object.entries(sales.byChannel || {}).sort((a,b) => b[1].revenue - a[1].revenue);
@@ -1305,6 +1343,24 @@ async function renderVerkoop(forceRefresh = false) {
           </div>
           <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#d97706;"></div></div>
           <div style="font-size:11px;color:#888;margin-top:2px;">${nayax.spiegel.transactions} ${t('transactions')} · incl. BTW</div>
+        </div>`;
+    }
+    // Untill F&B in Verkoop tab (incl BTW)
+    if (untillSalesAmount > 0) {
+      const untillDrank = untillV?.drank || 0;
+      const untillFood = untillV?.food || 0;
+      const pct = grandTotal > 0 ? Math.round((untillSalesAmount / grandTotal) * 100) : 0;
+      chRows += `
+        <div style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
+            <span style="font-size:13px;font-weight:600;color:#f59e0b;">🍺🍽️ F&B (Untill)</span>
+            <div>
+              <span style="font-size:13px;font-weight:700;">${fmtEur(untillSalesAmount)}</span>
+              <span style="font-size:11px;color:#888;margin-left:6px;">${pct}%</span>
+            </div>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:#f59e0b;"></div></div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${untillV.totalBills} ${t('transactions')} · 🍺 ${fmtEur(untillDrank)} · 🍽️ ${fmtEur(untillFood)} · incl. BTW</div>
         </div>`;
     }
     // Combine Roller + MyPOS + Payter hourly data (both incl BTW for payments)
@@ -2042,14 +2098,15 @@ const DEPT_KPI = {
   },
   'Horeca': {
     icon: '🍺', color: '#d97706',
-    // F&B revenue (food+drink combined until product-level split available)
-    revCats: ['F&B'],
-    revLabelKey: 'kpiFbRevLabel'
+    // Dranken revenue from Untill (excl BTW)
+    revCats: ['F&B_drank'],
+    revLabelKey: 'kpiDrankRevLabel'
   },
   'Keuken': {
     icon: '🍽️', color: '#dc2626',
-    // F&B food split not yet available at product level
-    fbComing: true
+    // Food revenue from Untill (excl BTW)
+    revCats: ['F&B_food'],
+    revLabelKey: 'kpiFoodRevLabel'
   },
   'Facilitair': {
     icon: '🔧', color: '#6b7280',
@@ -2176,11 +2233,12 @@ async function renderKpi(forceRefresh = false) {
           <button class="nav-btn" onclick="kpiDate=addDays(kpiDate,1);renderKpi()">›</button>
         </div>`;
 
-      const [dayD, personnelD, mypos, payter] = await Promise.all([
+      const [dayD, personnelD, mypos, payter, untillKpi] = await Promise.all([
         api(`/api/day?date=${kpiDate}`, forceRefresh),
         api(`/api/personeel?date=${kpiDate}`, forceRefresh).catch(() => ({ departments: [], totals: {} })),
         api(`/api/mypos?date=${kpiDate}`, forceRefresh).catch(() => null),
-        api(`/api/payter?date=${kpiDate}`, forceRefresh).catch(() => null)
+        api(`/api/payter?date=${kpiDate}`, forceRefresh).catch(() => null),
+        api(`/api/untill/turnover?date=${kpiDate}`, forceRefresh).catch(() => null)
       ]);
 
       const depts = personnelD.departments || [];
@@ -2190,7 +2248,18 @@ async function renderKpi(forceRefresh = false) {
       const rollerRev = dayD.visit?.netRevenue || 0;
       const myposRev  = mypos?.omzetExclBtw || 0;
       const payterRev = payter?.omzetExclBtw || 0;
-      const totalOmzet = rollerRev + myposRev + payterRev;
+      // Untill F&B excl BTW for KPI
+      const untillDrankKpi = (untillKpi?.drank || 0) / 1.21;
+      const untillFoodKpi = (untillKpi?.food || 0) / 1.09;
+      const untillDiversenKpi = (untillKpi?.diversen || 0) / 1.21;
+      const untillRevKpi = untillDrankKpi + untillFoodKpi + untillDiversenKpi;
+      const totalOmzet = rollerRev + myposRev + payterRev + untillRevKpi;
+      // Inject Untill F&B into byRc for KPI dept cards
+      if (untillRevKpi > 0) {
+        byRc['F&B'] = { revenue: Math.round(untillRevKpi * 100) / 100, visitors: 0 };
+        byRc['F&B_drank'] = { revenue: Math.round(untillDrankKpi * 100) / 100 };
+        byRc['F&B_food'] = { revenue: Math.round(untillFoodKpi * 100) / 100 };
+      }
 
       const totP = personnelD.totals || {};
       const plannedPct = totalOmzet > 0 && totP.plannedCost > 0 ? (totP.plannedCost / totalOmzet * 100) : null;
