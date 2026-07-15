@@ -285,7 +285,7 @@ function weatherBadge(w, small = false) {
   return `<span style="font-size:${fs};color:#aaa;white-space:nowrap;">${w.icon} ${w.max}° / ${w.min}°</span>`;
 }
 
-function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, myposLY = null, payterLY = null, nayaxLY = null) {
+function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, myposLY = null, payterLY = null, nayaxLY = null, untillLY = null) {
   if (!bmiResult) return '';
   // Deep-clone to avoid mutating cached data
   const byCategory = JSON.parse(JSON.stringify(bmiResult.byCategory || {}));
@@ -317,7 +317,27 @@ function bmiComparisonCard(bmiResult, label, currentTotal, weather = null, mypos
       byCategory['Overig'].total += nayaxSpiegelExcl;
     }
   }
-  const total = bmiResult.total + myposExcl + payterExcl + nayaxPhotoExcl + nayaxSpiegelExcl;
+  // Inject Untill F&B vorig jaar
+  const untillDrankExclLY = (untillLY?.drank || 0) / 1.21;
+  const untillFoodExclLY = (untillLY?.food || 0) / 1.09;
+  const untillDivExclLY = (untillLY?.diversen || 0) / 1.21;
+  const untillRevExclLY = untillDrankExclLY + untillFoodExclLY + untillDivExclLY;
+  if (untillRevExclLY > 0) {
+    if (!byCategory['F&B']) byCategory['F&B'] = { total: 0, subs: {} };
+    if (untillDrankExclLY > 0) {
+      byCategory['F&B'].subs['🍺 Dranken (Untill)'] = (byCategory['F&B'].subs['🍺 Dranken (Untill)'] || 0) + untillDrankExclLY;
+      byCategory['F&B'].total += untillDrankExclLY;
+    }
+    if (untillFoodExclLY > 0) {
+      byCategory['F&B'].subs['🍽️ Keuken (Untill)'] = (byCategory['F&B'].subs['🍽️ Keuken (Untill)'] || 0) + untillFoodExclLY;
+      byCategory['F&B'].total += untillFoodExclLY;
+    }
+    if (untillDivExclLY > 0) {
+      byCategory['F&B'].subs['📦 Diversen (Untill)'] = (byCategory['F&B'].subs['📦 Diversen (Untill)'] || 0) + untillDivExclLY;
+      byCategory['F&B'].total += untillDivExclLY;
+    }
+  }
+  const total = bmiResult.total + myposExcl + payterExcl + nayaxPhotoExcl + nayaxSpiegelExcl + untillRevExclLY;
   if (total === 0) return '';
   const growth = currentTotal > 0 ? ((currentTotal - total) / total * 100).toFixed(1) : null;
   const growthHtml = growth !== null
@@ -932,7 +952,29 @@ async function renderWeek(forceRefresh = false) {
     const bmiWeek = bmiForDates(bmiWeekDates);
     const bmiWeekStart = new Date(bmiWeekDates[0] + 'T12:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short' });
     const bmiWeekEnd   = new Date(bmiWeekDates[6] + 'T12:00:00').toLocaleDateString(locale(), { day:'numeric', month:'short', year:'numeric' });
-    const bmiWeekCardHtml = bmiComparisonCard(bmiWeek, `Vorig jaar (${bmiWeekStart} – ${bmiWeekEnd})`, weekTotalRev);
+    // Fetch LY data for MyPOS/Payter/Untill/Nayax for the 7 comparison days
+    const lyPromises = bmiWeekDates.flatMap(d => [
+      api(`/api/mypos?date=${d}`, false).catch(() => null),
+      api(`/api/payter?date=${d}`, false).catch(() => null),
+      api(`/api/nayax?date=${d}`, false).catch(() => null),
+      api(`/api/untill/turnover?date=${d}`, false).catch(() => null)
+    ]);
+    const lyResults = await Promise.all(lyPromises);
+    // Aggregate LY MyPOS/Payter/Nayax/Untill
+    let weekMyposLY = { omzetExclBtw: 0 }, weekPayterLY = { omzetExclBtw: 0 };
+    let weekNayaxLY = { photobooth: { omzetExclBtw: 0 }, spiegel: { omzetExclBtw: 0 } };
+    let weekUntillLY = { drank: 0, food: 0, diversen: 0 };
+    for (let i = 0; i < 7; i++) {
+      const mp = lyResults[i*4]; const py = lyResults[i*4+1]; const nx = lyResults[i*4+2]; const ut = lyResults[i*4+3];
+      weekMyposLY.omzetExclBtw += mp?.omzetExclBtw || 0;
+      weekPayterLY.omzetExclBtw += py?.omzetExclBtw || 0;
+      weekNayaxLY.photobooth.omzetExclBtw += nx?.photobooth?.omzetExclBtw || 0;
+      weekNayaxLY.spiegel.omzetExclBtw += nx?.spiegel?.omzetExclBtw || 0;
+      weekUntillLY.drank += ut?.drank || 0;
+      weekUntillLY.food += ut?.food || 0;
+      weekUntillLY.diversen += ut?.diversen || 0;
+    }
+    const bmiWeekCardHtml = bmiComparisonCard(bmiWeek, `Vorig jaar (${bmiWeekStart} – ${bmiWeekEnd})`, weekTotalRev, null, weekMyposLY, weekPayterLY, weekNayaxLY, weekUntillLY);
 
     setContent(`
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -1041,7 +1083,7 @@ async function renderBezoek(forceRefresh = false) {
   try {
     await loadBmiData();
     const bmiDatePre = dateMinusYear(selectedDate);
-    const [data, mypos, payter, nayax, untill, weatherToday, weatherLastYear, myposLY, payterLY, nayaxLY] = await Promise.all([
+    const [data, mypos, payter, nayax, untill, weatherToday, weatherLastYear, myposLY, payterLY, nayaxLY, untillLY] = await Promise.all([
       api(`/api/day?date=${selectedDate}`, forceRefresh),
       api(`/api/mypos?date=${selectedDate}`, forceRefresh).catch(() => null),
       api(`/api/payter?date=${selectedDate}`, forceRefresh).catch(() => null),
@@ -1051,7 +1093,8 @@ async function renderBezoek(forceRefresh = false) {
       fetchWeather(bmiDatePre).catch(() => null),
       api(`/api/mypos?date=${bmiDatePre}`, false).catch(() => null),
       api(`/api/payter?date=${bmiDatePre}`, false).catch(() => null),
-      api(`/api/nayax?date=${bmiDatePre}`, false).catch(() => null)
+      api(`/api/nayax?date=${bmiDatePre}`, false).catch(() => null),
+      api(`/api/untill/turnover?date=${bmiDatePre}`, false).catch(() => null)
     ]);
     const { visit } = data;
     const myposRev = mypos?.omzetExclBtw || 0;
@@ -1194,10 +1237,12 @@ async function renderBezoek(forceRefresh = false) {
     const bmiDate = bmiDatePre;
     const bmiDay = bmiForDate(bmiDate);
     const bmiLabelDate = new Date(bmiDate + 'T12:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
-    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear, myposLY, payterLY, nayaxLY);
+    const bmiCardHtml = bmiComparisonCard(bmiDay, `Vorig jaar (${bmiLabelDate})`, totalRev, weatherLastYear, myposLY, payterLY, nayaxLY, untillLY);
 
     // Compact BMI totaal vergelijking (kleine tegel) — inclusief MyPOS + Payter vorig jaar
-    const bmiTotalLY = (bmiDay?.total || 0) + (myposLY?.omzetExclBtw || 0) + (payterLY?.omzetExclBtw || 0);
+    const untillLYExcl = ((untillLY?.drank || 0) / 1.21) + ((untillLY?.food || 0) / 1.09) + ((untillLY?.diversen || 0) / 1.21);
+    const nayaxLYExcl = (nayaxLY?.omzetExclBtw || 0);
+    const bmiTotalLY = (bmiDay?.total || 0) + (myposLY?.omzetExclBtw || 0) + (payterLY?.omzetExclBtw || 0) + nayaxLYExcl + untillLYExcl;
     let bmiTotaalHtml = '';
     if (bmiTotalLY > 0) {
       const g = totalRev > 0 ? ((totalRev - bmiTotalLY) / bmiTotalLY * 100).toFixed(1) : null;
