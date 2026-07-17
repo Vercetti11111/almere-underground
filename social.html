@@ -439,6 +439,19 @@ function render(data) {
       </div>
     </div>
 
+    <!-- Followers trend chart (between socials and reviews) -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <span class="chart-title">📈 Volgers trend</span>
+        <div class="period-btns">
+          <button class="period-btn active" onclick="setDays(30, this)">30d</button>
+          <button class="period-btn" onclick="setDays(90, this)">90d</button>
+          <button class="period-btn" onclick="setDays(0, this)">Alles</button>
+        </div>
+      </div>
+      <canvas id="followersChart"></canvas>
+    </div>
+
     <!-- REVIEWS SECTION -->
     <div class="section-title">⭐ Reviews <span class="line"></span></div>
     <div class="cards">
@@ -499,20 +512,7 @@ function render(data) {
       </div>
     </div>
 
-    <!-- Followers trend chart -->
-    <div class="chart-container">
-      <div class="chart-header">
-        <span class="chart-title">📈 Volgers trend</span>
-        <div class="period-btns">
-          <button class="period-btn active" onclick="setDays(30, this)">30d</button>
-          <button class="period-btn" onclick="setDays(90, this)">90d</button>
-          <button class="period-btn" onclick="setDays(0, this)">Alles</button>
-        </div>
-      </div>
-      <canvas id="followersChart"></canvas>
-    </div>
-
-    <!-- Reviews trend chart -->
+    <!-- Reviews trend chart (Google only) -->
     <div class="chart-container">
       <div class="chart-header">
         <span class="chart-title">⭐ Reviews trend</span>
@@ -599,10 +599,7 @@ function setReviewDays(days, btn) {
     data: {
       labels,
       datasets: [
-        { label: 'Google', data: slice.map(d => d.google_reviews?.review_count || null), borderColor: '#fbbc04', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
-        { label: 'TripAdvisor', data: slice.map(d => d.tripadvisor?.review_count || null), borderColor: '#34e0a1', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
-        { label: 'Trustpilot', data: slice.map(d => d.trustpilot?.review_count || null), borderColor: '#00b67a', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
-        { label: 'Dagjeweg', data: slice.map(d => d.dagjeweg?.reviews || null), borderColor: '#ff8c00', borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
+        { label: 'Google Reviews', data: slice.map(d => d.google_reviews?.review_count || null), borderColor: '#fbbc04', backgroundColor: 'rgba(251,188,4,0.1)', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true },
       ]
     },
     options: {
@@ -612,8 +609,7 @@ function setReviewDays(days, btn) {
       plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 }, usePointStyle: true, pointStyle: 'circle' } } },
       scales: {
         x: { ticks: { color: '#9ca3af', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: '#2a2d3a' } },
-        y: { position: 'left', ticks: { color: '#fbbc04', font: { size: 10 } }, grid: { color: '#2a2d3a' }, title: { display: true, text: 'Google / TA', color: '#9ca3af', font: { size: 10 } } },
-        y1: { position: 'right', ticks: { color: '#00b67a', font: { size: 10 } }, grid: { display: false }, title: { display: true, text: 'Trustpilot', color: '#9ca3af', font: { size: 10 } } }
+        y: { min: 1000, max: 1500, ticks: { color: '#fbbc04', font: { size: 10 } }, grid: { color: '#2a2d3a' } }
       }
     }
   });
