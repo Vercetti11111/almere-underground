@@ -323,27 +323,28 @@ function render() {
   past.sort((a, b) => (b.createdDate || '').localeCompare(a.createdDate || ''));
   future.sort((a, b) => (a.bookingDate || '').localeCompare(b.bookingDate || ''));
 
-  const totalOwing = allBookings.reduce((s, b) => s + (b.owing || 0), 0);
-  const totalValue = allBookings.reduce((s, b) => s + (b.total || 0), 0);
-  const totalPaid = totalValue - totalOwing;
+  // Calculate totals for PAST bookings only
+  const pastTotal = past.reduce((s, b) => s + (b.total || 0), 0);
   const pastOwing = past.reduce((s, b) => s + (b.owing || 0), 0);
+  const pastPaid = pastTotal - pastOwing;
   const futureOwing = future.reduce((s, b) => s + (b.owing || 0), 0);
+  const futureTotal = future.reduce((s, b) => s + (b.total || 0), 0);
 
   let html = '';
 
-  // Summary
+  // Summary — only verlopen boekingen
   html += `<div class="summary-grid">
     <div class="summary-card">
-      <div class="label">${t('outstanding')}</div>
-      <div class="value orange">${fmtEur(totalOwing)}</div>
-    </div>
-    <div class="summary-card">
       <div class="label">${t('totalValue')}</div>
-      <div class="value">${fmtEur(totalValue)}</div>
+      <div class="value">${fmtEur(pastTotal)}</div>
     </div>
     <div class="summary-card">
       <div class="label">${t('paid')}</div>
-      <div class="value green">${fmtEur(totalPaid)}</div>
+      <div class="value green">${fmtEur(pastPaid)}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">${t('outstanding')}</div>
+      <div class="value orange">${fmtEur(pastOwing)}</div>
     </div>
   </div>`;
 
