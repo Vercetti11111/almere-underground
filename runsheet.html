@@ -57,6 +57,9 @@
     .rs-notes { background:#111118; border-radius:8px; padding:10px 12px; font-size:12px; color:#bbb; margin-top:8px; }
     .rs-notes-label { font-size:10px; color:#666; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
     .pay-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700; color:white; }
+    .rs-tafel { display:flex; align-items:center; gap:4px; font-size:12px; color:#999; }
+    .rs-tafel-label { font-weight:600; }
+    .rs-tafel-line { display:inline-block; width:60px; border-bottom:1px dashed #666; }
     .pay-paid { background:#166534; }
     .pay-unpaid { background:#92400e; }
     .rs-empty { text-align:center; padding:32px; color:#555; font-size:13px; background:#1a1a24; border-radius:12px; }
@@ -358,8 +361,14 @@ async function renderRunsheet(forceRefresh = false) {
 
       return `
         <div class="rs-booking">
-          <div class="rs-booking-name">${b.name}</div>
-          <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+            <div class="rs-booking-name">${b.name}</div>
+            <span class="pay-badge ${payClass}" style="white-space:nowrap;flex-shrink:0;">${payLabel}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
+            <div class="rs-tafel"><span class="rs-tafel-label">Tafel:</span> <span class="rs-tafel-line"></span></div>
+          </div>
           ${actRows ? `
           <table class="rs-table">
             <tr>
@@ -367,12 +376,9 @@ async function renderRunsheet(forceRefresh = false) {
             </tr>
             ${actRows}
           </table>` : ''}
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
-            <div class="rs-notes" style="flex:1;margin-top:0;margin-right:12px;">
-              <div class="rs-notes-label">${t('notes')}</div>
-              ${notes}
-            </div>
-            <span class="pay-badge ${payClass}" style="white-space:nowrap;flex-shrink:0;">${payLabel}</span>
+          <div class="rs-notes">
+            <div class="rs-notes-label">${t('notes')}</div>
+            ${notes}
           </div>
         </div>`;
     }
