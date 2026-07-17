@@ -423,7 +423,7 @@ async function renderRunsheet(forceRefresh = false) {
 function downloadRunsheetPDF(date) {
   // Build a clean print container
   const container = document.createElement('div');
-  container.style.cssText = 'position:absolute;left:-9999px;top:0;width:700px;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:20px;';
+  container.style.cssText = 'position:fixed;left:0;top:0;width:700px;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:20px;z-index:99999;overflow:auto;max-height:100vh;';
   document.body.appendChild(container);
 
   // Header
