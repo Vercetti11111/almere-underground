@@ -358,11 +358,8 @@ async function renderRunsheet(forceRefresh = false) {
 
       return `
         <div class="rs-booking">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
-            <div class="rs-booking-name">${b.name}</div>
-            <span class="pay-badge ${payClass}">${payLabel}</span>
-          </div>
-          <div class="rs-booking-id">${t('bookingNr')}${b.id}${b.totalGuests ? ` · ${b.totalGuests} ${t('pers')}` : ''}</div>
+          <div class="rs-booking-name">${b.name}</div>
+          <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
           ${actRows ? `
           <table class="rs-table">
             <tr>
@@ -370,9 +367,12 @@ async function renderRunsheet(forceRefresh = false) {
             </tr>
             ${actRows}
           </table>` : ''}
-          <div class="rs-notes">
-            <div class="rs-notes-label">${t('notes')}</div>
-            ${notes}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <div class="rs-notes" style="flex:1;margin-top:0;margin-right:12px;">
+              <div class="rs-notes-label">${t('notes')}</div>
+              ${notes}
+            </div>
+            <span class="pay-badge ${payClass}" style="white-space:nowrap;flex-shrink:0;">${payLabel}</span>
           </div>
         </div>`;
     }
