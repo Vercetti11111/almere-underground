@@ -42,14 +42,16 @@
     #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
 
     /* Runsheet */
-    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; }
+    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; max-width:600px; margin-left:auto; margin-right:auto; }
     .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
     .rs-kf { background:#7c1a1a; }
     .rs-bf { background:#1a3060; }
     .rs-booking { background:#1a1a24; margin-bottom:1px; padding:14px 16px; }
     .rs-booking:last-child { border-radius:0 0 14px 14px; }
-    .rs-booking-name { font-size:15px; font-weight:700; margin-bottom:2px; }
-    .rs-booking-id { font-size:11px; color:#666; margin-bottom:10px; }
+    .rs-booking-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:2px; }
+    .rs-booking-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .rs-booking-name { font-size:15px; font-weight:700; }
+    .rs-booking-id { font-size:11px; color:#666; }
     .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; }
     .rs-table th { text-align:left; color:#888; font-weight:600; padding:4px 6px 4px 0; border-bottom:1px solid #2a2a38; }
     .rs-table td { padding:5px 6px 5px 0; vertical-align:top; border-bottom:1px solid #1e1e2a; color:#ddd; }
@@ -361,11 +363,11 @@ async function renderRunsheet(forceRefresh = false) {
 
       return `
         <div class="rs-booking">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">
+          <div class="rs-booking-header">
             <div class="rs-booking-name">${b.name}</div>
-            <span class="pay-badge ${payClass}" style="white-space:nowrap;flex-shrink:0;">${payLabel}</span>
+            <span class="pay-badge ${payClass}">${payLabel}</span>
           </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="rs-booking-meta">
             <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
             <div class="rs-tafel"><span class="rs-tafel-label">Tafel:</span> <span class="rs-tafel-line"></span></div>
           </div>
