@@ -442,7 +442,7 @@ function downloadRunsheetPDF(date) {
   const sections = document.querySelectorAll('.rs-section');
   sections.forEach(sec => {
     const hdr = sec.querySelector('.rs-section-header');
-    const sectionTitle = hdr ? hdr.textContent.trim() : '';
+    const sectionTitle = hdr ? hdr.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
     const bookings = sec.querySelectorAll('.rs-booking');
 
     bookings.forEach(bk => {
@@ -472,7 +472,7 @@ function downloadRunsheetPDF(date) {
 
       // Booking name + pay badge
       const nameEl = bk.querySelector('.rs-booking-name');
-      const name = nameEl ? nameEl.textContent.trim() : '';
+      const name = nameEl ? nameEl.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
       const badge = bk.querySelector('.pay-badge');
       const badgeText = badge ? badge.textContent.trim() : '';
       const isPaid = badge && badge.classList.contains('pay-paid');
@@ -509,7 +509,9 @@ function downloadRunsheetPDF(date) {
       doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text('Tafel: _______________', 12, y);
+      const tafelText = 'Tafel: _______________';
+      const tafelW = doc.getTextWidth(tafelText);
+      doc.text(tafelText, 10 + pw - tafelW, y);
       doc.setTextColor(0, 0, 0);
       y += 5;
 
@@ -546,7 +548,7 @@ function downloadRunsheetPDF(date) {
 
       // Notes
       if (notes) {
-        const noteText = notes.textContent.replace(/^Opmerkingen\s*/i, '').trim();
+        const noteText = notes.textContent.replace(/^Opmerkingen\s*/i, '').replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
         if (noteText) {
           doc.setFillColor(245, 245, 245);
           const lines = doc.splitTextToSize(noteText, pw - 8);
