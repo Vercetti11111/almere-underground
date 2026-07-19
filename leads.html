@@ -720,13 +720,16 @@ async function copyReserveringen() {
   // Build HTML table
   let html = '';
   let plain = '';
-  const thStyle = 'background:#1e293b;color:#fff;padding:6px 10px;text-align:left;font-size:13px;border:1px solid #334155;';
-  const tdStyle = 'padding:5px 10px;font-size:13px;border:1px solid #e2e8f0;';
+  const colWidths = ['7%','15%','12%','5%','18%','16%','14%','8%','5%'];
+  const thBase = 'background:#1e293b;color:#fff;padding:6px 8px;text-align:left;font-size:13px;border:1px solid #334155;word-wrap:break-word;';
+  const tdBase = 'padding:5px 8px;font-size:13px;border:1px solid #e2e8f0;word-wrap:break-word;vertical-align:top;';
+  const tableStyle = 'border-collapse:collapse;width:100%;margin-bottom:12px;table-layout:fixed;';
 
   for (const [dateStr, bookings] of Object.entries(grouped)) {
     html += '<p style="font-weight:bold;font-size:14px;margin:12px 0 4px;">' + fmtPrintDate(dateStr) + '</p>';
-    html += '<table style="border-collapse:collapse;width:100%;margin-bottom:12px;">';
-    html += '<tr>' + cols.map(c => '<th style="' + thStyle + '">' + c + '</th>').join('') + '</tr>';
+    html += '<table style="' + tableStyle + '">';
+    html += '<colgroup>' + colWidths.map(w => '<col style="width:' + w + '">').join('') + '</colgroup>';
+    html += '<tr>' + cols.map(c => '<th style="' + thBase + '">' + c + '</th>').join('') + '</tr>';
     plain += '\n' + fmtPrintDate(dateStr) + '\n';
     plain += cols.join('\t') + '\n';
     for (const b of bookings) {
@@ -735,7 +738,7 @@ async function copyReserveringen() {
       const statusColor = (r.status === 'Op te volgen') ? 'color:red;font-weight:bold;' : '';
       html += '<tr>' + vals.map((v, i) => {
         const extra = (i === vals.length - 1) ? statusColor : '';
-        return '<td style="' + tdStyle + extra + '">' + (v || '') + '</td>';
+        return '<td style="' + tdBase + extra + '">' + (v || '') + '</td>';
       }).join('') + '</tr>';
       plain += vals.join('\t') + '\n';
     }
