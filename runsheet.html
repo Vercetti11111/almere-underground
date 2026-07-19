@@ -1033,7 +1033,7 @@ async function downloadRunsheetPDF(date) {
       const detailTime = firstTime(b);
 
       // Notes
-      const noteText = (b.notes || []).filter(n => n && n.text).map(n => n.text.trim()).join(' ').trim();
+      const noteText = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ').trim();
 
       // Page break check for KF
       if (!isBF) {
