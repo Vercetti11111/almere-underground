@@ -823,7 +823,7 @@ async function downloadRunsheetPDF(date) {
     doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
     doc.text('Run Sheet - Overzicht', leftM, 15);
     doc.setFontSize(11); doc.setFont(undefined, 'normal');
-    doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
+    doc.text(fmtDateLong(date), leftM, 22);
     return 32;
   }
 
@@ -956,7 +956,7 @@ async function downloadRunsheetPDF(date) {
     doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
     doc.text('Run Sheet - Details', leftM, 15);
     doc.setFontSize(11); doc.setFont(undefined, 'normal');
-    doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
+    doc.text(fmtDateLong(date), leftM, 22);
     let startY = 32;
     if (showSection && currentSection) startY = drawSectionBar(startY);
     return startY;
@@ -1054,35 +1054,35 @@ async function downloadRunsheetPDF(date) {
         margin: { left: leftM, right: leftM },
         tableWidth: ppw,
         theme: 'plain',
-        styles: { lineWidth: 0.3, lineColor: [190,190,190], cellPadding: { top: 2, bottom: 2, left: padL, right: 3 }, fontSize: 8, textColor: [30,30,30] },
+        styles: { lineWidth: 0.3, lineColor: [190,190,190], cellPadding: { top: 2, bottom: 2, left: padL, right: 3 }, fontSize: 10, textColor: [30,30,30] },
         head: [],
         body: (function() {
           const rows = [];
           // Info row — contact left | begintijd+pax right | badge | tafel
           rows.push([
-            { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: infoLines, styles: { fontSize: 10, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: rightCell, styles: { fontStyle: 'bold', fontSize: 10, textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
-            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
+            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 10, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
             { content: 'Tafel: ' + (bkAssign.tafel || '').replace(/^Tafel\s*/i, ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
           // Column headers
           const hdrRow = [];
           for (let i = 0; i < 5; i++) {
-            hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 7, textColor: [130,130,130], cellPadding: { top: 2, bottom: 1, left: padL, right: 1 } } });
+            hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 10, textColor: [130,130,130], cellPadding: { top: 2, bottom: 1, left: padL, right: 1 } } });
           }
           rows.push(hdrRow);
           // Data rows
           tableBody.forEach(cells => {
             const row = [];
             for (let i = 0; i < 5; i++) {
-              row.push({ content: cells[i] || '', styles: { fontSize: 7.5, cellPadding: { top: 1, bottom: 1, left: padL, right: 1 } } });
+              row.push({ content: cells[i] || '', styles: { fontSize: 10, cellPadding: { top: 1, bottom: 1, left: padL, right: 1 } } });
             }
             rows.push(row);
           });
           // Notes
           if (noteText) {
             rows.push([
-              { content: 'Opmerkingen: ' + noteText, colSpan: 5, styles: { fontSize: 7.5, textColor: [60,60,60], cellPadding: { top: 2, bottom: 4, left: padL, right: 3 } } }
+              { content: 'Opmerkingen: ' + noteText, colSpan: 5, styles: { fontSize: 10, textColor: [60,60,60], cellPadding: { top: 2, bottom: 4, left: padL, right: 3 } } }
             ]);
           }
           return rows;
@@ -1127,7 +1127,7 @@ async function downloadRunsheetPDF(date) {
       doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
       doc.text('Run Sheet - Aftekenlijst', leftM, 15);
       doc.setFontSize(11); doc.setFont(undefined, 'normal');
-      doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
+      doc.text(fmtDateLong(date), leftM, 22);
       // Section bar
       doc.setFontSize(10); doc.setFont(undefined, 'bold');
       doc.setFillColor(kfRgb[0], kfRgb[1], kfRgb[2]);
@@ -1208,6 +1208,19 @@ async function downloadRunsheetPDF(date) {
       doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(120,120,120);
       doc.text((idx + 1) + '/' + fpTotal, 297 - leftM, 10, { align: 'right' });
     });
+  }
+
+  // Print timestamp footer on every page
+  const now = new Date();
+  const pad2 = n => String(n).padStart(2, '0');
+  const printStamp = 'Geprint op: ' + now.getFullYear() + '/' + pad2(now.getMonth() + 1) + '/' + pad2(now.getDate()) + ' ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    const pgW = doc.internal.pageSize.getWidth();
+    const pgH = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(150,150,150);
+    doc.text(printStamp, pgW - leftM, pgH - 5, { align: 'right' });
   }
 
   doc.save(`RunSheet-${date}.pdf`);
