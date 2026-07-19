@@ -1061,21 +1061,7 @@ async function downloadRunsheetPDF(date) {
         const qty = parseInt(cells[3]); // Personen column
         if (!isNaN(qty) && qty > detailPax) detailPax = qty;
       });
-      const paxStr = detailPax > 0 ? String(detailPax) + ' pax' : '';
-
-      // Build time + pax right cell
-      const ft = bk.querySelector('.rs-booking-name-header');
-      const ftMatch = ft ? ft.textContent.match(/(\d{2}:\d{2})/) : null;
-      // Extract firstTime from the booking name header span
-      let detailFirstTime = '';
-      if (ft) {
-        const span = ft.querySelector('span');
-        if (span) {
-          const tm = span.textContent.match(/(\d{2}:\d{2})/);
-          if (tm) detailFirstTime = tm[1];
-        }
-      }
-      const timePaxLines = [detailFirstTime ? 'Begintijd: ' + detailFirstTime : '', paxStr ? 'Pax: ' + paxStr : ''].filter(Boolean).join('\n');
+      const paxStr = detailPax > 0 ? String(detailPax) : '';
 
       doc.autoTable({
         startY: y,
@@ -1086,10 +1072,9 @@ async function downloadRunsheetPDF(date) {
         head: [],
         body: (function() {
           const rows = [];
-          // Info row — split into contact left, time+pax right, badge, tafel
+          // Info row — contact left, badge, tafel
           rows.push([
-            { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
-            { content: timePaxLines, styles: { fontSize: 9, fontStyle: 'bold', textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: infoLines, colSpan: 2, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
             { content: 'Tafel: ' + (bkAssign.tafel || '').replace(/^Tafel\s*/i, ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
