@@ -44,7 +44,7 @@
     #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
 
     /* Runsheet */
-    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; max-width:600px; margin-left:auto; margin-right:auto; }
+    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; max-width:900px; margin-left:auto; margin-right:auto; }
     .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
     .rs-kf { background:#7c1a1a; }
     .rs-bf { background:#1a3060; }
@@ -111,7 +111,7 @@
     .rs-tab-active { background:#7c3aed; color:#fff; }
 
     /* Overview table */
-    .ov-section { margin-bottom:20px; border-radius:14px; overflow:hidden; }
+    .ov-section { margin-bottom:20px; border-radius:14px; overflow:visible; }
     .ov-header { padding:12px 16px; font-size:14px; font-weight:800; color:#fff; letter-spacing:0.04em; }
     .ov-table { width:100%; border-collapse:collapse; font-size:12px; background:#1a1a24; }
     .ov-table th { text-align:left; padding:8px 10px; color:#888; font-weight:600; border-bottom:1px solid #2a2a38; font-size:11px; }
@@ -986,19 +986,11 @@ async function downloadRunsheetPDF(date) {
     return atY + 8;
   }
 
-  // Collect sections from DOM for detail pages
-  const sections = document.querySelectorAll('.rs-section');
-  sections.forEach(sec => {
-    const hdr = sec.querySelector('.rs-section-header');
-    const sectionTitle = hdr ? hdr.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
-    const bookings = sec.querySelectorAll('.rs-booking');
-    if (bookings.length === 0) return;
-
-    const isBF = sectionTitle.toLowerCase().includes('bedrijfsfeest') || sectionTitle.toLowerCase().includes('bf') || sectionTitle.toLowerCase().includes('corporate');
-    const hdrBg = hdr ? getComputedStyle(hdr).backgroundColor : '';
-    const rgb = hdrBg.match(/\d+/g);
-    currentSectionRgb = (rgb && rgb.length >= 3) ? [+rgb[0], +rgb[1], +rgb[2]] : kfRgb;
-    currentSection = sectionTitle;
+  // ── Detail pages — generated from data (works from any tab) ──
+  function renderDetailSection(bookings, sectionLabel, isBF, sectionRgb) {
+    if (!bookings || bookings.length === 0) return;
+    currentSectionRgb = sectionRgb;
+    currentSection = sectionLabel;
 
     if (!isBF) {
       doc.addPage('a4', 'portrait');
@@ -1006,72 +998,60 @@ async function downloadRunsheetPDF(date) {
       y = drawSectionBar(y);
     }
 
-    bookings.forEach((bk, bkIdx) => {
+    sortByTime(bookings).forEach(b => {
       if (isBF) {
         doc.addPage('a4', 'portrait');
         y = drawPageHeader(false);
         y = drawSectionBar(y);
       }
 
-      const nameEl = bk.querySelector('.rs-booking-name-header') || bk.querySelector('.rs-booking-name');
-      const name = nameEl ? nameEl.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
-      const badge = bk.querySelector('.pay-badge');
-      const badgeText = badge ? badge.textContent.trim() : '';
-      const isPaid = badge && badge.classList.contains('pay-paid');
-      const idEl = bk.querySelector('.rs-booking-id');
-      const bookingId = idEl ? idEl.textContent.trim() : '';
-      // Extract numeric booking ID for assignment lookup
-      const numericId = bookingId.replace(/[^0-9]/g, '');
-      const bkAssign = pdfAssignments[numericId] || {};
-      const contactEl = bk.querySelector('.rs-contact');
-      const contactInfo = contactEl ? contactEl.textContent.trim() : '';
-      const notes = bk.querySelector('.rs-notes');
+      const bid = String(b.id || b.bookingReference || '');
+      const bkAssign = pdfAssignments[bid] || {};
+      const bName = (b.name || '').replace(/[^\x20-\x7E\u00C0-\u024F\s]/g, '').trim();
+      const bookingId = '#' + bid;
 
-      const allTR = bk.querySelectorAll('.rs-table tr');
-      const colHeaders = [];
-      const tableBody = [];
-      if (allTR.length > 0) {
-        allTR[0].querySelectorAll('th').forEach(th => colHeaders.push(th.textContent.trim()));
-        for (let ri = 1; ri < allTR.length; ri++) {
-          const row = [];
-          allTR[ri].querySelectorAll('td').forEach(td => row.push(td.textContent.trim()));
-          tableBody.push(row);
-        }
-      }
+      // Contact info
+      const cParts = [b.contactName, b.contactPhone, b.contactEmail].filter(Boolean);
+      let infoLines = cParts.join('\n');
+      infoLines += (infoLines ? '\n' : '') + bookingId;
 
-      let noteText = '';
-      if (notes) {
-        noteText = notes.textContent.replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim().replace(/^Opmerkingen\s*:?\s*/i, '').trim();
-      }
+      // Activities table
+      const colHeaders = ['Activiteit', 'Subtype', 'Begintijd', 'Personen', 'Prijs'];
+      const tableBody = (b.activities || []).map(a => [
+        a.mainActivity || a.name || '',
+        a.subtype || '',
+        (a.startTime || '').substring(0, 5),
+        String(a.quantity || ''),
+        fmtE(a.totalPrice || a.price || 0)
+      ]);
 
-      // KF page break check
+      // Payment badge
+      const totalPaid = (b.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+      const totalPrice = b.totalPrice || 0;
+      const isPaid = totalPaid >= totalPrice && totalPrice > 0;
+      const openAmt = totalPrice - totalPaid;
+      const badgePdf = isPaid ? 'BETAALD' : ('OPEN ' + fmtE(openAmt));
+
+      // Pax + begintijd
+      const detailPax = getPax(b);
+      const detailTime = firstTime(b);
+
+      // Notes
+      const noteText = (b.notes || []).filter(n => n && n.text).map(n => n.text.trim()).join(' ').trim();
+
+      // Page break check for KF
       if (!isBF) {
         const estH = 30 + tableBody.length * 8 + (noteText ? 14 : 0);
         if (y + estH > 280) { doc.addPage('a4', 'portrait'); y = drawPageHeader(true); }
       }
 
-      const badgeLines = badgeText.split('\n').map(l => l.trim()).filter(Boolean);
-      const badgePdf = badgeLines.join('\n');
       const padL = 5;
+      y = drawBookingNameBar(bName, y);
 
-      // Booking name sub-header bar
-      y = drawBookingNameBar(name, y);
-
-      // Row 1: Contact info left | Begintijd + Pax right | Badge | Tafel
-      let infoLines = '';
-      if (contactInfo) {
-        const parts = contactInfo.split(/\s*[·]\s*/);
-        parts.forEach(p => { if (p.trim()) infoLines += (infoLines ? '\n' : '') + p.trim(); });
-      }
-      infoLines += (infoLines ? '\n' : '') + bookingId;
-
-      // Extract pax from activity table (max quantity)
-      let detailPax = 0;
-      tableBody.forEach(cells => {
-        const qty = parseInt(cells[3]); // Personen column
-        if (!isNaN(qty) && qty > detailPax) detailPax = qty;
-      });
-      const paxStr = detailPax > 0 ? String(detailPax) : '';
+      // Build right-cell content: begintijd + pax stacked
+      let rightCell = '';
+      if (detailTime) rightCell += 'Begintijd: ' + detailTime;
+      if (detailPax) rightCell += (rightCell ? '\n' : '') + 'Pax: ' + detailPax;
 
       doc.autoTable({
         startY: y,
@@ -1082,20 +1062,19 @@ async function downloadRunsheetPDF(date) {
         head: [],
         body: (function() {
           const rows = [];
-          // Info row — contact left, badge, tafel
+          // Info row — contact left | begintijd+pax right | badge | tafel
           rows.push([
-            { content: infoLines, colSpan: 2, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: rightCell, styles: { fontSize: 8, textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
             { content: 'Tafel: ' + (bkAssign.tafel || '').replace(/^Tafel\s*/i, ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
           // Column headers
-          if (colHeaders.length > 0) {
-            const hdrRow = [];
-            for (let i = 0; i < 5; i++) {
-              hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 7, textColor: [130,130,130], cellPadding: { top: 2, bottom: 1, left: padL, right: 1 } } });
-            }
-            rows.push(hdrRow);
+          const hdrRow = [];
+          for (let i = 0; i < 5; i++) {
+            hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 7, textColor: [130,130,130], cellPadding: { top: 2, bottom: 1, left: padL, right: 1 } } });
           }
+          rows.push(hdrRow);
           // Data rows
           tableBody.forEach(cells => {
             const row = [];
@@ -1128,7 +1107,15 @@ async function downloadRunsheetPDF(date) {
 
       y = doc.lastAutoTable.finalY + 4;
     });
-  });
+  }
+
+  // Generate KF detail pages
+  const kfLabel = allKF.length === 1 ? 'Kinderfeestje (1 boeking)' : 'Kinderfeestjes (' + allKF.length + ' boekingen)';
+  renderDetailSection(allKF, kfLabel, false, kfRgb);
+
+  // Generate BF detail pages
+  const bfLabel = allBF.length === 1 ? 'Bedrijfsfeest (1 boeking)' : 'Bedrijfsfeesten (' + allBF.length + ' boekingen)';
+  renderDetailSection(allBF, bfLabel, true, bfRgb);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // LAST PAGE: AFTEKENLIJST — Landscape, KF only
@@ -1163,7 +1150,8 @@ async function downloadRunsheetPDF(date) {
       return [
         b.name || '',
         getPax(b),          // PAX
-        (ca.tafel || '').replace(/^Tafel\s*/i, ''),     // Tafel (opgeslagen of leeg)
+        (ca.tafel || '').replace(/^Tafel\s*/i, ''),     // Tafel
+        shortN(ca.begeleider || ''),  // Begeleider
         firstTime(b),       // Aankomsttijd
         hasLimo(b) ? 'Ja' : 'Nee',  // Limo
         '',                 // Eten & Tijd
@@ -1181,19 +1169,20 @@ async function downloadRunsheetPDF(date) {
       theme: 'grid',
       headStyles: { fillColor: kfRgb, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
       styles: { fontSize: 8, cellPadding: 3, textColor: [30,30,30], lineWidth: 0.3, lineColor: [190,190,190], minCellHeight: 10 },
-      head: [['Boekingsnaam', 'Pax', 'Tafel', 'Aankomst', 'Limo', 'Eten & Tijd', 'Taart & Tijd', 'Gezongen', 'Gegeten', 'Bijzonderheden']],
+      head: [['Boekingsnaam', 'Pax', 'Tafel', 'Begeleider', 'Aankomst', 'Limo', 'Eten & Tijd', 'Taart & Tijd', 'Gezongen', 'Gegeten', 'Bijzonderheden']],
       body: checkRows,
       columnStyles: {
-        0: { cellWidth: 48 },
-        1: { cellWidth: 14 },
-        2: { cellWidth: 22 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 16 },
-        5: { cellWidth: 28 },
-        6: { cellWidth: 28 },
-        7: { cellWidth: 22 },
-        8: { cellWidth: 22 },
-        9: { cellWidth: lpw - 48 - 14 - 22 - 20 - 16 - 28 - 28 - 22 - 22 }
+        0: { cellWidth: 42 },
+        1: { cellWidth: 12 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 14 },
+        6: { cellWidth: 26 },
+        7: { cellWidth: 26 },
+        8: { cellWidth: 20 },
+        9: { cellWidth: 20 },
+        10: { cellWidth: lpw - 42 - 12 - 18 - 28 - 18 - 14 - 26 - 26 - 20 - 20 }
       },
       didDrawPage: function(d) {
         const pg = doc.internal.getNumberOfPages();
