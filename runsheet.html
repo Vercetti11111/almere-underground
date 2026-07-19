@@ -445,19 +445,9 @@ function downloadRunsheetPDF(date) {
     const sectionTitle = hdr ? hdr.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
     const bookings = sec.querySelectorAll('.rs-booking');
 
-    bookings.forEach(bk => {
-      // Estimate height for this booking to check page break
-      const rows = bk.querySelectorAll('.rs-table tbody tr');
-      const notes = bk.querySelector('.rs-notes');
-      const estH = 30 + rows.length * 5 + (notes ? 12 : 0);
-
-      // If booking won't fit on current page, start new page
-      if (y + estH > 280) {
-        doc.addPage();
-        y = 15;
-      }
-
-      // Section label
+    // Section label — once per section
+    if (bookings.length > 0) {
+      if (y + 20 > 280) { doc.addPage(); y = 15; }
       doc.setFontSize(10);
       doc.setFont(undefined, 'bold');
       const hdrBg = hdr ? getComputedStyle(hdr).backgroundColor : '#6366f1';
@@ -469,6 +459,19 @@ function downloadRunsheetPDF(date) {
       doc.text(sectionTitle, 12, y + 1);
       y += 8;
       doc.setTextColor(0, 0, 0);
+    }
+
+    bookings.forEach(bk => {
+      // Estimate height for this booking to check page break
+      const rows = bk.querySelectorAll('.rs-table tbody tr');
+      const notes = bk.querySelector('.rs-notes');
+      const estH = 30 + rows.length * 5 + (notes ? 12 : 0);
+
+      // If booking won't fit on current page, start new page
+      if (y + estH > 280) {
+        doc.addPage();
+        y = 15;
+      }
 
       // Booking name + pay badge
       const nameEl = bk.querySelector('.rs-booking-name');
