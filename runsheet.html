@@ -383,6 +383,26 @@ async function renderRunsheet(forceRefresh = false) {
     const data = await api(`/api/runsheet?date=${rsDate}`, forceRefresh);
     lastRunsheetData = data;
 
+    function getFirstTime(b) {
+      const acts = b.activities || [];
+      let eStr = null, eMin = Infinity;
+      for (const a of acts) {
+        if (!a.startTime) continue;
+        const st = a.startTime;
+        let hh, mm;
+        if (st.length <= 5) { [hh, mm] = st.split(':').map(Number); }
+        else { hh = parseInt(st.substring(11,13)); mm = parseInt(st.substring(14,16)); }
+        const tot = hh * 60 + mm;
+        if (tot < eMin) { eMin = tot; eStr = String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0'); }
+      }
+      return eStr || '';
+    }
+    function getBookingPax(b) {
+      let max = 0;
+      for (const a of (b.activities || [])) { if ((a.quantity || 0) > max) max = a.quantity; }
+      return max > 0 ? String(max) : '';
+    }
+
     function renderBooking(b) {
       const isPaid = b.paymentStatus === 'paid';
       const payClass = isPaid ? 'pay-paid' : 'pay-unpaid';
@@ -409,7 +429,7 @@ async function renderRunsheet(forceRefresh = false) {
 
       return `
         <div class="rs-booking">
-          <div class="rs-booking-name-header">${b.name}</div>
+          <div class="rs-booking-name-header" style="display:flex;justify-content:space-between;align-items:center;">${b.name}<span style="font-size:12px;font-weight:400;color:#aaa;margin-left:8px;">${getFirstTime(b) ? getFirstTime(b) + ' · ' : ''}${getBookingPax(b) ? getBookingPax(b) + ' pax' : ''}</span></div>
           <div class="rs-booking-top">
             <div class="rs-booking-left">
               ${b.contactName ? `<div class="rs-contact" style="color:#ccc;font-weight:600;">${b.contactName}</div>` : ''}
@@ -530,9 +550,10 @@ async function renderOverview(forceRefresh = false) {
           `<option value="${s}" ${assign.begeleider === s ? 'selected' : ''}>${s}</option>`
         ).join('');
 
+        const paxVal = getBookingPax(b);
         return `
           <tr>
-            <td style="font-weight:600;">${b.name || '—'}</td>
+            <td style="font-weight:600;">${b.name || '—'}<span style="float:right;font-weight:400;color:#aaa;font-size:12px;">${paxVal ? paxVal + ' pax' : ''}</span></td>
             <td>${b.contactName || '—'}</td>
             <td>${b.contactPhone || '—'}</td>
             <td style="color:#999;font-size:11px;">#${bid}</td>
@@ -670,6 +691,15 @@ async function downloadRunsheetPDF(date) {
     return earliestStr || '';
   }
 
+  // Helper: PAX = highest quantity across all activities
+  function getPax(b) {
+    const acts = b.activities || [];
+    if (!acts.length) return '';
+    let max = 0;
+    for (const a of acts) { if ((a.quantity || 0) > max) max = a.quantity; }
+    return max > 0 ? String(max) : '';
+  }
+
   // Helper: has limo (subtype contains 'drank')
   function hasLimo(b) {
     return (b.activities || []).some(a =>
@@ -729,6 +759,7 @@ async function downloadRunsheetPDF(date) {
         b.contactName || '',
         b.contactPhone || '',
         '#' + (bid || ''),
+        getPax(b),
         assign.tafel || '',
         assign.begeleider || '',
         firstTime(b),
@@ -738,14 +769,15 @@ async function downloadRunsheetPDF(date) {
   }
 
   const fpColStyles = {
-    0: { cellWidth: 50 },
-    1: { cellWidth: 38 },
-    2: { cellWidth: 32 },
-    3: { cellWidth: 25 },
-    4: { cellWidth: 22 },
-    5: { cellWidth: 30 },
-    6: { cellWidth: 22 },
-    7: { cellWidth: lpw - 50 - 38 - 32 - 25 - 22 - 30 - 22 }
+    0: { cellWidth: 46 },
+    1: { cellWidth: 34 },
+    2: { cellWidth: 30 },
+    3: { cellWidth: 22 },
+    4: { cellWidth: 14 },
+    5: { cellWidth: 22 },
+    6: { cellWidth: 28 },
+    7: { cellWidth: 20 },
+    8: { cellWidth: lpw - 46 - 34 - 30 - 22 - 14 - 22 - 28 - 20 }
   };
 
   function drawSectionBarFP(label, rgb, atY) {
@@ -758,7 +790,7 @@ async function downloadRunsheetPDF(date) {
     return atY + 9;
   }
 
-  const fpHead = [['Reserveringsnaam', 'Contactnaam', 'Telefoon', 'Boeking ID', 'Tafel', 'Begeleider', 'Begintijd', 'Betaald / Openstaand']];
+  const fpHead = [['Reserveringsnaam', 'Contactnaam', 'Telefoon', 'Boeking ID', 'Pax', 'Tafel', 'Begeleider', 'Begintijd', 'Betaald / Openstaand']];
   const fpTableOpts = {
     margin: { left: leftM, right: leftM, top: 42 },
     tableWidth: lpw,
@@ -933,13 +965,35 @@ async function downloadRunsheetPDF(date) {
       // Booking name sub-header bar
       y = drawBookingNameBar(name, y);
 
-      // Row 1: Contact name → phone → booking ID (new order)
+      // Row 1: Contact info left | Begintijd + Pax right | Badge | Tafel
       let infoLines = '';
       if (contactInfo) {
         const parts = contactInfo.split(/\s*[·]\s*/);
         parts.forEach(p => { if (p.trim()) infoLines += (infoLines ? '\n' : '') + p.trim(); });
       }
       infoLines += (infoLines ? '\n' : '') + bookingId;
+
+      // Extract pax from activity table (max quantity)
+      let detailPax = 0;
+      tableBody.forEach(cells => {
+        const qty = parseInt(cells[3]); // Personen column
+        if (!isNaN(qty) && qty > detailPax) detailPax = qty;
+      });
+      const paxStr = detailPax > 0 ? String(detailPax) + ' pax' : '';
+
+      // Build time + pax right cell
+      const ft = bk.querySelector('.rs-booking-name-header');
+      const ftMatch = ft ? ft.textContent.match(/(\d{2}:\d{2})/) : null;
+      // Extract firstTime from the booking name header span
+      let detailFirstTime = '';
+      if (ft) {
+        const span = ft.querySelector('span');
+        if (span) {
+          const tm = span.textContent.match(/(\d{2}:\d{2})/);
+          if (tm) detailFirstTime = tm[1];
+        }
+      }
+      const timePaxLines = [detailFirstTime ? 'Begintijd: ' + detailFirstTime : '', paxStr ? 'Pax: ' + paxStr : ''].filter(Boolean).join('\n');
 
       doc.autoTable({
         startY: y,
@@ -950,9 +1004,10 @@ async function downloadRunsheetPDF(date) {
         head: [],
         body: (function() {
           const rows = [];
-          // Info row
+          // Info row — split into contact left, time+pax right, badge, tafel
           rows.push([
-            { content: infoLines, colSpan: 2, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: timePaxLines, styles: { fontSize: 9, fontStyle: 'bold', textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
             { content: 'Tafel: ' + (bkAssign.tafel || ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
@@ -1030,6 +1085,7 @@ async function downloadRunsheetPDF(date) {
       const ca = pdfAssignments[bid] || {};
       return [
         b.name || '',
+        getPax(b),          // PAX
         ca.tafel || '',     // Tafel (opgeslagen of leeg)
         firstTime(b),       // Aankomsttijd
         hasLimo(b) ? 'Ja' : 'Nee',  // Limo
@@ -1048,18 +1104,19 @@ async function downloadRunsheetPDF(date) {
       theme: 'grid',
       headStyles: { fillColor: kfRgb, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
       styles: { fontSize: 8, cellPadding: 3, textColor: [30,30,30], lineWidth: 0.3, lineColor: [190,190,190], minCellHeight: 10 },
-      head: [['Boekingsnaam', 'Tafel', 'Aankomst', 'Limo', 'Eten & Tijd', 'Taart & Tijd', 'Gezongen', 'Gegeten', 'Bijzonderheden']],
+      head: [['Boekingsnaam', 'Pax', 'Tafel', 'Aankomst', 'Limo', 'Eten & Tijd', 'Taart & Tijd', 'Gezongen', 'Gegeten', 'Bijzonderheden']],
       body: checkRows,
       columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 22 },
+        0: { cellWidth: 48 },
+        1: { cellWidth: 14 },
         2: { cellWidth: 22 },
-        3: { cellWidth: 18 },
-        4: { cellWidth: 30 },
-        5: { cellWidth: 30 },
-        6: { cellWidth: 25 },
-        7: { cellWidth: 25 },
-        8: { cellWidth: lpw - 50 - 22 - 22 - 18 - 30 - 30 - 25 - 25 }
+        3: { cellWidth: 20 },
+        4: { cellWidth: 16 },
+        5: { cellWidth: 28 },
+        6: { cellWidth: 28 },
+        7: { cellWidth: 22 },
+        8: { cellWidth: 22 },
+        9: { cellWidth: lpw - 48 - 14 - 22 - 20 - 16 - 28 - 28 - 22 - 22 }
       },
       didDrawPage: function(d) {
         const pg = doc.internal.getNumberOfPages();
