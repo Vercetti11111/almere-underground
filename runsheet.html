@@ -424,22 +424,45 @@ async function renderRunsheet(forceRefresh = false) {
 }
 
 function downloadRunsheetPDF(date) {
-  // Build print container — use jsPDF directly for reliability
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pw = 190; // page width minus margins
+  const leftM = 10;
   let y = 15;
-  const lh = 5; // line height
+  let currentSection = '';
+  let currentSectionRgb = [99, 102, 241];
+  let currentBookingCount = 0;
 
-  // Header
-  doc.setFontSize(18);
-  doc.setFont(undefined, 'bold');
-  doc.text('Run Sheet', 10, y);
-  y += 7;
-  doc.setFontSize(11);
-  doc.setFont(undefined, 'normal');
-  doc.text('Almere Underground — ' + fmtDateLong(date), 10, y);
-  y += 10;
+  // ── Draw page header: "Run Sheet" + date + section bar ──
+  function drawPageHeader(showSection) {
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('Run Sheet', leftM, 15);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
+    let startY = 32;
+    if (showSection && currentSection) {
+      startY = drawSectionBar(startY);
+    }
+    return startY;
+  }
+
+  // ── Draw section bar ──
+  function drawSectionBar(atY) {
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.setFillColor(currentSectionRgb[0], currentSectionRgb[1], currentSectionRgb[2]);
+    doc.setTextColor(255, 255, 255);
+    doc.roundedRect(leftM, atY - 4, pw, 7, 1, 1, 'F');
+    doc.text(currentSection + (currentBookingCount ? '  ' + currentBookingCount + ' boekingen' : ''), leftM + 2, atY + 1);
+    doc.setTextColor(0, 0, 0);
+    return atY + 8;
+  }
+
+  // Initial header
+  y = drawPageHeader(false);
 
   // Collect sections
   const sections = document.querySelectorAll('.rs-section');
@@ -447,28 +470,29 @@ function downloadRunsheetPDF(date) {
     const hdr = sec.querySelector('.rs-section-header');
     const sectionTitle = hdr ? hdr.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
     const bookings = sec.querySelectorAll('.rs-booking');
+    if (bookings.length === 0) return;
 
-    // Section label — once per section
-    if (bookings.length > 0) {
-      if (y + 20 > 280) { doc.addPage(); y = 15; }
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      const hdrBg = hdr ? getComputedStyle(hdr).backgroundColor : '#6366f1';
-      const rgb = hdrBg.match(/\d+/g);
-      if (rgb && rgb.length >= 3) doc.setFillColor(+rgb[0], +rgb[1], +rgb[2]);
-      else doc.setFillColor(99, 102, 241);
-      doc.setTextColor(255, 255, 255);
-      doc.roundedRect(10, y - 4, pw, 7, 1, 1, 'F');
-      doc.text(sectionTitle, 12, y + 1);
-      y += 8;
-      doc.setTextColor(0, 0, 0);
-    }
+    const isBF = sectionTitle.toLowerCase().includes('bedrijfsfeest') || sectionTitle.toLowerCase().includes('bf') || sectionTitle.toLowerCase().includes('corporate');
 
-    bookings.forEach(bk => {
+    // Parse section color
+    const hdrBg = hdr ? getComputedStyle(hdr).backgroundColor : '';
+    const rgb = hdrBg.match(/\d+/g);
+    currentSectionRgb = (rgb && rgb.length >= 3) ? [+rgb[0], +rgb[1], +rgb[2]] : [99, 102, 241];
+    currentSection = sectionTitle;
+    currentBookingCount = bookings.length;
+
+    // Draw section bar
+    if (y + 20 > 280) { doc.addPage(); y = drawPageHeader(false); }
+    y = drawSectionBar(y);
+
+    bookings.forEach((bk, bkIdx) => {
+      // BF: always new page, 1 per page
+      if (isBF) {
+        doc.addPage();
+        y = drawPageHeader(true);
+      }
+
       const notes = bk.querySelector('.rs-notes');
-
-      // ── Per-booking: build one autoTable with header row (name/badge/tafel) + activities + notes ──
-
       const nameEl = bk.querySelector('.rs-booking-name');
       const name = nameEl ? nameEl.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
       const badge = bk.querySelector('.pay-badge');
@@ -483,11 +507,8 @@ function downloadRunsheetPDF(date) {
       const allTR = bk.querySelectorAll('.rs-table tr');
       const colHeaders = [];
       const tableBody = [];
-
       if (allTR.length > 0) {
-        // First row = th headers
         allTR[0].querySelectorAll('th').forEach(th => colHeaders.push(th.textContent.trim()));
-        // Data rows
         for (let ri = 1; ri < allTR.length; ri++) {
           const row = [];
           allTR[ri].querySelectorAll('td').forEach(td => row.push(td.textContent.trim()));
@@ -495,50 +516,56 @@ function downloadRunsheetPDF(date) {
         }
       }
 
-      // Notes text
       let noteText = '';
       if (notes) {
         noteText = notes.textContent.replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim().replace(/^Opmerkingen\s*:?\s*/i, '').trim();
       }
 
-      // Estimate if we need a page break
-      const estH = 30 + tableBody.length * 8 + (noteText ? 14 : 0);
-      if (y + estH > 280) { doc.addPage(); y = 15; }
+      // Page break check (KF only — BF already on new page)
+      if (!isBF) {
+        const estH = 30 + tableBody.length * 8 + (noteText ? 14 : 0);
+        if (y + estH > 280) {
+          doc.addPage();
+          y = drawPageHeader(true);
+        }
+      }
 
-      // Draw booking card using autoTable
+      // Badge text for PDF
+      const badgeLines = badgeText.split('\n').map(l => l.trim()).filter(Boolean);
+      const badgePdf = badgeLines.join('\n');
+
+      const padL = 5; // consistent left padding
+
       doc.autoTable({
         startY: y,
-        margin: { left: 10, right: 10 },
+        margin: { left: leftM, right: leftM },
         tableWidth: pw,
         theme: 'plain',
-        styles: { lineWidth: 0.3, lineColor: [190, 190, 190], cellPadding: { top: 2, bottom: 2, left: 5, right: 3 }, fontSize: 8, textColor: [30, 30, 30] },
+        styles: { lineWidth: 0.3, lineColor: [190, 190, 190], cellPadding: { top: 2, bottom: 2, left: padL, right: 3 }, fontSize: 8, textColor: [30, 30, 30] },
         head: [],
         body: (function() {
           const rows = [];
 
-          // Row 1: Name (bold, 10pt) | Badge (multi-line) | Tafel (bold, 10pt)
-          // Format badge text: split lines for PDF
-          const badgeLines = badgeText.split('\n').map(l => l.trim()).filter(Boolean);
-          const badgePdf = badgeLines.join('\n');
+          // Row 1: Name | Badge | Tafel
           rows.push([
-            { content: name, colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 4, bottom: 2, left: 5, right: 2 } } },
-            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 2, left: 3, right: 3 } } },
-            { content: 'Tafel:', colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 4, bottom: 2, left: 5, right: 2 } } },
+            { content: name, colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 5, bottom: 2, left: padL, right: 2 } } },
+            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 5, bottom: 2, left: 3, right: 3 } } },
+            { content: 'Tafel:', colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 5, bottom: 2, left: padL, right: 2 } } },
           ]);
 
-          // Row 2: Booking ID + contact info (smaller font, grey)
-          const subLine = [bookingId, contactInfo].filter(Boolean).join('  ·  ');
+          // Row 2: Booking ID + contact (grey)
+          const subLine = [bookingId, contactInfo].filter(Boolean).join('  \u00B7  ');
           if (subLine) {
             rows.push([
-              { content: subLine, colSpan: 5, styles: { fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 1, bottom: 2, left: 5, right: 2 } } }
+              { content: subLine, colSpan: 5, styles: { fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 1, bottom: 3, left: padL, right: 2 } } }
             ]);
           }
 
-          // Row 2: Column headers
+          // Column headers
           if (colHeaders.length > 0) {
             const hdrRow = [];
             for (let i = 0; i < 5; i++) {
-              hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 7, textColor: [130, 130, 130], cellPadding: { top: 2, bottom: 1, left: 3, right: 1 } } });
+              hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 7, textColor: [130, 130, 130], cellPadding: { top: 2, bottom: 1, left: padL, right: 1 } } });
             }
             rows.push(hdrRow);
           }
@@ -547,32 +574,34 @@ function downloadRunsheetPDF(date) {
           tableBody.forEach(cells => {
             const row = [];
             for (let i = 0; i < 5; i++) {
-              row.push({ content: cells[i] || '', styles: { fontSize: 7.5, cellPadding: { top: 1, bottom: 1, left: 3, right: 1 } } });
+              row.push({ content: cells[i] || '', styles: { fontSize: 7.5, cellPadding: { top: 1, bottom: 1, left: padL, right: 1 } } });
             }
             rows.push(row);
           });
 
-          // Notes row (full width span)
+          // Notes
           if (noteText) {
             rows.push([
-              { content: 'Opmerkingen: ' + noteText, colSpan: 5, styles: { fontSize: 7.5, textColor: [60, 60, 60], cellPadding: { top: 2, bottom: 3, left: 3, right: 3 } } }
+              { content: 'Opmerkingen: ' + noteText, colSpan: 5, styles: { fontSize: 7.5, textColor: [60, 60, 60], cellPadding: { top: 2, bottom: 4, left: padL, right: 3 } } }
             ]);
           }
 
           return rows;
         })(),
         columnStyles: {
-          0: { cellWidth: 52 },  // Activiteit
-          1: { cellWidth: 48 },  // Subtype
-          2: { cellWidth: 28 },  // Tijd
-          3: { cellWidth: 22 },  // Personen
-          4: { cellWidth: 40 },  // Locatie
+          0: { cellWidth: 52 },
+          1: { cellWidth: 48 },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 40 },
         },
-        // Border around entire booking
         tableLineWidth: 0.3,
         tableLineColor: [190, 190, 190],
         didDrawPage: function(data) {
-          // Reset y on new page
+          // If autoTable spills to next page, redraw header
+          if (data.pageNumber > 1) {
+            y = drawPageHeader(true);
+          }
         }
       });
 
