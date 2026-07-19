@@ -494,7 +494,7 @@ function downloadRunsheetPDF(date) {
       // Notes text
       let noteText = '';
       if (notes) {
-        noteText = notes.textContent.replace(/^Opmerkingen\s*/i, '').replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        noteText = notes.textContent.replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim().replace(/^Opmerkingen\s*:?\s*/i, '').trim();
       }
 
       // Estimate if we need a page break
@@ -512,14 +512,11 @@ function downloadRunsheetPDF(date) {
         body: (function() {
           const rows = [];
 
-          // Row 1: Name + Badge | Tafel (spanning 5 cols → use content callback)
-          // We use a single-row approach with columnStyles
+          // Row 1: Name (span 2 cols, left) | Badge (center) | Tafel (left, span 2 cols)
           rows.push([
-            { content: name + (bookingId ? '  (' + bookingId + ')' : ''), styles: { fontStyle: 'bold', fontSize: 10, cellPadding: { top: 3, bottom: 1, left: 3, right: 1 } } },
-            { content: '', styles: { cellPadding: { top: 3, bottom: 1 } } },
-            { content: '', styles: { cellPadding: { top: 3, bottom: 1 } } },
-            { content: badgeText, styles: { fontStyle: 'bold', fontSize: 7, halign: 'right', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 1, left: 2, right: 2 } } },
-            { content: 'Tafel: _______________', styles: { halign: 'right', fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 3, bottom: 1, left: 1, right: 3 } } },
+            { content: name + (bookingId ? '  (' + bookingId + ')' : ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 3, bottom: 1, left: 3, right: 1 } } },
+            { content: badgeText, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 1, left: 2, right: 2 } } },
+            { content: 'Tafel: _______________', colSpan: 2, styles: { halign: 'left', fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 3, bottom: 1, left: 3, right: 1 } } },
           ]);
 
           // Row 2: Column headers
