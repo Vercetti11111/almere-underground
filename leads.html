@@ -192,7 +192,8 @@
         <input type="date" id="printFrom" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:4px 8px;color:#f1f1f5;font-size:12px;" />
         <label style="font-size:12px;color:#888;">Tot:</label>
         <input type="date" id="printTo" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:4px 8px;color:#f1f1f5;font-size:12px;" />
-        <button class="print-btn" onclick="printReserveringen()">🖨️ Print / Kopieer</button>
+        <button class="print-btn" onclick="copyReserveringen()" style="background:#10b981;">📋 Kopieer</button>
+        <button class="print-btn" onclick="pdfReserveringen()">🖨️ PDF</button>
       </div>
     </div>
 
@@ -619,19 +620,18 @@ function initPrintDates() {
 }
 initPrintDates();
 
-function printReserveringen() {
+function getFilteredReserveringen() {
   const from = document.getElementById('printFrom').value;
   const to = document.getElementById('printTo').value;
-  if (!from || !to) { alert('Selecteer een datumrange'); return; }
+  if (!from || !to) { alert('Selecteer een datumrange'); return null; }
 
-  // Filter reserveringen within date range
+  // Only BF and FF (not KF)
   const filtered = allBookings.filter(b => {
-    if (!b.isKF && !b.isFF && !b.isBF) return false;
+    if (!b.isFF && !b.isBF) return false;
     const bd = (b.bookingDate || '').substring(0, 10);
     return bd >= from && bd <= to;
   });
 
-  // Sort by date then time
   filtered.sort((a, b) => {
     const da = (a.bookingDate || '').substring(0, 10);
     const db = (b.bookingDate || '').substring(0, 10);
@@ -639,63 +639,151 @@ function printReserveringen() {
     return (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
   });
 
-  // Group by date
   const grouped = {};
   for (const b of filtered) {
     const d = (b.bookingDate || '').substring(0, 10);
     if (!grouped[d]) grouped[d] = [];
     grouped[d].push(b);
   }
-
-  // Build print HTML
-  const dayNames = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
-  const monthNames = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
-
-  function fmtPrintDate(iso) {
-    const d = new Date(iso + 'T00:00:00');
-    return dayNames[d.getDay()] + ' ' + d.getDate() + ' ' + monthNames[d.getMonth()];
-  }
-
-  let html = '';
-  for (const [dateStr, bookings] of Object.entries(grouped)) {
-    html += '<div class="print-date-header">' + fmtPrintDate(dateStr) + '</div>';
-    html += '<table class="print-table"><tr><th>Tijd</th><th>Bedrijf</th><th>Klantnaam</th><th>Pax</th><th>Activiteit</th><th>Foods</th><th>Drinks</th><th>Begeleiding</th><th>Status</th></tr>';
-    for (const b of bookings) {
-      const foods = (b.foods || []).length ? b.foods.join(', ') : '';
-      const drinks = (b.drinks || []).length ? b.drinks.join(', ') : '';
-      const foodsDisplay = foods || (!drinks ? 'Nacalculatie' : '-');
-      const drinksDisplay = drinks || (!foods ? 'Nacalculatie' : 'nacalculatie');
-      const activities = (b.activityNames || b.products || []).join(', ');
-      const status = b.leadCategory || (b.amountOwing <= 0 ? 'Betaald' : 'Open');
-      html += '<tr>';
-      html += '<td>' + (b.startTime || '-') + '</td>';
-      html += '<td>' + (b.name || '-') + '</td>';
-      html += '<td>' + (b.contactName || '-') + '</td>';
-      html += '<td>' + (b.pax || b.totalGuests || '-') + '</td>';
-      html += '<td>' + (activities || '-') + '</td>';
-      html += '<td>' + foodsDisplay + '</td>';
-      html += '<td>' + drinksDisplay + '</td>';
-      html += '<td></td>';
-      html += '<td>' + status + '</td>';
-      html += '</tr>';
-    }
-    html += '</table><br>';
-  }
-
-  if (!html) {
-    html = '<p>Geen reserveringen in de geselecteerde periode.</p>';
-  }
-
-  document.getElementById('printSection').innerHTML = html;
-
-  // Also build a copyable version
-  buildCopyableTable(grouped);
-
-  setTimeout(() => window.print(), 200);
+  return grouped;
 }
 
-function buildCopyableTable(grouped) {
-  // Already in printSection — the @media print CSS will handle visibility
+function fmtPrintDate(iso) {
+  const dayNames = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
+  const monthNames = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+  const d = new Date(iso + 'T00:00:00');
+  return dayNames[d.getDay()] + ' ' + d.getDate() + ' ' + monthNames[d.getMonth()];
+}
+
+function getBookingRow(b) {
+  const foods = (b.foods || []).length ? b.foods.join(', ') : '';
+  const drinks = (b.drinks || []).length ? b.drinks.join(', ') : '';
+  const foodsDisplay = foods || 'Nacalculatie';
+  const drinksDisplay = drinks || 'Nacalculatie';
+  const activities = (b.activityNames || b.products || []).join(', ');
+  const status = b.leadCategory || (b.amountOwing <= 0 ? 'Betaald' : 'Open');
+  return {
+    tijd: b.startTime || '-',
+    bedrijf: b.name || '-',
+    klant: b.contactName || '-',
+    pax: b.pax || b.totalGuests || '-',
+    activiteit: activities || '-',
+    foods: foodsDisplay,
+    drinks: drinksDisplay,
+    begeleiding: '',
+    status: status
+  };
+}
+
+function copyReserveringen() {
+  const grouped = getFilteredReserveringen();
+  if (!grouped) return;
+
+  const cols = ['Tijd','Bedrijf','Klantnaam','Pax','Activiteit','Foods','Drinks','Begeleiding','Status'];
+  let text = '';
+
+  for (const [dateStr, bookings] of Object.entries(grouped)) {
+    text += '\n' + fmtPrintDate(dateStr) + '\n';
+    text += cols.join('\t') + '\n';
+    for (const b of bookings) {
+      const r = getBookingRow(b);
+      text += [r.tijd, r.bedrijf, r.klant, r.pax, r.activiteit, r.foods, r.drinks, r.begeleiding, r.status].join('\t') + '\n';
+    }
+  }
+
+  if (!text.trim()) { alert('Geen reserveringen in de geselecteerde periode.'); return; }
+
+  navigator.clipboard.writeText(text.trim()).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ Gekopieerd!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  }).catch(() => alert('Kopiëren mislukt'));
+}
+
+function pdfReserveringen() {
+  const grouped = getFilteredReserveringen();
+  if (!grouped) return;
+
+  const dates = Object.keys(grouped);
+  if (!dates.length) { alert('Geen reserveringen in de geselecteerde periode.'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const leftM = 10;
+  const pw = 277; // landscape width minus margins
+  const from = document.getElementById('printFrom').value;
+  const to = document.getElementById('printTo').value;
+
+  // Header
+  doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
+  doc.text('Reserveringen', leftM, 15);
+  doc.setFontSize(10); doc.setFont(undefined, 'normal');
+  doc.text(fmtPrintDate(from) + '  –  ' + fmtPrintDate(to), leftM, 22);
+
+  // Print timestamp
+  const now = new Date();
+  const ts = 'Geprint op: ' + now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+  let y = 30;
+  const heads = [['Tijd','Bedrijf','Klantnaam','Pax','Activiteit','Foods','Drinks','Begeleiding','Status']];
+  const colStyles = {
+    0: { cellWidth: 16 },  // Tijd
+    1: { cellWidth: 50 },  // Bedrijf
+    2: { cellWidth: 32 },  // Klantnaam
+    3: { cellWidth: 12 },  // Pax
+    4: { cellWidth: 50 },  // Activiteit
+    5: { cellWidth: 36 },  // Foods
+    6: { cellWidth: 36 },  // Drinks
+    7: { cellWidth: 24 },  // Begeleiding
+    8: { cellWidth: 21 },  // Status
+  };
+
+  for (let di = 0; di < dates.length; di++) {
+    const dateStr = dates[di];
+    const bookings = grouped[dateStr];
+
+    // Check if we need a new page (if less than 30mm left)
+    if (y > 170) {
+      doc.addPage('a4', 'landscape');
+      y = 15;
+    }
+
+    // Date header
+    doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
+    doc.text(fmtPrintDate(dateStr), leftM, y);
+    y += 2;
+
+    const rows = bookings.map(b => {
+      const r = getBookingRow(b);
+      return [r.tijd, r.bedrijf, r.klant, String(r.pax), r.activiteit, r.foods, r.drinks, r.begeleiding, {
+        content: r.status,
+        styles: { textColor: r.status === 'Betaald' ? [21, 87, 36] : [180, 60, 0] }
+      }];
+    });
+
+    doc.autoTable({
+      head: heads,
+      body: rows,
+      startY: y,
+      margin: { left: leftM, right: leftM },
+      styles: { fontSize: 7.5, cellPadding: 1.5, overflow: 'linebreak', lineColor: [200,200,200], lineWidth: 0.2 },
+      headStyles: { fillColor: [30, 30, 50], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 },
+      columnStyles: colStyles,
+      theme: 'grid',
+      didDrawPage: function(data) {
+        // Footer with timestamp
+        doc.setFontSize(7); doc.setFont(undefined, 'normal'); doc.setTextColor(150,150,150);
+        doc.text(ts, leftM, 200);
+      }
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+  }
+
+  // Save
+  const fn = 'Reserveringen_' + from + '_' + to + '.pdf';
+  doc.save(fn);
 }
 
 // ── Auto-init (after all declarations) ────────────────────────────────────────
