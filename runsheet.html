@@ -821,7 +821,7 @@ async function downloadRunsheetPDF(date) {
 
   function drawFrontpageHeader() {
     doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
-    doc.text('Run Sheet', leftM, 15);
+    doc.text('Run Sheet - Overzicht', leftM, 15);
     doc.setFontSize(11); doc.setFont(undefined, 'normal');
     doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
     return 32;
@@ -943,15 +943,6 @@ async function downloadRunsheetPDF(date) {
     }));
   }
 
-  // Add page numbers to frontpage pages
-  const fpTotal = frontpagePages.length;
-  if (fpTotal > 1) {
-    frontpagePages.forEach((pg, idx) => {
-      doc.setPage(pg);
-      doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(120,120,120);
-      doc.text((idx + 1) + '/' + fpTotal, 297 - leftM, 10, { align: 'right' });
-    });
-  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DETAIL PAGES — Portrait, per booking
@@ -963,7 +954,7 @@ async function downloadRunsheetPDF(date) {
 
   function drawPageHeader(showSection) {
     doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
-    doc.text('Run Sheet', leftM, 15);
+    doc.text('Run Sheet - Details', leftM, 15);
     doc.setFontSize(11); doc.setFont(undefined, 'normal');
     doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
     let startY = 32;
@@ -1134,7 +1125,7 @@ async function downloadRunsheetPDF(date) {
 
     function drawAftHeader() {
       doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
-      doc.text('Aftekenlijst Kinderfeestjes', leftM, 15);
+      doc.text('Run Sheet - Aftekenlijst', leftM, 15);
       doc.setFontSize(11); doc.setFont(undefined, 'normal');
       doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
       // Section bar
@@ -1207,6 +1198,16 @@ async function downloadRunsheetPDF(date) {
         doc.text((idx + 1) + '/' + aftTotal, 297 - leftM, 10, { align: 'right' });
       });
     }
+  }
+
+  // Add page numbers to frontpage pages (only if >1 page)
+  const fpTotal = frontpagePages.length;
+  if (fpTotal > 1) {
+    frontpagePages.forEach((pg, idx) => {
+      doc.setPage(pg);
+      doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(120,120,120);
+      doc.text((idx + 1) + '/' + fpTotal, 297 - leftM, 10, { align: 'right' });
+    });
   }
 
   doc.save(`RunSheet-${date}.pdf`);
