@@ -73,6 +73,23 @@
       .ov-table .ov-hide-mobile { display:none !important; }
     }
     .rs-empty { text-align:center; padding:32px; color:#555; font-size:13px; background:#1a1a24; border-radius:12px; }
+    /* Detail overlay */
+    .ov-detail-btn { display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#2a2a3a;color:#8b8bff;border:1px solid #3a3a4a;cursor:pointer;font-size:14px;font-weight:700;line-height:1;margin-right:6px;vertical-align:middle;flex-shrink:0; }
+    .ov-detail-btn:hover { background:#3a3a5a;color:#a5a5ff; }
+    .ov-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px; }
+    .ov-overlay-card { background:#16161e;border-radius:16px;max-width:520px;width:100%;max-height:85vh;overflow-y:auto;padding:0;box-shadow:0 12px 40px rgba(0,0,0,0.6); }
+    .ov-overlay-header { display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #2a2a38; }
+    .ov-overlay-header h3 { margin:0;font-size:16px;color:#f1f1f5;font-weight:800; }
+    .ov-overlay-close { background:none;border:none;color:#888;font-size:22px;cursor:pointer;padding:4px 8px; }
+    .ov-overlay-close:hover { color:#fff; }
+    .ov-overlay-body { padding:16px 20px; }
+    .ov-overlay-body .ov-info-row { display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e1e2a;font-size:13px;color:#ccc; }
+    .ov-overlay-body .ov-info-label { color:#888;font-weight:600; }
+    .ov-overlay-body .ov-act-table { width:100%;border-collapse:collapse;font-size:12px;margin-top:12px; }
+    .ov-overlay-body .ov-act-table th { text-align:left;color:#888;font-weight:600;padding:6px 8px;border-bottom:1px solid #2a2a38;font-size:11px; }
+    .ov-overlay-body .ov-act-table td { padding:5px 8px;border-bottom:1px solid #1e1e2a;color:#ddd; }
+    .ov-overlay-body .ov-notes { background:#111118;border-radius:8px;padding:10px 12px;font-size:12px;color:#bbb;margin-top:12px; }
+    .ov-overlay-body .ov-notes-label { font-size:10px;color:#666;font-weight:600;text-transform:uppercase;margin-bottom:4px; }
 
     @media print {
       body { background:#fff !important; color:#000 !important; font-size:11pt; }
@@ -552,8 +569,10 @@ async function renderOverview(forceRefresh = false) {
       }).map(s => shortName(s.name));
     }
 
-    // Store bookings reference for conflict checking
+    // Store bookings reference for conflict checking + detail overlay lookup
     window._ovAllBookings = allBookings;
+    window._ovBookingMap = {};
+    allBookings.forEach(b => { window._ovBookingMap[String(b.id || b.bookingReference || '')] = b; });
 
     function renderSection(bookings, title, colorClass, bgColor) {
       if (!bookings.length) return '';
@@ -592,7 +611,7 @@ async function renderOverview(forceRefresh = false) {
         const paxVal = getBookingPax(b);
         return `
           <tr>
-            <td style="font-weight:600;">${b.name || '—'}<span style="float:right;font-weight:400;color:#aaa;font-size:12px;">${paxVal ? paxVal + ' pax' : ''}</span></td>
+            <td style="font-weight:600;"><button class="ov-detail-btn" onclick="showBookingOverlay('${bid}')" title="Details">+</button>${b.name || '—'}<span style="float:right;font-weight:400;color:#aaa;font-size:12px;">${paxVal ? paxVal + ' pax' : ''}</span></td>
             <td class="ov-hide-mobile">${b.contactName || '—'}</td>
             <td class="ov-hide-mobile">${b.contactPhone || '—'}</td>
             <td class="ov-hide-mobile" style="color:#999;font-size:11px;">#${bid}</td>
@@ -737,6 +756,62 @@ function doSaveAssignment(bookingId, field, value, selectEl) {
       }
     }
   }, 300);
+}
+
+// ── Booking detail overlay ─────────────────────────────────────────────────
+function showBookingOverlay(bid) {
+  const b = (window._ovBookingMap || {})[bid];
+  if (!b) return;
+  const fmtE = v => '€' + (v || 0).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const isPaid = b.paymentStatus === 'paid';
+  const amountPaid = (b.total || 0) - (b.amountOwing || 0);
+
+  let actRows = '';
+  for (const a of (b.activities || [])) {
+    const locs = a.locations?.length ? a.locations.join(', ') : '—';
+    const st = a.startTime ? (a.startTime.length <= 5 ? a.startTime : a.startTime.substring(11,16)) : '—';
+    const et = a.endTime ? (a.endTime.length <= 5 ? a.endTime : a.endTime.substring(11,16)) : '';
+    actRows += `<tr><td>${a.mainActivity || '—'}</td><td>${a.subtype || '—'}</td><td>${st}${et ? '–'+et : ''}</td><td>${a.quantity || '—'}</td><td>${locs}</td></tr>`;
+  }
+
+  const notes = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ');
+
+  const html = `
+    <div class="ov-overlay" onclick="if(event.target===this)closeBookingOverlay()">
+      <div class="ov-overlay-card">
+        <div class="ov-overlay-header">
+          <h3>${b.name || '—'}</h3>
+          <button class="ov-overlay-close" onclick="closeBookingOverlay()">✕</button>
+        </div>
+        <div class="ov-overlay-body">
+          <div class="ov-info-row"><span class="ov-info-label">Contact</span><span>${b.contactName || '—'}</span></div>
+          <div class="ov-info-row"><span class="ov-info-label">Telefoon</span><span>${b.contactPhone || '—'}</span></div>
+          <div class="ov-info-row"><span class="ov-info-label">E-mail</span><span>${b.contactEmail || '—'}</span></div>
+          <div class="ov-info-row"><span class="ov-info-label">Boekingsnummer</span><span>#${bid}</span></div>
+          <div class="ov-info-row"><span class="ov-info-label">Betaald</span><span>${fmtE(amountPaid)}</span></div>
+          <div class="ov-info-row"><span class="ov-info-label">Openstaand</span><span style="color:${isPaid ? '#22c55e' : '#f59e0b'};font-weight:600;">${isPaid ? '—' : fmtE(b.amountOwing)}</span></div>
+          <div class="ov-info-row"><span class="ov-info-label">Totaal</span><span style="font-weight:600;">${fmtE(b.total)}</span></div>
+          ${actRows ? `
+          <table class="ov-act-table">
+            <tr><th>Activiteit</th><th>Type</th><th>Tijd</th><th>Pax</th><th>Locatie</th></tr>
+            ${actRows}
+          </table>` : ''}
+          ${notes ? `<div class="ov-notes"><div class="ov-notes-label">Opmerkingen</div>${notes}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+
+  // Remove existing overlay if any
+  closeBookingOverlay();
+  const div = document.createElement('div');
+  div.id = 'booking-overlay-wrapper';
+  div.innerHTML = html;
+  document.body.appendChild(div);
+}
+
+function closeBookingOverlay() {
+  const el = document.getElementById('booking-overlay-wrapper');
+  if (el) el.remove();
 }
 
 async function downloadRunsheetPDF(date) {
