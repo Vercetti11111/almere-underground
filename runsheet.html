@@ -348,8 +348,8 @@ function switchTab(tab) {
 function tabNav() {
   return `
     <div class="rs-tabs no-print">
-      <button class="rs-tab ${activeTab === 'overzicht' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('overzicht')">📋 Overzicht</button>
       <button class="rs-tab ${activeTab === 'details' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('details')">📖 Details</button>
+      <button class="rs-tab ${activeTab === 'overzicht' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('overzicht')">📋 Overzicht en dagplanning</button>
     </div>`;
 }
 
@@ -532,13 +532,21 @@ async function renderOverview(forceRefresh = false) {
       return max > 0 ? String(max) : '';
     }
 
+    // Shorten name: "Frank Keijzer" → "Frank K."
+    function shortName(n) {
+      if (!n) return '';
+      const parts = n.trim().split(/\s+/);
+      if (parts.length <= 1) return n;
+      return parts[0] + ' ' + parts[parts.length - 1][0] + '.';
+    }
+
     // Filter staff to those whose shift covers the booking start time
     function staffForTime(startTime) {
-      if (!startTime || startTime === '99:99') return ovStaff; // no time known → show all
+      if (!startTime || startTime === '99:99') return ovStaff.map(shortName);
       return ovStaffFull.filter(s => {
-        if (!s.start || !s.end) return true; // no shift info → show
+        if (!s.start || !s.end) return true;
         return startTime >= s.start && startTime < s.end;
-      }).map(s => s.name);
+      }).map(s => shortName(s.name));
     }
 
     // Store bookings reference for conflict checking
@@ -574,8 +582,9 @@ async function renderOverview(forceRefresh = false) {
         ).join('');
         // If saved begeleider is not in filtered list (custom or different shift), add it
         const savedBeg = assign.begeleider || '';
-        const begExtraOpt = (savedBeg && !filteredStaff.includes(savedBeg))
-          ? `<option value="${savedBeg}" selected>${savedBeg}</option>` : '';
+        const savedBegShort = shortName(savedBeg);
+        const begExtraOpt = (savedBeg && !filteredStaff.includes(savedBeg) && !filteredStaff.includes(savedBegShort))
+          ? `<option value="${savedBeg}" selected>${shortName(savedBeg)}</option>` : '';
 
         const paxVal = getBookingPax(b);
         return `
@@ -731,6 +740,7 @@ async function downloadRunsheetPDF(date) {
   if (!data) { alert('Geen data geladen'); return; }
 
   const fmtE = v => '\u20AC' + (v || 0).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const shortN = n => { if (!n) return ''; const p = n.trim().split(/\s+/); return p.length <= 1 ? n : p[0] + ' ' + p[p.length-1][0] + '.'; };
   const allKF = data.kf || [];
   const allBF = data.bf || [];
 
@@ -843,7 +853,7 @@ async function downloadRunsheetPDF(date) {
         '#' + (bid || ''),
         getPax(b),
         (assign.tafel || '').replace(/^Tafel\s*/i, ''),
-        assign.begeleider || '',
+        shortN(assign.begeleider || ''),
         firstTime(b),
         { content: payStr, styles: { textColor: isPaid ? [21, 87, 36] : [180, 60, 0] } }
       ];
