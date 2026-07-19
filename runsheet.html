@@ -103,6 +103,25 @@
     .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
     .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
 
+    /* Tab navigation */
+    .rs-tabs { display:flex; gap:4px; margin-bottom:16px; }
+    .rs-tab { flex:1; text-align:center; padding:10px 6px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; border:none; transition:all 0.2s; }
+    .rs-tab-inactive { background:#1a1a24; color:#888; }
+    .rs-tab-inactive:hover { color:#ccc; }
+    .rs-tab-active { background:#7c3aed; color:#fff; }
+
+    /* Overview table */
+    .ov-section { margin-bottom:20px; border-radius:14px; overflow:hidden; }
+    .ov-header { padding:12px 16px; font-size:14px; font-weight:800; color:#fff; letter-spacing:0.04em; }
+    .ov-table { width:100%; border-collapse:collapse; font-size:12px; background:#1a1a24; }
+    .ov-table th { text-align:left; padding:8px 10px; color:#888; font-weight:600; border-bottom:1px solid #2a2a38; font-size:11px; }
+    .ov-table td { padding:8px 10px; border-bottom:1px solid #1e1e2a; color:#ddd; vertical-align:middle; }
+    .ov-table tr:last-child td { border-bottom:none; }
+    .ov-select { background:#0f0f13; color:#f1f1f5; border:1px solid #3a3a4a; border-radius:6px; padding:4px 6px; font-size:12px; width:100%; cursor:pointer; }
+    .ov-select:focus { border-color:#7c3aed; outline:none; }
+    .ov-save-indicator { font-size:10px; color:#22c55e; opacity:0; transition:opacity 0.3s; margin-left:4px; }
+    .ov-save-indicator.show { opacity:1; }
+
   </style>
 </head>
 <body>
@@ -261,8 +280,10 @@ async function refreshAll() {
   const btn = document.getElementById('refresh-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
   Object.keys(cache).forEach(k => delete cache[k]);
+  ovStaff = null; // refresh staff list
   try {
-    await renderRunsheet(true);
+    if (activeTab === 'overzicht') await renderOverview(true);
+    else await renderRunsheet(true);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔄'; }
   }
@@ -313,6 +334,24 @@ function cacheLabel(data) {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let rsDate = todayStr();
+let activeTab = 'details'; // 'overzicht' or 'details'
+let ovTables = null; // cached table list
+let ovStaff = null; // cached staff for current date
+let ovAssignments = {}; // current assignments {bookingId: {tafel, begeleider}}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  render();
+}
+
+function tabNav() {
+  return `
+    <div class="rs-tabs no-print">
+      <button class="rs-tab ${activeTab === 'overzicht' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('overzicht')">📋 Overzicht</button>
+      <button class="rs-tab ${activeTab === 'details' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('details')">📖 Details</button>
+    </div>`;
+}
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function dateNav() {
@@ -417,6 +456,7 @@ async function renderRunsheet(forceRefresh = false) {
 
     setContent(`
       ${dateNav()}
+      ${tabNav()}
       <div style="text-align:right;margin-bottom:14px;" class="no-print">
         <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">${t('downloadPdf')}</button>
       </div>
@@ -430,7 +470,159 @@ async function renderRunsheet(forceRefresh = false) {
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
-function downloadRunsheetPDF(date) {
+// ── OVERVIEW TAB ──────────────────────────────────────────────────────────────
+async function renderOverview(forceRefresh = false) {
+  setContent(spinner());
+  try {
+    // Load runsheet data, tables, staff, and assignments in parallel
+    const [data, tables, staff, assignments] = await Promise.all([
+      api(`/api/runsheet?date=${rsDate}`, forceRefresh),
+      ovTables || api('/api/runsheet-tables'),
+      api(`/api/runsheet-staff?date=${rsDate}`, forceRefresh),
+      api(`/api/runsheet-assignments?date=${rsDate}`, forceRefresh)
+    ]);
+
+    lastRunsheetData = data;
+    ovTables = tables;
+    ovStaff = staff;
+    ovAssignments = assignments || {};
+
+    const allBookings = [...(data.kf || []), ...(data.bf || [])];
+
+    // Sort by earliest start time
+    function getFirstTime(b) {
+      const acts = b.activities || [];
+      if (!acts.length) return '99:99';
+      let earliest = '99:99';
+      for (const a of acts) {
+        const st = a.startTime || '';
+        const t = st.length <= 5 ? st : st.substring(11, 16);
+        if (t && t < earliest) earliest = t;
+      }
+      return earliest;
+    }
+
+    function renderSection(bookings, title, colorClass, bgColor) {
+      if (!bookings.length) return '';
+
+      const sorted = bookings.slice().sort((a, b) => getFirstTime(a).localeCompare(getFirstTime(b)));
+
+      const rows = sorted.map(b => {
+        const bid = String(b.id || b.bookingReference || '');
+        const assign = ovAssignments[bid] || {};
+        const isPaid = b.paymentStatus === 'paid';
+        const amountPaid = (b.total || 0) - (b.amountOwing || 0);
+        const fmtE = v => '€' + (v || 0).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
+        const payText = isPaid
+          ? `<span style="color:#22c55e;font-weight:600;">${t('paid')}: ${fmtE(b.total)}</span>`
+          : `<span style="color:#f59e0b;font-weight:600;">${t('outstanding')}: ${fmtE(b.amountOwing)}</span><br><span style="font-size:11px;color:#999;">${t('paid')}: ${fmtE(amountPaid)}</span>`;
+
+        const ft = getFirstTime(b);
+        const timeStr = ft !== '99:99' ? ft : '—';
+
+        // Table dropdown
+        const tableOptions = (ovTables || []).map(t =>
+          `<option value="${t}" ${assign.tafel === t ? 'selected' : ''}>${t}</option>`
+        ).join('');
+
+        // Staff dropdown
+        const staffOptions = (ovStaff || []).map(s =>
+          `<option value="${s}" ${assign.begeleider === s ? 'selected' : ''}>${s}</option>`
+        ).join('');
+
+        return `
+          <tr>
+            <td style="font-weight:600;">${b.name || '—'}</td>
+            <td>${b.contactName || '—'}</td>
+            <td>${b.contactPhone || '—'}</td>
+            <td style="color:#999;font-size:11px;">#${bid}</td>
+            <td>
+              <select class="ov-select" onchange="saveAssignment('${bid}','tafel',this.value,this)">
+                <option value="">— Kies —</option>
+                ${tableOptions}
+              </select>
+            </td>
+            <td>
+              <select class="ov-select" onchange="saveAssignment('${bid}','begeleider',this.value,this)">
+                <option value="">— Kies —</option>
+                ${staffOptions}
+              </select>
+            </td>
+            <td style="text-align:center;">${timeStr}</td>
+            <td>${payText}</td>
+          </tr>`;
+      }).join('');
+
+      return `
+        <div class="ov-section">
+          <div class="ov-header" style="background:${bgColor};">${title} — ${bookings.length === 1 ? '1 boeking' : bookings.length + ' boekingen'}</div>
+          <table class="ov-table">
+            <tr>
+              <th>Reserveringsnaam</th>
+              <th>Contact</th>
+              <th>Telefoon</th>
+              <th>Boeking</th>
+              <th>Tafel</th>
+              <th>Begeleider</th>
+              <th>Begintijd</th>
+              <th>Betaald / Openstaand</th>
+            </tr>
+            ${rows}
+          </table>
+        </div>`;
+    }
+
+    const kfHtml = renderSection(data.kf || [], '🎂 ' + t('kfTitle'), 'rs-kf', '#7c1a1a');
+    const bfHtml = renderSection(data.bf || [], '🏢 ' + t('bfTitle'), 'rs-bf', '#1a3060');
+    const empty = !allBookings.length ? `<div class="rs-empty">${t('noBookings')} ${fmtDate(rsDate)}</div>` : '';
+
+    setContent(`
+      ${dateNav()}
+      ${tabNav()}
+      <div style="text-align:right;margin-bottom:14px;" class="no-print">
+        <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">${t('downloadPdf')}</button>
+      </div>
+      ${kfHtml}${bfHtml}${empty}
+      ${cacheLabel(data)}
+    `);
+  } catch (e) { setContent(errMsg(e.message)); }
+}
+
+// ── Save assignment ──────────────────────────────────────────────────────────
+let saveTimer = null;
+async function saveAssignment(bookingId, field, value, selectEl) {
+  if (!ovAssignments[bookingId]) ovAssignments[bookingId] = {};
+  ovAssignments[bookingId][field] = value;
+
+  // Show save indicator
+  const indicator = selectEl?.parentElement?.querySelector('.ov-save-indicator');
+
+  // Debounce save
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const url = `${WORKER}/api/runsheet-assignments?date=${rsDate}`;
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Access-Code': accessCode },
+        body: JSON.stringify(ovAssignments)
+      });
+      // Flash save indicator on the select
+      if (selectEl) {
+        selectEl.style.borderColor = '#22c55e';
+        setTimeout(() => { selectEl.style.borderColor = ''; }, 800);
+      }
+    } catch (e) {
+      console.error('Save failed:', e);
+      if (selectEl) {
+        selectEl.style.borderColor = '#ef4444';
+        setTimeout(() => { selectEl.style.borderColor = ''; }, 800);
+      }
+    }
+  }, 300);
+}
+
+async function downloadRunsheetPDF(date) {
   const { jsPDF } = window.jspdf;
   const data = lastRunsheetData;
   if (!data) { alert('Geen data geladen'); return; }
@@ -438,6 +630,16 @@ function downloadRunsheetPDF(date) {
   const fmtE = v => '\u20AC' + (v || 0).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
   const allKF = data.kf || [];
   const allBF = data.bf || [];
+
+  // Load saved assignments for PDF
+  let pdfAssignments = ovAssignments;
+  if (!pdfAssignments || !Object.keys(pdfAssignments).length) {
+    try {
+      const r = await fetch(`${WORKER}/api/runsheet-assignments?date=${date}`, { headers: { 'X-Access-Code': accessCode } });
+      pdfAssignments = await r.json();
+      if (pdfAssignments.error) pdfAssignments = {};
+    } catch(e) { pdfAssignments = {}; }
+  }
 
   // Helper: first activity start time
   function firstTime(b) {
@@ -515,6 +717,8 @@ function downloadRunsheetPDF(date) {
 
   function buildOverviewRows(bookings) {
     return bookings.map(b => {
+      const bid = String(b.id || b.bookingReference || '');
+      const assign = pdfAssignments[bid] || {};
       const isPaid = b.paymentStatus === 'paid';
       const amtPaid = (b.total || 0) - (b.amountOwing || 0);
       const payStr = isPaid
@@ -524,9 +728,9 @@ function downloadRunsheetPDF(date) {
         b.name || '',
         b.contactName || '',
         b.contactPhone || '',
-        '#' + (b.id || ''),
-        '',  // Tafel
-        '',  // Begeleider
+        '#' + (bid || ''),
+        assign.tafel || '',
+        assign.begeleider || '',
         firstTime(b),
         { content: payStr, styles: { textColor: isPaid ? [21, 87, 36] : [180, 60, 0] } }
       ];
@@ -692,6 +896,9 @@ function downloadRunsheetPDF(date) {
       const isPaid = badge && badge.classList.contains('pay-paid');
       const idEl = bk.querySelector('.rs-booking-id');
       const bookingId = idEl ? idEl.textContent.trim() : '';
+      // Extract numeric booking ID for assignment lookup
+      const numericId = bookingId.replace(/[^0-9]/g, '');
+      const bkAssign = pdfAssignments[numericId] || {};
       const contactEl = bk.querySelector('.rs-contact');
       const contactInfo = contactEl ? contactEl.textContent.trim() : '';
       const notes = bk.querySelector('.rs-notes');
@@ -747,7 +954,7 @@ function downloadRunsheetPDF(date) {
           rows.push([
             { content: infoLines, colSpan: 2, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
-            { content: 'Tafel:', colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: 'Tafel: ' + (bkAssign.tafel || ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
           // Column headers
           if (colHeaders.length > 0) {
@@ -818,17 +1025,21 @@ function downloadRunsheetPDF(date) {
     drawAftHeader();
     aftPages.push(doc.internal.getNumberOfPages());
 
-    const checkRows = sortByTime(allKF).map(b => [
-      b.name || '',
-      '',               // Tafel (leeg)
-      firstTime(b),     // Aankomsttijd
-      hasLimo(b) ? 'Ja' : 'Nee',  // Limo
-      '',               // Eten & Tijd
-      '',               // Taart & Tijd
-      '',               // Gezongen
-      '',               // Gegeten
-      ''                // Bijzonderheden
-    ]);
+    const checkRows = sortByTime(allKF).map(b => {
+      const bid = String(b.id || b.bookingReference || '');
+      const ca = pdfAssignments[bid] || {};
+      return [
+        b.name || '',
+        ca.tafel || '',     // Tafel (opgeslagen of leeg)
+        firstTime(b),       // Aankomsttijd
+        hasLimo(b) ? 'Ja' : 'Nee',  // Limo
+        '',                 // Eten & Tijd
+        '',                 // Taart & Tijd
+        '',                 // Gezongen
+        '',                 // Gegeten
+        ''                  // Bijzonderheden
+      ];
+    });
 
     doc.autoTable({
       startY: 37,
@@ -878,7 +1089,8 @@ function downloadRunsheetPDF(date) {
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
   if (!accessCode) return;
-  renderRunsheet(false);
+  if (activeTab === 'overzicht') renderOverview(false);
+  else renderRunsheet(false);
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────────
