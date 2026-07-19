@@ -682,38 +682,67 @@ async function copyReserveringen() {
   if (!grouped) return;
 
   const cols = ['Tijd','Bedrijf','Klantnaam','Pax','Activiteit','Foods','Drinks','Begeleiding','Status'];
-  let text = '';
+
+  // Build HTML table
+  let html = '';
+  let plain = '';
+  const thStyle = 'background:#1e293b;color:#fff;padding:6px 10px;text-align:left;font-size:13px;border:1px solid #334155;';
+  const tdStyle = 'padding:5px 10px;font-size:13px;border:1px solid #e2e8f0;';
 
   for (const [dateStr, bookings] of Object.entries(grouped)) {
-    text += '\n' + fmtPrintDate(dateStr) + '\n';
-    text += cols.join('\t') + '\n';
+    html += '<p style="font-weight:bold;font-size:14px;margin:12px 0 4px;">' + fmtPrintDate(dateStr) + '</p>';
+    html += '<table style="border-collapse:collapse;width:100%;margin-bottom:12px;">';
+    html += '<tr>' + cols.map(c => '<th style="' + thStyle + '">' + c + '</th>').join('') + '</tr>';
+    plain += '\n' + fmtPrintDate(dateStr) + '\n';
+    plain += cols.join('\t') + '\n';
     for (const b of bookings) {
       const r = getBookingRow(b);
-      text += [r.tijd, r.bedrijf, r.klant, r.pax, r.activiteit, r.foods, r.drinks, r.begeleiding, r.status].join('\t') + '\n';
+      const vals = [r.tijd, r.bedrijf, r.klant, r.pax, r.activiteit, r.foods, r.drinks, r.begeleiding, r.status];
+      const statusColor = (r.status === 'Op te volgen') ? 'color:red;font-weight:bold;' : '';
+      html += '<tr>' + vals.map((v, i) => {
+        const extra = (i === vals.length - 1) ? statusColor : '';
+        return '<td style="' + tdStyle + extra + '">' + (v || '') + '</td>';
+      }).join('') + '</tr>';
+      plain += vals.join('\t') + '\n';
     }
+    html += '</table>';
   }
 
-  if (!text.trim()) { alert('Geen reserveringen in de geselecteerde periode.'); return; }
+  if (!plain.trim()) { alert('Geen reserveringen in de geselecteerde periode.'); return; }
+
+  const showSuccess = () => {
+    const btn = document.querySelector('.print-btn[onclick*="copy"]');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Gekopieerd!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  };
 
   try {
-    await navigator.clipboard.writeText(text.trim());
-    const btn = document.querySelector('.print-btn[onclick*="copy"]');
-    const orig = btn.textContent;
-    btn.textContent = '✅ Gekopieerd!';
-    setTimeout(() => btn.textContent = orig, 2000);
+    // Copy as both HTML (for email) and plain text (fallback)
+    const htmlBlob = new Blob([html], { type: 'text/html' });
+    const textBlob = new Blob([plain.trim()], { type: 'text/plain' });
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/html': htmlBlob,
+        'text/plain': textBlob
+      })
+    ]);
+    showSuccess();
   } catch(e) {
-    // Fallback for non-secure contexts
-    const ta = document.createElement('textarea');
-    ta.value = text.trim();
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    const btn = document.querySelector('.print-btn[onclick*="copy"]');
-    const orig = btn.textContent;
-    btn.textContent = '✅ Gekopieerd!';
-    setTimeout(() => btn.textContent = orig, 2000);
+    // Fallback: copy plain text
+    try {
+      await navigator.clipboard.writeText(plain.trim());
+      showSuccess();
+    } catch(e2) {
+      const ta = document.createElement('textarea');
+      ta.value = plain.trim();
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showSuccess();
+    }
   }
 }
 
