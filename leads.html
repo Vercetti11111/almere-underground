@@ -695,7 +695,7 @@ async function copyReserveringen() {
   const tableStyle = 'border-collapse:collapse;width:1000px;margin-bottom:12px;table-layout:fixed;';
 
   for (const [dateStr, bookings] of Object.entries(grouped)) {
-    html += '<p style="font-weight:bold;font-size:14px;margin:12px 0 4px;">' + fmtPrintDate(dateStr) + '</p>';
+    html += '<p style="font-weight:bold;font-size:14px;margin:24px 0 6px;">' + fmtPrintDate(dateStr) + '</p>';
     html += '<table style="' + tableStyle + '">';
     html += '<colgroup>' + colWidths.map(w => '<col style="width:' + w + '">').join('') + '</colgroup>';
     html += '<tr>' + cols.map(c => '<th style="' + thBase + '">' + c + '</th>').join('') + '</tr>';
