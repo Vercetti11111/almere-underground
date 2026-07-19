@@ -545,12 +545,15 @@ function downloadRunsheetPDF(date) {
 
       const padL = 5; // consistent left padding
 
-      // Booking name as sub-header above the table (same style as section header)
+      // Booking name as sub-header — same style as section bar (colored bg, white text)
       doc.setFontSize(10);
       doc.setFont(undefined, 'bold');
-      doc.setTextColor(30, 30, 30);
-      doc.text(name, leftM + padL, y + 5);
-      y += 9;
+      doc.setFillColor(currentSectionRgb[0], currentSectionRgb[1], currentSectionRgb[2]);
+      doc.setTextColor(255, 255, 255);
+      doc.roundedRect(leftM, y - 2, pw, 7, 1, 1, 'F');
+      doc.text(name, leftM + 2, y + 3);
+      doc.setTextColor(0, 0, 0);
+      y += 8;
 
       doc.autoTable({
         startY: y,
@@ -562,12 +565,17 @@ function downloadRunsheetPDF(date) {
         body: (function() {
           const rows = [];
 
-          // Row 1: Booking ID + contact | Badge | Tafel
-          const idContactLine = bookingId + (contactInfo ? '\n' + contactInfo : '');
+          // Row 1: Booking ID + boeker + phone (each on own line) | Badge | Tafel
+          // Split contact: "Jan Jansen · +316..." → name on line 2, phone on line 3
+          let idLines = bookingId;
+          if (contactInfo) {
+            const parts = contactInfo.split(/\s*[·]\s*/);
+            parts.forEach(p => { if (p.trim()) idLines += '\n' + p.trim(); });
+          }
           rows.push([
-            { content: idContactLine, colSpan: 2, styles: { fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
-            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
-            { content: 'Tafel:', colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: idLines, colSpan: 2, styles: { fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
+            { content: 'Tafel:', colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
 
           // Column headers
