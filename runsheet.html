@@ -58,7 +58,7 @@
     .rs-booking-id { font-size:12px; color:#ccc; }
     .rs-contact { font-size:12px; color:#999; margin-top:2px; }
     .rs-contact { font-size:12px; color:#999; margin-top:2px; }
-    .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; padding:0 16px; }
+    .rs-table { width:calc(100% - 32px); border-collapse:collapse; font-size:12px; margin:0 16px 10px; }
     .rs-table th, .rs-table td { padding-left:16px; }
     .rs-table th { text-align:left; color:#888; font-weight:600; padding:4px 6px 4px 0; border-bottom:1px solid #2a2a38; }
     .rs-table td { padding:5px 6px 5px 0; vertical-align:top; border-bottom:1px solid #1e1e2a; color:#ddd; }
@@ -368,15 +368,14 @@ async function renderRunsheet(forceRefresh = false) {
 
       const notes = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ') || t('noNotes');
 
-      const contactLine = [b.contactName, b.contactPhone].filter(Boolean).join(' · ');
-
       return `
         <div class="rs-booking">
           <div class="rs-booking-name-header">${b.name}</div>
           <div class="rs-booking-top">
             <div class="rs-booking-left">
+              ${b.contactName ? `<div class="rs-contact" style="color:#ccc;font-weight:600;">${b.contactName}</div>` : ''}
+              ${b.contactPhone ? `<div class="rs-contact">${b.contactPhone}</div>` : ''}
               <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
-              ${contactLine ? `<div class="rs-contact">${contactLine}</div>` : ''}
             </div>
             <div class="rs-booking-right">
               <span class="pay-badge ${payClass}">${payLabel}</span>
