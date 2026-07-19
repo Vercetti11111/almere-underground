@@ -706,10 +706,10 @@ async function copyReserveringen() {
   // Build HTML table
   let html = '';
   let plain = '';
-  const colWidths = ['7%','15%','12%','5%','18%','16%','14%','8%','5%'];
+  const colWidths = ['70px','150px','120px','50px','180px','160px','130px','85px','55px'];
   const thBase = 'background:#1e293b;color:#fff;padding:6px 8px;text-align:left;font-size:13px;border:1px solid #334155;word-wrap:break-word;';
   const tdBase = 'padding:5px 8px;font-size:13px;border:1px solid #e2e8f0;word-wrap:break-word;vertical-align:top;';
-  const tableStyle = 'border-collapse:collapse;width:100%;max-width:800px;margin-bottom:12px;table-layout:fixed;';
+  const tableStyle = 'border-collapse:collapse;width:1000px;margin-bottom:12px;table-layout:fixed;';
 
   for (const [dateStr, bookings] of Object.entries(grouped)) {
     html += '<p style="font-weight:bold;font-size:14px;margin:12px 0 4px;">' + fmtPrintDate(dateStr) + '</p>';
