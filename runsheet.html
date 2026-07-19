@@ -50,11 +50,12 @@
     .rs-bf { background:#1a3060; }
     .rs-booking { background:#1a1a24; margin-bottom:1px; padding:14px 16px; }
     .rs-booking:last-child { border-radius:0 0 14px 14px; }
-    .rs-booking-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:2px; }
-    .rs-booking-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .rs-booking-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+    .rs-booking-left { flex:1; min-width:0; }
+    .rs-booking-right { flex-shrink:0; text-align:right; margin-left:12px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
     .rs-booking-name { font-size:15px; font-weight:700; }
-    .rs-booking-id { font-size:11px; color:#666; }
-    .rs-contact { font-size:12px; color:#444; margin-top:2px; }
+    .rs-booking-id { font-size:11px; color:#888; margin-top:3px; }
+    .rs-contact { font-size:12px; color:#999; margin-top:2px; }
     .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; }
     .rs-table th { text-align:left; color:#888; font-weight:600; padding:4px 6px 4px 0; border-bottom:1px solid #2a2a38; }
     .rs-table td { padding:5px 6px 5px 0; vertical-align:top; border-bottom:1px solid #1e1e2a; color:#ddd; }
@@ -364,14 +365,15 @@ async function renderRunsheet(forceRefresh = false) {
 
       return `
         <div class="rs-booking">
-          <div class="rs-booking-header">
-            <div class="rs-booking-name">${b.name}</div>
-            <span class="pay-badge ${payClass}">${payLabel}</span>
-          </div>
-          <div class="rs-booking-meta">
-            <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
-            ${b.contactName || b.contactPhone ? `<div class="rs-contact">${b.contactName || ''}${b.contactName && b.contactPhone ? ' · ' : ''}${b.contactPhone || ''}</div>` : ''}
-            <div class="rs-tafel">Tafel:</div>
+          <div class="rs-booking-top">
+            <div class="rs-booking-left">
+              <div class="rs-booking-name">${b.name}</div>
+              <div class="rs-booking-id">${t('bookingNr')}${b.id}${b.contactName || b.contactPhone ? '  ·  ' + (b.contactName || '') + (b.contactName && b.contactPhone ? ' · ' : '') + (b.contactPhone || '') : ''}</div>
+            </div>
+            <div class="rs-booking-right">
+              <span class="pay-badge ${payClass}">${payLabel}</span>
+              <div class="rs-tafel">Tafel:</div>
+            </div>
           </div>
           ${actRows ? `
           <table class="rs-table">
