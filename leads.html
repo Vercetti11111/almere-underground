@@ -620,14 +620,19 @@ async function doRefresh() {
 
 
 // ── Print reserveringen ──────────────────────────────────────────────────────
-// Sync date labels
-  function syncDateLabel(inputId, labelId) {
-    const val = document.getElementById(inputId).value;
-    if (val) {
-      const d = new Date(val + 'T12:00:00');
-      document.getElementById(labelId).textContent = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
+function syncDateLabel(inputId, labelId) {
+  const val = document.getElementById(inputId).value;
+  if (val) {
+    const d = new Date(val + 'T12:00:00');
+    document.getElementById(labelId).textContent = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
   }
+}
+
+function initPrintDates() {
+  const today = new Date();
+  const from = today.toISOString().slice(0,10);
+  const toD = new Date(today); toD.setDate(toD.getDate() + 30);
+  const to = toD.toISOString().slice(0,10);
   document.getElementById('printFrom').value = from;
   document.getElementById('printTo').value = to;
   document.getElementById('printFrom').addEventListener('change', function() { syncDateLabel('printFrom','printFromLabel'); });
