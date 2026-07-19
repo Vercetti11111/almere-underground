@@ -473,7 +473,10 @@ function downloadRunsheetPDF(date) {
         y = 15;
       }
 
-      // Booking name + pay badge
+      // Remember start Y for border
+      const bookingStartY = y - 2;
+
+      // Booking name (left) + pay badge (right-aligned)
       const nameEl = bk.querySelector('.rs-booking-name');
       const name = nameEl ? nameEl.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
       const badge = bk.querySelector('.pay-badge');
@@ -482,33 +485,29 @@ function downloadRunsheetPDF(date) {
 
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
-      doc.text(name, 12, y + 1);
+      doc.text(name, 14, y + 1);
 
       if (badgeText) {
-        const nameW = doc.getTextWidth(name);
         doc.setFontSize(8);
         doc.setFont(undefined, 'bold');
         const bw = doc.getTextWidth(badgeText) + 6;
+        const badgeX = 10 + pw - bw;
         doc.setFillColor(isPaid ? 212 : 255, isPaid ? 237 : 243, isPaid ? 218 : 205);
-        doc.roundedRect(14 + nameW + 4, y - 3, bw, 5, 1, 1, 'F');
+        doc.roundedRect(badgeX, y - 3, bw, 5, 1, 1, 'F');
         doc.setTextColor(isPaid ? 21 : 133, isPaid ? 87 : 100, isPaid ? 36 : 0);
-        doc.text(badgeText, 14 + nameW + 7, y + 0.5);
+        doc.text(badgeText, badgeX + 3, y + 0.5);
         doc.setTextColor(0, 0, 0);
       }
       y += 5;
 
-      // Booking ID
+      // Booking ID + Tafel on same line
       const idEl = bk.querySelector('.rs-booking-id');
       if (idEl) {
         doc.setFontSize(8);
         doc.setFont(undefined, 'normal');
         doc.setTextColor(120, 120, 120);
-        doc.text(idEl.textContent.trim(), 12, y);
-        doc.setTextColor(0, 0, 0);
-        y += 4;
+        doc.text(idEl.textContent.trim(), 14, y);
       }
-
-      // Tafel
       doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
       doc.setTextColor(100, 100, 100);
@@ -521,18 +520,18 @@ function downloadRunsheetPDF(date) {
       // Activities table
       if (rows.length > 0) {
         const headers = bk.querySelectorAll('.rs-table thead th');
-        const colX = [12, 70, 115, 140, 165];
+        const colX = [14, 70, 115, 140, 165];
+        // Column headers
         doc.setFontSize(8);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(100, 100, 100);
         headers.forEach((th, i) => {
           if (colX[i] !== undefined) doc.text(th.textContent.trim(), colX[i], y);
         });
-        y += 1;
-        doc.setDrawColor(200, 200, 200);
-        doc.line(12, y, 10 + pw, y);
-        y += 3;
+        y += 4;
+        doc.setTextColor(0, 0, 0);
 
+        // Table rows
         doc.setFont(undefined, 'normal');
         doc.setTextColor(30, 30, 30);
         doc.setFontSize(8);
@@ -549,14 +548,11 @@ function downloadRunsheetPDF(date) {
         y += 2;
       }
 
-      // Notes
+      // Notes (no grey fill)
       if (notes) {
         const noteText = notes.textContent.replace(/^Opmerkingen\s*/i, '').replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
         if (noteText) {
-          doc.setFillColor(245, 245, 245);
-          const lines = doc.splitTextToSize(noteText, pw - 8);
-          const boxH = lines.length * 4 + 4;
-          doc.roundedRect(12, y - 2, pw - 4, boxH, 1, 1, 'F');
+          const lines = doc.splitTextToSize(noteText, pw - 10);
           doc.setFontSize(7);
           doc.setFont(undefined, 'bold');
           doc.setTextColor(150, 150, 150);
@@ -565,14 +561,15 @@ function downloadRunsheetPDF(date) {
           doc.setFontSize(8);
           doc.setTextColor(80, 80, 80);
           doc.text(lines, 14, y + 5);
-          y += boxH + 4;
+          y += lines.length * 4 + 8;
         }
       }
 
-      // Separator
-      doc.setDrawColor(220, 220, 220);
-      doc.line(12, y, 10 + pw, y);
-      y += 6;
+      // Border around entire booking
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.rect(10, bookingStartY, pw, y - bookingStartY + 1);
+      y += 5;
     });
   });
 
