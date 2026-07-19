@@ -495,7 +495,7 @@ async function renderOverview(forceRefresh = false) {
   setContent(spinner());
   try {
     // Load runsheet data, tables, staff, and assignments in parallel
-    const [data, tables, staff, assignments] = await Promise.all([
+    const [data, tables, staffRaw, assignments] = await Promise.all([
       api(`/api/runsheet?date=${rsDate}`, forceRefresh),
       ovTables || api('/api/runsheet-tables'),
       api(`/api/runsheet-staff?date=${rsDate}`, forceRefresh),
@@ -503,8 +503,11 @@ async function renderOverview(forceRefresh = false) {
     ]);
 
     lastRunsheetData = data;
-    ovTables = tables;
-    ovStaff = staff;
+    // Strip "Tafel " prefix from table names — show only the number
+    ovTables = (tables || []).map(t => typeof t === 'string' ? t.replace(/^Tafel\s*/i, '') : t);
+    // Staff now comes as [{name, start, end}] — store full objects
+    ovStaffFull = Array.isArray(staffRaw) ? staffRaw : [];
+    ovStaff = ovStaffFull.map(s => typeof s === 'string' ? s : s.name);
     ovAssignments = assignments || {};
 
     const allBookings = [...(data.kf || []), ...(data.bf || [])];
@@ -521,6 +524,25 @@ async function renderOverview(forceRefresh = false) {
       }
       return earliest;
     }
+
+    // PAX = highest quantity across activities
+    function getBookingPax(b) {
+      let max = 0;
+      for (const a of (b.activities || [])) { if ((a.quantity || 0) > max) max = a.quantity; }
+      return max > 0 ? String(max) : '';
+    }
+
+    // Filter staff to those whose shift covers the booking start time
+    function staffForTime(startTime) {
+      if (!startTime || startTime === '99:99') return ovStaff; // no time known → show all
+      return ovStaffFull.filter(s => {
+        if (!s.start || !s.end) return true; // no shift info → show
+        return startTime >= s.start && startTime < s.end;
+      }).map(s => s.name);
+    }
+
+    // Store bookings reference for conflict checking
+    window._ovAllBookings = allBookings;
 
     function renderSection(bookings, title, colorClass, bgColor) {
       if (!bookings.length) return '';
@@ -540,15 +562,20 @@ async function renderOverview(forceRefresh = false) {
         const ft = getFirstTime(b);
         const timeStr = ft !== '99:99' ? ft : '—';
 
-        // Table dropdown
-        const tableOptions = (ovTables || []).map(t =>
-          `<option value="${t}" ${assign.tafel === t ? 'selected' : ''}>${t}</option>`
+        // Table dropdown — add "Anders..." option
+        const tableOptions = (ovTables || []).map(tn =>
+          `<option value="${tn}" ${assign.tafel === tn ? 'selected' : ''}>${tn}</option>`
         ).join('');
 
-        // Staff dropdown
-        const staffOptions = (ovStaff || []).map(s =>
+        // Staff dropdown — filter by booking start time + add "Anders..." option
+        const filteredStaff = staffForTime(ft !== '99:99' ? ft : null);
+        const staffOptions = filteredStaff.map(s =>
           `<option value="${s}" ${assign.begeleider === s ? 'selected' : ''}>${s}</option>`
         ).join('');
+        // If saved begeleider is not in filtered list (custom or different shift), add it
+        const savedBeg = assign.begeleider || '';
+        const begExtraOpt = (savedBeg && !filteredStaff.includes(savedBeg))
+          ? `<option value="${savedBeg}" selected>${savedBeg}</option>` : '';
 
         const paxVal = getBookingPax(b);
         return `
@@ -558,15 +585,18 @@ async function renderOverview(forceRefresh = false) {
             <td>${b.contactPhone || '—'}</td>
             <td style="color:#999;font-size:11px;">#${bid}</td>
             <td>
-              <select class="ov-select" onchange="saveAssignment('${bid}','tafel',this.value,this)">
+              <select class="ov-select" data-bid="${bid}" data-field="tafel" onchange="handleAssignmentChange(this,'${bid}','tafel')">
                 <option value="">— Kies —</option>
                 ${tableOptions}
+                <option value="__anders__">Anders…</option>
               </select>
             </td>
             <td>
-              <select class="ov-select" onchange="saveAssignment('${bid}','begeleider',this.value,this)">
+              <select class="ov-select" data-bid="${bid}" data-field="begeleider" onchange="handleAssignmentChange(this,'${bid}','begeleider')">
                 <option value="">— Kies —</option>
+                ${begExtraOpt}
                 ${staffOptions}
+                <option value="__anders__">Anders…</option>
               </select>
             </td>
             <td style="text-align:center;">${timeStr}</td>
@@ -609,14 +639,66 @@ async function renderOverview(forceRefresh = false) {
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
-// ── Save assignment ──────────────────────────────────────────────────────────
+// ── Assignment handler (conflict check + "Anders" popup) ─────────────────────
 let saveTimer = null;
-async function saveAssignment(bookingId, field, value, selectEl) {
+let ovStaffFull = []; // [{name, start, end}]
+
+function handleAssignmentChange(selectEl, bookingId, field) {
+  const value = selectEl.value;
+
+  // "Anders…" → prompt for manual input
+  if (value === '__anders__') {
+    const label = field === 'tafel' ? 'Voer een tafelnummer in:' : 'Voer een naam in:';
+    const custom = prompt(label);
+    if (!custom || !custom.trim()) {
+      // Cancelled → revert to previous value
+      const prev = (ovAssignments[bookingId] || {})[field] || '';
+      selectEl.value = prev;
+      return;
+    }
+    const val = custom.trim();
+    // Add custom option to select
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = val;
+    opt.selected = true;
+    // Insert before "Anders…"
+    const andersOpt = selectEl.querySelector('option[value="__anders__"]');
+    selectEl.insertBefore(opt, andersOpt);
+    selectEl.value = val;
+    doSaveAssignment(bookingId, field, val, selectEl);
+    return;
+  }
+
+  // Conflict check for tafel
+  if (field === 'tafel' && value) {
+    // Find other bookings assigned to the same table
+    const conflicts = [];
+    for (const [bid, a] of Object.entries(ovAssignments)) {
+      if (bid !== bookingId && a.tafel === value) {
+        // Find booking name
+        const allB = window._ovAllBookings || [];
+        const match = allB.find(b => String(b.id || b.bookingReference || '') === bid);
+        conflicts.push(match ? match.name : `#${bid}`);
+      }
+    }
+    if (conflicts.length > 0) {
+      const msg = `⚠️ Tafel ${value} is al toegewezen aan:\n\n${conflicts.map(c => '• ' + c).join('\n')}\n\nWeet je zeker dat je deze tafel wilt toewijzen?`;
+      if (!confirm(msg)) {
+        // Revert to previous value
+        const prev = (ovAssignments[bookingId] || {})[field] || '';
+        selectEl.value = prev;
+        return;
+      }
+    }
+  }
+
+  doSaveAssignment(bookingId, field, value, selectEl);
+}
+
+function doSaveAssignment(bookingId, field, value, selectEl) {
   if (!ovAssignments[bookingId]) ovAssignments[bookingId] = {};
   ovAssignments[bookingId][field] = value;
-
-  // Show save indicator
-  const indicator = selectEl?.parentElement?.querySelector('.ov-save-indicator');
 
   // Debounce save
   clearTimeout(saveTimer);
@@ -760,7 +842,7 @@ async function downloadRunsheetPDF(date) {
         b.contactPhone || '',
         '#' + (bid || ''),
         getPax(b),
-        assign.tafel || '',
+        (assign.tafel || '').replace(/^Tafel\s*/i, ''),
         assign.begeleider || '',
         firstTime(b),
         { content: payStr, styles: { textColor: isPaid ? [21, 87, 36] : [180, 60, 0] } }
@@ -1009,7 +1091,7 @@ async function downloadRunsheetPDF(date) {
             { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: timePaxLines, styles: { fontSize: 9, fontStyle: 'bold', textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
-            { content: 'Tafel: ' + (bkAssign.tafel || ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: 'Tafel: ' + (bkAssign.tafel || '').replace(/^Tafel\s*/i, ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
           // Column headers
           if (colHeaders.length > 0) {
@@ -1086,7 +1168,7 @@ async function downloadRunsheetPDF(date) {
       return [
         b.name || '',
         getPax(b),          // PAX
-        ca.tafel || '',     // Tafel (opgeslagen of leeg)
+        (ca.tafel || '').replace(/^Tafel\s*/i, ''),     // Tafel (opgeslagen of leeg)
         firstTime(b),       // Aankomsttijd
         hasLimo(b) ? 'Ja' : 'Nee',  // Limo
         '',                 // Eten & Tijd
