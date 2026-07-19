@@ -69,6 +69,9 @@
     .rs-tafel { font-size:15px; font-weight:700; color:#f1f1f5; }
     .pay-paid { background:#166534; }
     .pay-unpaid { background:#92400e; }
+    @media (max-width:600px) {
+      .ov-table .ov-hide-mobile { display:none !important; }
+    }
     .rs-empty { text-align:center; padding:32px; color:#555; font-size:13px; background:#1a1a24; border-radius:12px; }
 
     @media print {
@@ -590,9 +593,9 @@ async function renderOverview(forceRefresh = false) {
         return `
           <tr>
             <td style="font-weight:600;">${b.name || '—'}<span style="float:right;font-weight:400;color:#aaa;font-size:12px;">${paxVal ? paxVal + ' pax' : ''}</span></td>
-            <td>${b.contactName || '—'}</td>
-            <td>${b.contactPhone || '—'}</td>
-            <td style="color:#999;font-size:11px;">#${bid}</td>
+            <td class="ov-hide-mobile">${b.contactName || '—'}</td>
+            <td class="ov-hide-mobile">${b.contactPhone || '—'}</td>
+            <td class="ov-hide-mobile" style="color:#999;font-size:11px;">#${bid}</td>
             <td>
               <select class="ov-select" data-bid="${bid}" data-field="tafel" onchange="handleAssignmentChange(this,'${bid}','tafel')">
                 <option value="">— Kies —</option>
@@ -619,9 +622,9 @@ async function renderOverview(forceRefresh = false) {
           <table class="ov-table">
             <tr>
               <th>Reserveringsnaam</th>
-              <th>Contact</th>
-              <th>Telefoon</th>
-              <th>Boeking</th>
+              <th class="ov-hide-mobile">Contact</th>
+              <th class="ov-hide-mobile">Telefoon</th>
+              <th class="ov-hide-mobile">Boeking</th>
               <th>Tafel</th>
               <th>Begeleider</th>
               <th>Begintijd</th>
@@ -843,11 +846,11 @@ async function downloadRunsheetPDF(date) {
     return bookings.map(b => {
       const bid = String(b.id || b.bookingReference || '');
       const assign = pdfAssignments[bid] || {};
-      const isPaid = b.paymentStatus === 'paid';
+      const isPaid = b.paymentStatus === 'paid' || (b.amountOwing || 0) <= 0;
       const amtPaid = (b.total || 0) - (b.amountOwing || 0);
       const payStr = isPaid
-        ? 'Betaald: ' + fmtE(b.total)
-        : 'Openstaand: ' + fmtE(b.amountOwing) + '\nBetaald: ' + fmtE(amtPaid);
+        ? 'BETAALD'
+        : 'Betaald: ' + fmtE(amtPaid) + '\nOpenstaand: ' + fmtE(b.amountOwing);
       return [
         b.name || '',
         b.contactName || '',
@@ -1018,21 +1021,21 @@ async function downloadRunsheetPDF(date) {
       infoLines += (infoLines ? '\n' : '') + bookingId;
 
       // Activities table
-      const colHeaders = ['Activiteit', 'Subtype', 'Begintijd', 'Personen', 'Prijs'];
+      const colHeaders = ['Activiteit', 'Subtype', 'Begintijd', 'Personen', 'Locatie'];
       const tableBody = (b.activities || []).map(a => [
         a.mainActivity || a.name || '',
         a.subtype || '',
         (a.startTime || '').substring(0, 5),
         String(a.quantity || ''),
-        fmtE(a.totalPrice || a.price || 0)
+        (a.locations || []).join(', ') || '—'
       ]);
 
       // Payment badge
       const totalPaid = (b.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
       const totalPrice = b.totalPrice || 0;
-      const isPaid = totalPaid >= totalPrice && totalPrice > 0;
-      const openAmt = totalPrice - totalPaid;
-      const badgePdf = isPaid ? 'BETAALD' : ('OPEN ' + fmtE(openAmt));
+      const openAmt = Math.max(0, totalPrice - totalPaid);
+      const isPaid = openAmt <= 0;
+      const badgePdf = isPaid ? 'BETAALD' : ('Open: ' + fmtE(openAmt));
 
       // Pax + begintijd
       const detailPax = getPax(b);
