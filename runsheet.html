@@ -488,70 +488,99 @@ function downloadRunsheetPDF(date) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const lpw = 277; // landscape page width (297 - 2×10)
 
-  // Title
-  doc.setFontSize(18); doc.setFont(undefined, 'bold');
-  doc.text('Run Sheet', leftM, 15);
-  doc.setFontSize(11); doc.setFont(undefined, 'normal');
-  doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
+  // Track frontpage pages for numbering
+  const frontpagePages = [];
 
+  function drawFrontpageHeader() {
+    doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
+    doc.text('Run Sheet', leftM, 15);
+    doc.setFontSize(11); doc.setFont(undefined, 'normal');
+    doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
+    return 32;
+  }
+
+  drawFrontpageHeader();
+  frontpagePages.push(doc.internal.getNumberOfPages());
   let fy = 32;
 
-  // Helper: draw a section overview table
-  function drawOverviewSection(bookings, sectionLabel, rgb) {
-    if (!bookings.length) return;
-    // Section bar
-    doc.setFontSize(10); doc.setFont(undefined, 'bold');
-    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-    doc.setTextColor(255, 255, 255);
-    doc.roundedRect(leftM, fy - 4, lpw, 7, 1, 1, 'F');
-    const countLabel = bookings.length === 1 ? '1 boeking' : bookings.length + ' boekingen';
-    doc.text(sectionLabel + ' \u2014 ' + countLabel, leftM + 2, fy + 1);
-    doc.setTextColor(0, 0, 0);
-    fy += 4;
+  // Build combined rows for one big autoTable so page breaks work smoothly
+  const fpAllRows = [];
 
-    const rows = bookings.map(b => {
+  function addOverviewRows(bookings, sectionLabel, rgb) {
+    if (!bookings.length) return;
+    const countLabel = bookings.length === 1 ? '1 boeking' : bookings.length + ' boekingen';
+    // Section separator row
+    fpAllRows.push({
+      _sectionBar: true,
+      _label: sectionLabel + ' \u2014 ' + countLabel,
+      _rgb: rgb,
+      cells: [{ content: sectionLabel + ' \u2014 ' + countLabel, colSpan: 8,
+        styles: { fillColor: rgb, textColor: [255,255,255], fontStyle: 'bold', fontSize: 10, cellPadding: {top:3,bottom:3,left:2,right:2} }
+      }]
+    });
+    bookings.forEach(b => {
       const isPaid = b.paymentStatus === 'paid';
       const amtPaid = (b.total || 0) - (b.amountOwing || 0);
       const payStr = isPaid
         ? 'Betaald: ' + fmtE(b.total)
         : 'Openstaand: ' + fmtE(b.amountOwing) + '\nBetaald: ' + fmtE(amtPaid);
-      return [
+      fpAllRows.push([
         b.name || '',
         b.contactName || '',
         b.contactPhone || '',
         '#' + (b.id || ''),
-        '',  // Tafel — empty
-        '',  // Begeleider — empty
+        '',  // Tafel
+        '',  // Begeleider
         firstTime(b),
         { content: payStr, styles: { textColor: isPaid ? [21, 87, 36] : [180, 60, 0] } }
-      ];
+      ]);
     });
-
-    doc.autoTable({
-      startY: fy,
-      margin: { left: leftM, right: leftM },
-      tableWidth: lpw,
-      theme: 'grid',
-      headStyles: { fillColor: rgb, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
-      styles: { fontSize: 8, cellPadding: 2, textColor: [30,30,30], lineWidth: 0.3, lineColor: [190,190,190] },
-      head: [['Reserveringsnaam', 'Contactnaam', 'Telefoon', 'Boeking ID', 'Tafel', 'Begeleider', 'Begintijd', 'Betaald / Openstaand']],
-      body: rows,
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 38 },
-        2: { cellWidth: 32 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 22 },
-        5: { cellWidth: 30 },
-        6: { cellWidth: 22 },
-        7: { cellWidth: lpw - 50 - 38 - 32 - 25 - 22 - 30 - 22 }
-      }
-    });
-    fy = doc.lastAutoTable.finalY + 6;
   }
 
-  drawOverviewSection(allKF, 'Kinderfeestjes (KF)', kfRgb);
-  drawOverviewSection(allBF, 'Bedrijfsfeesten (BF)', bfRgb);
+  addOverviewRows(allKF, 'Kinderfeestjes (KF)', kfRgb);
+  addOverviewRows(allBF, 'Bedrijfsfeesten (BF)', bfRgb);
+
+  // Convert to body array
+  const fpBody = fpAllRows.map(r => r.cells ? r.cells : r);
+
+  doc.autoTable({
+    startY: fy,
+    margin: { left: leftM, right: leftM, top: 32 },
+    tableWidth: lpw,
+    theme: 'grid',
+    headStyles: { fillColor: [60,60,60], textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
+    styles: { fontSize: 8, cellPadding: 2, textColor: [30,30,30], lineWidth: 0.3, lineColor: [190,190,190] },
+    head: [['Reserveringsnaam', 'Contactnaam', 'Telefoon', 'Boeking ID', 'Tafel', 'Begeleider', 'Begintijd', 'Betaald / Openstaand']],
+    body: fpBody,
+    columnStyles: {
+      0: { cellWidth: 50 },
+      1: { cellWidth: 38 },
+      2: { cellWidth: 32 },
+      3: { cellWidth: 25 },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 30 },
+      6: { cellWidth: 22 },
+      7: { cellWidth: lpw - 50 - 38 - 32 - 25 - 22 - 30 - 22 }
+    },
+    didDrawPage: function(d) {
+      const pg = doc.internal.getNumberOfPages();
+      if (frontpagePages.indexOf(pg) === -1) frontpagePages.push(pg);
+      // Repeat header on continuation pages
+      if (d.pageNumber > 1) {
+        drawFrontpageHeader();
+      }
+    }
+  });
+
+  // Add page numbers to frontpage pages
+  const fpTotal = frontpagePages.length;
+  if (fpTotal > 1) {
+    frontpagePages.forEach((pg, idx) => {
+      doc.setPage(pg);
+      doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(120,120,120);
+      doc.text((idx + 1) + '/' + fpTotal, 297 - leftM, 10, { align: 'right' });
+    });
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // DETAIL PAGES — Portrait, per booking
@@ -729,22 +758,27 @@ function downloadRunsheetPDF(date) {
   // ═══════════════════════════════════════════════════════════════════════════
   if (allKF.length > 0) {
     doc.addPage('a4', 'landscape');
-    // Title
-    doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
-    doc.text('Aftekenlijst Kinderfeestjes', leftM, 15);
-    doc.setFontSize(11); doc.setFont(undefined, 'normal');
-    doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
 
-    // Section bar
-    let cy = 32;
-    doc.setFontSize(10); doc.setFont(undefined, 'bold');
-    doc.setFillColor(kfRgb[0], kfRgb[1], kfRgb[2]);
-    doc.setTextColor(255,255,255);
-    doc.roundedRect(leftM, cy - 4, lpw, 7, 1, 1, 'F');
+    const aftPages = [];
     const ckLabel = allKF.length === 1 ? '1 boeking' : allKF.length + ' boekingen';
-    doc.text('Kinderfeestjes (KF) \u2014 ' + ckLabel, leftM + 2, cy + 1);
-    doc.setTextColor(0,0,0);
-    cy += 4;
+    const aftHeaderText = 'Kinderfeestjes (KF) \u2014 ' + ckLabel;
+
+    function drawAftHeader() {
+      doc.setFontSize(18); doc.setFont(undefined, 'bold'); doc.setTextColor(0,0,0);
+      doc.text('Aftekenlijst Kinderfeestjes', leftM, 15);
+      doc.setFontSize(11); doc.setFont(undefined, 'normal');
+      doc.text('Almere Underground \u2014 ' + fmtDateLong(date), leftM, 22);
+      // Section bar
+      doc.setFontSize(10); doc.setFont(undefined, 'bold');
+      doc.setFillColor(kfRgb[0], kfRgb[1], kfRgb[2]);
+      doc.setTextColor(255,255,255);
+      doc.roundedRect(leftM, 28, lpw, 7, 1, 1, 'F');
+      doc.text(aftHeaderText, leftM + 2, 33);
+      doc.setTextColor(0,0,0);
+    }
+
+    drawAftHeader();
+    aftPages.push(doc.internal.getNumberOfPages());
 
     const checkRows = allKF.map(b => [
       b.name || '',
@@ -759,8 +793,8 @@ function downloadRunsheetPDF(date) {
     ]);
 
     doc.autoTable({
-      startY: cy,
-      margin: { left: leftM, right: leftM },
+      startY: 37,
+      margin: { left: leftM, right: leftM, top: 37 },
       tableWidth: lpw,
       theme: 'grid',
       headStyles: { fillColor: kfRgb, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
@@ -777,8 +811,25 @@ function downloadRunsheetPDF(date) {
         6: { cellWidth: 25 },
         7: { cellWidth: 25 },
         8: { cellWidth: lpw - 50 - 22 - 22 - 18 - 30 - 30 - 25 - 25 }
+      },
+      didDrawPage: function(d) {
+        const pg = doc.internal.getNumberOfPages();
+        if (aftPages.indexOf(pg) === -1) aftPages.push(pg);
+        if (d.pageNumber > 1) {
+          drawAftHeader();
+        }
       }
     });
+
+    // Add page numbers to aftekenlijst pages
+    const aftTotal = aftPages.length;
+    if (aftTotal > 1) {
+      aftPages.forEach((pg, idx) => {
+        doc.setPage(pg);
+        doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(120,120,120);
+        doc.text((idx + 1) + '/' + aftTotal, 297 - leftM, 10, { align: 'right' });
+      });
+    }
   }
 
   doc.save(`RunSheet-${date}.pdf`);
