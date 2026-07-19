@@ -29,7 +29,7 @@
     @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
 
     /* App */
-    #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; }
+    #app-screen { display:block; max-width:1200px; margin:0 auto; padding:16px 12px 90px; }
 
     /* Common */
     .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
@@ -44,7 +44,7 @@
     #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
 
     /* Runsheet */
-    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; max-width:900px; margin-left:auto; margin-right:auto; }
+    .rs-section { border-radius:14px; overflow:hidden; margin-bottom:20px; max-width:1200px; margin-left:auto; margin-right:auto; }
     .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
     .rs-kf { background:#7c1a1a; }
     .rs-bf { background:#1a3060; }
@@ -90,7 +90,7 @@
   
     /* ── Desktop / View Mode ────────────────────────── */
     body.desktop-mode #app-screen,
-    body.force-desktop #app-screen { max-width:900px; padding:24px 32px 90px; }
+    body.force-desktop #app-screen { max-width:1200px; padding:24px 32px 90px; }
     body.desktop-mode .rs-section,
     body.force-desktop .rs-section { }
     body.desktop-mode .rs-booking,
@@ -349,7 +349,7 @@ function tabNav() {
   return `
     <div class="rs-tabs no-print">
       <button class="rs-tab ${activeTab === 'details' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('details')">📖 Details</button>
-      <button class="rs-tab ${activeTab === 'overzicht' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('overzicht')">📋 Overzicht en dagplanning</button>
+      <button class="rs-tab ${activeTab === 'overzicht' ? 'rs-tab-active' : 'rs-tab-inactive'}" onclick="switchTab('overzicht')">📋 Dagplanning</button>
     </div>`;
 }
 
@@ -719,6 +719,8 @@ function doSaveAssignment(bookingId, field, value, selectEl) {
         headers: { 'Content-Type': 'application/json', 'X-Access-Code': accessCode },
         body: JSON.stringify(ovAssignments)
       });
+      // Keep local cache in sync so tab switch doesn't revert
+      cache[`/api/runsheet-assignments?date=${rsDate}`] = JSON.parse(JSON.stringify(ovAssignments));
       // Flash save indicator on the select
       if (selectEl) {
         selectEl.style.borderColor = '#22c55e';
@@ -1065,7 +1067,7 @@ async function downloadRunsheetPDF(date) {
           // Info row — contact left | begintijd+pax right | badge | tafel
           rows.push([
             { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
-            { content: rightCell, styles: { fontSize: 8, textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: rightCell, styles: { fontStyle: 'bold', fontSize: 10, textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
             { content: 'Tafel: ' + (bkAssign.tafel || '').replace(/^Tafel\s*/i, ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
