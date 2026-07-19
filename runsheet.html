@@ -1054,35 +1054,35 @@ async function downloadRunsheetPDF(date) {
         margin: { left: leftM, right: leftM },
         tableWidth: ppw,
         theme: 'plain',
-        styles: { lineWidth: 0.3, lineColor: [190,190,190], cellPadding: { top: 2, bottom: 2, left: padL, right: 3 }, fontSize: 10, textColor: [30,30,30] },
+        styles: { lineWidth: 0.3, lineColor: [190,190,190], cellPadding: { top: 2, bottom: 2, left: padL, right: 3 }, fontSize: 8, textColor: [30,30,30] },
         head: [],
         body: (function() {
           const rows = [];
           // Info row — contact left | begintijd+pax right | badge | tafel
           rows.push([
-            { content: infoLines, styles: { fontSize: 10, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: rightCell, styles: { fontStyle: 'bold', fontSize: 10, textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
-            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 10, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
+            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
             { content: 'Tafel: ' + (bkAssign.tafel || '').replace(/^Tafel\s*/i, ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
           // Column headers
           const hdrRow = [];
           for (let i = 0; i < 5; i++) {
-            hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 10, textColor: [130,130,130], cellPadding: { top: 2, bottom: 1, left: padL, right: 1 } } });
+            hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 7, textColor: [0,0,0], cellPadding: { top: 2, bottom: 1, left: padL, right: 1 } } });
           }
           rows.push(hdrRow);
           // Data rows
           tableBody.forEach(cells => {
             const row = [];
             for (let i = 0; i < 5; i++) {
-              row.push({ content: cells[i] || '', styles: { fontSize: 10, cellPadding: { top: 1, bottom: 1, left: padL, right: 1 } } });
+              row.push({ content: cells[i] || '', styles: { fontSize: 7.5, cellPadding: { top: 1, bottom: 1, left: padL, right: 1 } } });
             }
             rows.push(row);
           });
           // Notes
           if (noteText) {
             rows.push([
-              { content: 'Opmerkingen: ' + noteText, colSpan: 5, styles: { fontSize: 10, textColor: [60,60,60], cellPadding: { top: 2, bottom: 4, left: padL, right: 3 } } }
+              { content: 'Opmerkingen: ' + noteText, colSpan: 5, styles: { fontSize: 7.5, textColor: [60,60,60], cellPadding: { top: 2, bottom: 4, left: padL, right: 3 } } }
             ]);
           }
           return rows;
