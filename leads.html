@@ -136,7 +136,8 @@
     .cl-to { color: #22c55e; }
     .cl-new { color: #3b82f6; }
     .changelog-btn { background: #3b82f622 !important; color: #3b82f6 !important; }
-  </style>
+        input[type="date"] { color-scheme: dark; }
+    </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -191,15 +192,9 @@
     <div id="printControls" class="no-print" style="display:none;margin:8px 0;padding:10px;background:#1a1a24;border-radius:10px;">
       <div style="display:flex;gap:10px;align-items:center;justify-content:center;">
         <label style="font-size:13px;color:#888;font-weight:600;">Van:</label>
-        <div style="position:relative;">
-          <div id="printFromLabel" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 12px;color:#f1f1f5;font-size:13px;min-width:110px;text-align:center;pointer-events:none;"></div>
-          <input type="date" id="printFrom" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;background:transparent;z-index:10;" />
-        </div>
+        <input type="date" id="printFrom" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 12px;color:#f1f1f5;font-size:13px;min-width:110px;text-align:center;cursor:pointer;-webkit-appearance:none;" />
         <label style="font-size:13px;color:#888;font-weight:600;">Tot:</label>
-        <div style="position:relative;">
-          <div id="printToLabel" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 12px;color:#f1f1f5;font-size:13px;min-width:110px;text-align:center;pointer-events:none;"></div>
-          <input type="date" id="printTo" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;background:transparent;z-index:10;" />
-        </div>
+        <input type="date" id="printTo" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 12px;color:#f1f1f5;font-size:13px;min-width:110px;text-align:center;cursor:pointer;-webkit-appearance:none;" />
       </div>
       <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;">
         <button class="print-btn" onclick="copyReserveringen()" style="background:#10b981;">📋 Kopieer</button>
@@ -620,25 +615,13 @@ async function doRefresh() {
 
 
 // ── Print reserveringen ──────────────────────────────────────────────────────
-function syncDateLabel(inputId, labelId) {
-  const val = document.getElementById(inputId).value;
-  if (val) {
-    const d = new Date(val + 'T12:00:00');
-    document.getElementById(labelId).textContent = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-}
-
 function initPrintDates() {
   const today = new Date();
   const from = today.toISOString().slice(0,10);
-  const toD = new Date(today); toD.setDate(toD.getDate() + 30);
+  const toD = new Date(today); toD.setDate(toD.getDate() + 60);
   const to = toD.toISOString().slice(0,10);
   document.getElementById('printFrom').value = from;
   document.getElementById('printTo').value = to;
-  document.getElementById('printFrom').addEventListener('change', function() { syncDateLabel('printFrom','printFromLabel'); });
-  document.getElementById('printTo').addEventListener('change', function() { syncDateLabel('printTo','printToLabel'); });
-  syncDateLabel('printFrom','printFromLabel');
-  syncDateLabel('printTo','printToLabel');
 }
 initPrintDates();
 
