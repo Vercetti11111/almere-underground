@@ -694,20 +694,25 @@ async function copyReserveringen() {
   const tdBase = 'padding:5px 8px;font-size:13px;border:1px solid #e2e8f0;word-wrap:break-word;vertical-align:top;';
   const tableStyle = 'border-collapse:collapse;width:1000px;margin-bottom:12px;table-layout:fixed;';
 
+  let first = true;
   for (const [dateStr, bookings] of Object.entries(grouped)) {
-    html += '<p style="font-weight:bold;font-size:14px;margin:24px 0 6px;">' + fmtPrintDate(dateStr) + '</p>';
+    if (!first) html += '<br>';
+    first = false;
+    html += '<p style="font-weight:bold;font-size:14px;margin:0 0 4px;">' + fmtPrintDate(dateStr) + '</p>';
     html += '<table style="' + tableStyle + '">';
     html += '<colgroup>' + colWidths.map(w => '<col style="width:' + w + '">').join('') + '</colgroup>';
-    html += '<tr>' + cols.map(c => '<th style="' + thBase + '">' + c + '</th>').join('') + '</tr>';
+    html += '<tr>' + cols.map((c, i) => '<th style="' + thBase + 'width:' + colWidths[i] + ';">' + c + '</th>').join('') + '</tr>';
     plain += '\n' + fmtPrintDate(dateStr) + '\n';
     plain += cols.join('\t') + '\n';
     for (const b of bookings) {
       const r = getBookingRow(b);
       const vals = [r.tijd, r.bedrijf, r.klant, r.pax, r.activiteit, r.foods, r.drinks, r.begeleiding, r.status];
-      const statusColor = (r.status === 'Op te volgen') ? 'color:red;font-weight:bold;' : '';
       html += '<tr>' + vals.map((v, i) => {
-        const extra = (i === vals.length - 1) ? statusColor : '';
-        return '<td style="' + tdBase + extra + '">' + (v || '') + '</td>';
+        let cellVal = v || '';
+        if (i === vals.length - 1 && r.status === 'Op te volgen') {
+          cellVal = '<span style="color:red;font-weight:bold;">' + cellVal + '</span>';
+        }
+        return '<td style="' + tdBase + 'width:' + colWidths[i] + ';">' + cellVal + '</td>';
       }).join('') + '</tr>';
       plain += vals.join('\t') + '\n';
     }
