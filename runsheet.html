@@ -54,6 +54,7 @@
     .rs-booking-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
     .rs-booking-name { font-size:15px; font-weight:700; }
     .rs-booking-id { font-size:11px; color:#666; }
+    .rs-contact { font-size:12px; color:#444; margin-top:2px; }
     .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; }
     .rs-table th { text-align:left; color:#888; font-weight:600; padding:4px 6px 4px 0; border-bottom:1px solid #2a2a38; }
     .rs-table td { padding:5px 6px 5px 0; vertical-align:top; border-bottom:1px solid #1e1e2a; color:#ddd; }
@@ -371,6 +372,7 @@ async function renderRunsheet(forceRefresh = false) {
           </div>
           <div class="rs-booking-meta">
             <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
+            ${b.contactName || b.contactPhone ? `<div class="rs-contact">${b.contactName || ''}${b.contactName && b.contactPhone ? ' · ' : ''}${b.contactPhone || ''}</div>` : ''}
             <div class="rs-tafel"><span class="rs-tafel-label">Tafel:</span> <span class="rs-tafel-line"></span></div>
           </div>
           ${actRows ? `
@@ -474,6 +476,8 @@ function downloadRunsheetPDF(date) {
       const isPaid = badge && badge.classList.contains('pay-paid');
       const idEl = bk.querySelector('.rs-booking-id');
       const bookingId = idEl ? idEl.textContent.trim() : '';
+      const contactEl = bk.querySelector('.rs-contact');
+      const contactInfo = contactEl ? contactEl.textContent.trim() : '';
 
       // Build table body: activity rows from HTML
       const allTR = bk.querySelectorAll('.rs-table tr');
@@ -512,12 +516,20 @@ function downloadRunsheetPDF(date) {
         body: (function() {
           const rows = [];
 
-          // Row 1: Name (span 2 cols, left) | Badge (center) | Tafel (left, span 2 cols)
+          // Row 1: Name (bold, 10pt) | Badge (center) | Tafel (left)
           rows.push([
-            { content: name + (bookingId ? '  (' + bookingId + ')' : ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 3, bottom: 1, left: 3, right: 1 } } },
+            { content: name, colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 3, bottom: 1, left: 3, right: 1 } } },
             { content: badgeText, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 1, left: 2, right: 2 } } },
             { content: 'Tafel: _______________', colSpan: 2, styles: { halign: 'left', fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 3, bottom: 1, left: 3, right: 1 } } },
           ]);
+
+          // Row 2: Booking ID + contact info (smaller font, grey)
+          const subLine = [bookingId, contactInfo].filter(Boolean).join('  ·  ');
+          if (subLine) {
+            rows.push([
+              { content: subLine, colSpan: 5, styles: { fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 0, bottom: 1, left: 3, right: 1 } } }
+            ]);
+          }
 
           // Row 2: Column headers
           if (colHeaders.length > 0) {
