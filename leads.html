@@ -139,28 +139,6 @@
   </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/nl.js"></script>
-<style>
-  .flatpickr-calendar { background: #1a1a24 !important; border: 1px solid #2a2a3a !important; }
-  .flatpickr-day { color: #f1f1f5 !important; }
-  .flatpickr-day.selected { background: #6366f1 !important; border-color: #6366f1 !important; }
-  .flatpickr-day:hover { background: #2a2a3a !important; }
-  .flatpickr-months .flatpickr-month { color: #f1f1f5 !important; fill: #f1f1f5 !important; }
-  .flatpickr-current-month .flatpickr-monthDropdown-months { background: #1a1a24 !important; color: #f1f1f5 !important; }
-  .flatpickr-current-month input.cur-year { color: #f1f1f5 !important; }
-  span.flatpickr-weekday { color: #888 !important; }
-  .flatpickr-months .flatpickr-prev-month, .flatpickr-months .flatpickr-next-month { fill: #f1f1f5 !important; }
-  .flatpickr-day.flatpickr-disabled { color: #444 !important; }
-  .flatpickr-innerContainer { background: #1a1a24 !important; }
-  .flatpickr-rContainer { background: #1a1a24 !important; }
-  .flatpickr-weekdays { background: #1a1a24 !important; }
-  .flatpickr-monthDropdown-months option { background: #1a1a24 !important; }
-  .numInputWrapper:hover { background: transparent !important; }
-  .flatpickr-day.today { border-color: #6366f1 !important; }
-</style>
 </head>
 <body>
 <div class="container">
@@ -211,11 +189,19 @@
 
     <!-- Print controls (reservations tab only) -->
     <div id="printControls" class="no-print" style="display:none;margin:8px 0;padding:10px;background:#1a1a24;border-radius:10px;">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <label style="font-size:12px;color:#888;">Van:</label>
-        <input type="text" id="printFrom" placeholder="Selecteer datum" readonly style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 10px;color:#f1f1f5;font-size:13px;cursor:pointer;width:130px;" />
-        <label style="font-size:12px;color:#888;">Tot:</label>
-        <input type="text" id="printTo" placeholder="Selecteer datum" readonly style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 10px;color:#f1f1f5;font-size:13px;cursor:pointer;width:130px;" />
+      <div style="display:flex;gap:10px;align-items:center;justify-content:center;">
+        <label style="font-size:13px;color:#888;font-weight:600;">Van:</label>
+        <div style="position:relative;">
+          <div id="printFromLabel" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 12px;color:#f1f1f5;font-size:13px;min-width:110px;text-align:center;pointer-events:none;"></div>
+          <input type="date" id="printFrom" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;background:transparent;z-index:10;" />
+        </div>
+        <label style="font-size:13px;color:#888;font-weight:600;">Tot:</label>
+        <div style="position:relative;">
+          <div id="printToLabel" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:6px 12px;color:#f1f1f5;font-size:13px;min-width:110px;text-align:center;pointer-events:none;"></div>
+          <input type="date" id="printTo" style="position:absolute;inset:0;opacity:0.001;border:none;cursor:pointer;background:transparent;z-index:10;" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;">
         <button class="print-btn" onclick="copyReserveringen()" style="background:#10b981;">📋 Kopieer</button>
         <button class="print-btn" onclick="pdfReserveringen()">🖨️ PDF</button>
       </div>
@@ -634,25 +620,20 @@ async function doRefresh() {
 
 
 // ── Print reserveringen ──────────────────────────────────────────────────────
-let fpFrom, fpTo;
-function initPrintDates() {
-  const today = new Date();
-  const from = today.toISOString().substring(0, 10);
-  const future = new Date(today.getTime() + 60 * 24 * 3600 * 1000);
-  const to = future.toISOString().substring(0, 10);
-
-  const fpConfig = {
-    locale: 'nl',
-    dateFormat: 'Y-m-d',
-    altInput: true,
-    altFormat: 'j F Y',
-    disableMobile: true,
-    allowInput: false,
-    clickOpens: true,
-    animate: true
-  };
-  fpFrom = flatpickr('#printFrom', { ...fpConfig, defaultDate: from });
-  fpTo = flatpickr('#printTo', { ...fpConfig, defaultDate: to });
+// Sync date labels
+  function syncDateLabel(inputId, labelId) {
+    const val = document.getElementById(inputId).value;
+    if (val) {
+      const d = new Date(val + 'T12:00:00');
+      document.getElementById(labelId).textContent = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  }
+  document.getElementById('printFrom').value = from;
+  document.getElementById('printTo').value = to;
+  document.getElementById('printFrom').addEventListener('change', function() { syncDateLabel('printFrom','printFromLabel'); });
+  document.getElementById('printTo').addEventListener('change', function() { syncDateLabel('printTo','printToLabel'); });
+  syncDateLabel('printFrom','printFromLabel');
+  syncDateLabel('printTo','printToLabel');
 }
 initPrintDates();
 
