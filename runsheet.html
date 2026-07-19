@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Almere Underground – Run Sheet</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     ::-webkit-scrollbar { display: none; }
@@ -421,69 +421,157 @@ async function renderRunsheet(forceRefresh = false) {
 }
 
 function downloadRunsheetPDF(date) {
-  // Build a clean print container
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:0;top:0;width:700px;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:20px;z-index:99999;overflow:auto;max-height:100vh;';
-  document.body.appendChild(container);
+  // Build print container — use jsPDF directly for reliability
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pw = 190; // page width minus margins
+  let y = 15;
+  const lh = 5; // line height
 
   // Header
-  container.innerHTML = `
-    <div style="margin-bottom:16px;">
-      <div style="font-size:20pt;font-weight:800;color:#000;">Run Sheet</div>
-      <div style="font-size:12pt;color:#555;">Almere Underground — ${fmtDateLong(date)}</div>
-    </div>
-  `;
+  doc.setFontSize(18);
+  doc.setFont(undefined, 'bold');
+  doc.text('Run Sheet', 10, y);
+  y += 7;
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'normal');
+  doc.text('Almere Underground — ' + fmtDateLong(date), 10, y);
+  y += 10;
 
-  // Collect all booking sections
+  // Collect sections
   const sections = document.querySelectorAll('.rs-section');
   sections.forEach(sec => {
-    const clone = sec.cloneNode(true);
-    // Style for print
-    clone.style.cssText = 'border:1.5px solid #ccc;border-radius:6px;overflow:hidden;margin-bottom:14px;max-width:none;';
-    // Section header
-    const hdr = clone.querySelector('.rs-section-header');
-    if (hdr) hdr.style.cssText += 'color:#fff;padding:8px 14px;font-size:13pt;';
-    // Each booking: avoid page break inside
-    clone.querySelectorAll('.rs-booking').forEach(bk => {
-      bk.style.cssText = 'background:#fff;border-bottom:1px solid #ddd;padding:10px 14px;color:#000;page-break-inside:avoid;break-inside:avoid;';
-      // Name
-      bk.querySelectorAll('.rs-booking-name').forEach(n => n.style.cssText = 'font-size:13pt;font-weight:700;color:#000;');
-      // ID
-      bk.querySelectorAll('.rs-booking-id').forEach(n => n.style.cssText = 'font-size:9pt;color:#555;');
+    const hdr = sec.querySelector('.rs-section-header');
+    const sectionTitle = hdr ? hdr.textContent.trim() : '';
+    const bookings = sec.querySelectorAll('.rs-booking');
+
+    bookings.forEach(bk => {
+      // Estimate height for this booking to check page break
+      const rows = bk.querySelectorAll('.rs-table tbody tr');
+      const notes = bk.querySelector('.rs-notes');
+      const estH = 30 + rows.length * 5 + (notes ? 12 : 0);
+
+      // If booking won't fit on current page, start new page
+      if (y + estH > 280) {
+        doc.addPage();
+        y = 15;
+      }
+
+      // Section label
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      const hdrBg = hdr ? getComputedStyle(hdr).backgroundColor : '#6366f1';
+      const rgb = hdrBg.match(/\d+/g);
+      if (rgb && rgb.length >= 3) doc.setFillColor(+rgb[0], +rgb[1], +rgb[2]);
+      else doc.setFillColor(99, 102, 241);
+      doc.setTextColor(255, 255, 255);
+      doc.roundedRect(10, y - 4, pw, 7, 1, 1, 'F');
+      doc.text(sectionTitle, 12, y + 1);
+      y += 8;
+      doc.setTextColor(0, 0, 0);
+
+      // Booking name + pay badge
+      const nameEl = bk.querySelector('.rs-booking-name');
+      const name = nameEl ? nameEl.textContent.trim() : '';
+      const badge = bk.querySelector('.pay-badge');
+      const badgeText = badge ? badge.textContent.trim() : '';
+      const isPaid = badge && badge.classList.contains('pay-paid');
+
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(name, 12, y + 1);
+
+      if (badgeText) {
+        const nameW = doc.getTextWidth(name);
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'bold');
+        const bw = doc.getTextWidth(badgeText) + 6;
+        doc.setFillColor(isPaid ? 212 : 255, isPaid ? 237 : 243, isPaid ? 218 : 205);
+        doc.roundedRect(14 + nameW + 4, y - 3, bw, 5, 1, 1, 'F');
+        doc.setTextColor(isPaid ? 21 : 133, isPaid ? 87 : 100, isPaid ? 36 : 0);
+        doc.text(badgeText, 14 + nameW + 7, y + 0.5);
+        doc.setTextColor(0, 0, 0);
+      }
+      y += 5;
+
+      // Booking ID
+      const idEl = bk.querySelector('.rs-booking-id');
+      if (idEl) {
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(120, 120, 120);
+        doc.text(idEl.textContent.trim(), 12, y);
+        doc.setTextColor(0, 0, 0);
+        y += 4;
+      }
+
       // Tafel
-      bk.querySelectorAll('.rs-tafel').forEach(n => n.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:10pt;color:#555;');
-      bk.querySelectorAll('.rs-tafel-line').forEach(n => n.style.cssText = 'display:inline-block;width:80px;border-bottom:1px dashed #999;');
-      // Table
-      bk.querySelectorAll('.rs-table').forEach(tbl => {
-        tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:6px;';
-        tbl.querySelectorAll('th').forEach(th => th.style.cssText = 'text-align:left;color:#555;font-weight:600;padding:3px 4px;border-bottom:1px solid #ccc;');
-        tbl.querySelectorAll('td').forEach(td => td.style.cssText = 'padding:3px 4px;color:#222;border-bottom:1px solid #eee;');
-      });
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Tafel: _______________', 12, y);
+      doc.setTextColor(0, 0, 0);
+      y += 5;
+
+      // Activities table
+      if (rows.length > 0) {
+        const headers = bk.querySelectorAll('.rs-table thead th');
+        const colX = [12, 70, 115, 140, 165];
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(100, 100, 100);
+        headers.forEach((th, i) => {
+          if (colX[i] !== undefined) doc.text(th.textContent.trim(), colX[i], y);
+        });
+        y += 1;
+        doc.setDrawColor(200, 200, 200);
+        doc.line(12, y, 10 + pw, y);
+        y += 3;
+
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(30, 30, 30);
+        doc.setFontSize(8);
+        rows.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          cells.forEach((td, i) => {
+            if (colX[i] !== undefined) {
+              const txt = td.textContent.trim().substring(0, 40);
+              doc.text(txt, colX[i], y);
+            }
+          });
+          y += lh;
+        });
+        y += 2;
+      }
+
       // Notes
-      bk.querySelectorAll('.rs-notes').forEach(n => n.style.cssText = 'background:#f5f5f5;border-radius:4px;padding:6px 10px;font-size:9pt;color:#444;margin-top:6px;');
-      bk.querySelectorAll('.rs-notes-label').forEach(n => n.style.cssText = 'font-size:8pt;color:#888;font-weight:600;text-transform:uppercase;margin-bottom:2px;');
-      // Pay badge
-      bk.querySelectorAll('.pay-badge').forEach(b => {
-        const isPaid = b.classList.contains('pay-paid');
-        b.style.cssText = `display:inline-block;padding:2px 10px;border-radius:999px;font-size:9pt;font-weight:700;border:1px solid #888;color:#000;background:${isPaid ? '#d4edda' : '#fff3cd'};`;
-      });
+      if (notes) {
+        const noteText = notes.textContent.replace(/^Opmerkingen\s*/i, '').trim();
+        if (noteText) {
+          doc.setFillColor(245, 245, 245);
+          const lines = doc.splitTextToSize(noteText, pw - 8);
+          const boxH = lines.length * 4 + 4;
+          doc.roundedRect(12, y - 2, pw - 4, boxH, 1, 1, 'F');
+          doc.setFontSize(7);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(150, 150, 150);
+          doc.text('OPMERKINGEN', 14, y + 1);
+          doc.setFont(undefined, 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          doc.text(lines, 14, y + 5);
+          y += boxH + 4;
+        }
+      }
+
+      // Separator
+      doc.setDrawColor(220, 220, 220);
+      doc.line(12, y, 10 + pw, y);
+      y += 6;
     });
-    container.appendChild(clone);
   });
 
-  // Generate PDF
-  const opt = {
-    margin: [10, 10, 10, 10],
-    filename: `RunSheet-${date}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, width: 700 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['avoid-all', 'css'], avoid: '.rs-booking' }
-  };
-
-  html2pdf().set(opt).from(container).save().then(() => {
-    document.body.removeChild(container);
-  });
+  doc.save(`RunSheet-${date}.pdf`);
 }
 
 
