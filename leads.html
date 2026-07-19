@@ -137,6 +137,8 @@
     .cl-new { color: #3b82f6; }
     .changelog-btn { background: #3b82f622 !important; color: #3b82f6 !important; }
   </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -675,7 +677,7 @@ function getBookingRow(b) {
   };
 }
 
-function copyReserveringen() {
+async function copyReserveringen() {
   const grouped = getFilteredReserveringen();
   if (!grouped) return;
 
@@ -693,12 +695,26 @@ function copyReserveringen() {
 
   if (!text.trim()) { alert('Geen reserveringen in de geselecteerde periode.'); return; }
 
-  navigator.clipboard.writeText(text.trim()).then(() => {
-    const btn = event.target;
+  try {
+    await navigator.clipboard.writeText(text.trim());
+    const btn = document.querySelector('.print-btn[onclick*="copy"]');
     const orig = btn.textContent;
     btn.textContent = '✅ Gekopieerd!';
     setTimeout(() => btn.textContent = orig, 2000);
-  }).catch(() => alert('Kopiëren mislukt'));
+  } catch(e) {
+    // Fallback for non-secure contexts
+    const ta = document.createElement('textarea');
+    ta.value = text.trim();
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const btn = document.querySelector('.print-btn[onclick*="copy"]');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Gekopieerd!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  }
 }
 
 function pdfReserveringen() {
