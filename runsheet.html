@@ -444,7 +444,14 @@ function downloadRunsheetPDF(date) {
   function firstTime(b) {
     const acts = b.activities || [];
     if (!acts.length) return '';
-    return fmtTime(acts[0].startTime) || '';
+    // Find earliest startTime across all activities
+    let earliest = null;
+    for (const a of acts) {
+      if (!a.startTime) continue;
+      const t = new Date(a.startTime);
+      if (!earliest || t < earliest) earliest = t;
+    }
+    return earliest ? fmtTime(earliest.toISOString()) : '';
   }
 
   // Helper: has limo (subtype contains 'drank')
