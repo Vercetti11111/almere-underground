@@ -6,6 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Almere Underground – Run Sheet</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     ::-webkit-scrollbar { display: none; }
@@ -462,143 +463,108 @@ function downloadRunsheetPDF(date) {
     }
 
     bookings.forEach(bk => {
-      // Estimate height for this booking to check page break
-      const rows = bk.querySelectorAll('.rs-table tbody tr');
       const notes = bk.querySelector('.rs-notes');
-      const estH = 30 + rows.length * 5 + (notes ? 12 : 0);
 
-      // If booking won't fit on current page, start new page
-      if (y + estH > 280) {
-        doc.addPage();
-        y = 15;
-      }
+      // ── Per-booking: build one autoTable with header row (name/badge/tafel) + activities + notes ──
 
-      // Padding before booking content
-      y += 2;
-      const bookingStartY = y;
-
-      // Helper: truncate text to fit within maxW
-      function fitText(doc, txt, maxW) {
-        if (doc.getTextWidth(txt) <= maxW) return txt;
-        while (txt.length > 0 && doc.getTextWidth(txt + '...') > maxW) txt = txt.slice(0, -1);
-        return txt + '...';
-      }
-
-      // Booking name (left) + pay badge (right-aligned)
       const nameEl = bk.querySelector('.rs-booking-name');
       const name = nameEl ? nameEl.textContent.trim().replace(/[^\x20-\x7E\u00C0-\u024F]/g, '').trim() : '';
       const badge = bk.querySelector('.pay-badge');
       const badgeText = badge ? badge.textContent.trim() : '';
       const isPaid = badge && badge.classList.contains('pay-paid');
-
-      doc.setFontSize(11);
-      doc.setFont(undefined, 'bold');
-      doc.text(name, 14, y + 4);
-
-      if (badgeText) {
-        doc.setFontSize(8);
-        doc.setFont(undefined, 'bold');
-        const bw = doc.getTextWidth(badgeText) + 6;
-        const badgeX = 10 + pw - bw - 2;
-        doc.setFillColor(isPaid ? 212 : 255, isPaid ? 237 : 243, isPaid ? 218 : 205);
-        doc.roundedRect(badgeX, y + 0.5, bw, 5, 1, 1, 'F');
-        doc.setTextColor(isPaid ? 21 : 133, isPaid ? 87 : 100, isPaid ? 36 : 0);
-        doc.text(badgeText, badgeX + 3, y + 4);
-        doc.setTextColor(0, 0, 0);
-      }
-      y += 8;
-
-      // Booking ID + Tafel on same line
       const idEl = bk.querySelector('.rs-booking-id');
-      if (idEl) {
-        doc.setFontSize(8);
-        doc.setFont(undefined, 'normal');
-        doc.setTextColor(120, 120, 120);
-        doc.text(idEl.textContent.trim(), 14, y);
-      }
-      doc.setFontSize(9);
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(100, 100, 100);
-      const tafelText = 'Tafel: _______________';
-      const tafelW = doc.getTextWidth(tafelText);
-      doc.text(tafelText, 10 + pw - tafelW - 2, y);
-      doc.setTextColor(0, 0, 0);
-      y += 6;
+      const bookingId = idEl ? idEl.textContent.trim() : '';
 
-      // Activities table — column positions & widths (total pw=190)
-      // Activiteit(55) | Subtype(50) | Tijd(28) | Pers(15) | Locatie(42)
-      const colDef = [
-        { x: 14,  w: 53 },   // Activiteit
-        { x: 67,  w: 48 },   // Subtype
-        { x: 115, w: 26 },   // Tijd
-        { x: 141, w: 13 },   // Personen
-        { x: 154, w: 40 },   // Locatie
-      ];
-
-      // Get all table rows (no thead/tbody in HTML)
+      // Build table body: activity rows from HTML
       const allTR = bk.querySelectorAll('.rs-table tr');
+      const colHeaders = [];
+      const tableBody = [];
+
       if (allTR.length > 0) {
-        // First row = headers (th elements)
-        const headerRow = allTR[0];
-        const ths = headerRow.querySelectorAll('th');
-        if (ths.length > 0) {
-          doc.setFontSize(7);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(130, 130, 130);
-          ths.forEach((th, i) => {
-            if (colDef[i]) doc.text(th.textContent.trim().toUpperCase(), colDef[i].x, y);
-          });
-          y += 1.5;
-          doc.setDrawColor(180, 180, 180);
-          doc.setLineWidth(0.2);
-          doc.line(14, y, 10 + pw - 2, y);
-          y += 3;
-        }
-
-        // Data rows (skip first header row)
-        doc.setFont(undefined, 'normal');
-        doc.setTextColor(30, 30, 30);
-        doc.setFontSize(7.5);
+        // First row = th headers
+        allTR[0].querySelectorAll('th').forEach(th => colHeaders.push(th.textContent.trim()));
+        // Data rows
         for (let ri = 1; ri < allTR.length; ri++) {
-          const cells = allTR[ri].querySelectorAll('td');
-          cells.forEach((td, i) => {
-            if (colDef[i]) {
-              const txt = fitText(doc, td.textContent.trim(), colDef[i].w);
-              doc.text(txt, colDef[i].x, y);
-            }
-          });
-          y += 4;
+          const row = [];
+          allTR[ri].querySelectorAll('td').forEach(td => row.push(td.textContent.trim()));
+          tableBody.push(row);
         }
-        y += 2;
       }
 
-      // Notes (no grey fill)
+      // Notes text
+      let noteText = '';
       if (notes) {
-        const noteText = notes.textContent.replace(/^Opmerkingen\s*/i, '').replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
-        if (noteText) {
-          doc.setDrawColor(200, 200, 200);
-          doc.setLineWidth(0.2);
-          doc.line(14, y - 1, 10 + pw - 2, y - 1);
-          const wrapLines = doc.splitTextToSize(noteText, pw - 12);
-          doc.setFontSize(7);
-          doc.setFont(undefined, 'bold');
-          doc.setTextColor(150, 150, 150);
-          doc.text('OPMERKINGEN', 14, y + 2);
-          doc.setFont(undefined, 'normal');
-          doc.setFontSize(7.5);
-          doc.setTextColor(60, 60, 60);
-          doc.text(wrapLines, 14, y + 6);
-          y += wrapLines.length * 3.5 + 9;
-        }
+        noteText = notes.textContent.replace(/^Opmerkingen\s*/i, '').replace(/[\t\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
       }
 
-      y += 2;
+      // Estimate if we need a page break
+      const estH = 30 + tableBody.length * 8 + (noteText ? 14 : 0);
+      if (y + estH > 280) { doc.addPage(); y = 15; }
 
-      // Border around entire booking
-      doc.setDrawColor(190, 190, 190);
-      doc.setLineWidth(0.3);
-      doc.rect(10, bookingStartY - 1, pw, y - bookingStartY + 2);
-      y += 4;
+      // Draw booking card using autoTable
+      doc.autoTable({
+        startY: y,
+        margin: { left: 10, right: 10 },
+        tableWidth: pw,
+        theme: 'plain',
+        styles: { lineWidth: 0.3, lineColor: [190, 190, 190], cellPadding: 2, fontSize: 8, textColor: [30, 30, 30] },
+        head: [],
+        body: (function() {
+          const rows = [];
+
+          // Row 1: Name + Badge | Tafel (spanning 5 cols → use content callback)
+          // We use a single-row approach with columnStyles
+          rows.push([
+            { content: name + (bookingId ? '  (' + bookingId + ')' : ''), styles: { fontStyle: 'bold', fontSize: 10, cellPadding: { top: 3, bottom: 1, left: 3, right: 1 } } },
+            { content: '', styles: { cellPadding: { top: 3, bottom: 1 } } },
+            { content: '', styles: { cellPadding: { top: 3, bottom: 1 } } },
+            { content: badgeText, styles: { fontStyle: 'bold', fontSize: 7, halign: 'right', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 1, left: 2, right: 2 } } },
+            { content: 'Tafel: _______________', styles: { halign: 'right', fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 3, bottom: 1, left: 1, right: 3 } } },
+          ]);
+
+          // Row 2: Column headers
+          if (colHeaders.length > 0) {
+            const hdrRow = [];
+            for (let i = 0; i < 5; i++) {
+              hdrRow.push({ content: (colHeaders[i] || '').toUpperCase(), styles: { fontStyle: 'bold', fontSize: 7, textColor: [130, 130, 130], cellPadding: { top: 2, bottom: 1, left: 3, right: 1 } } });
+            }
+            rows.push(hdrRow);
+          }
+
+          // Data rows
+          tableBody.forEach(cells => {
+            const row = [];
+            for (let i = 0; i < 5; i++) {
+              row.push({ content: cells[i] || '', styles: { fontSize: 7.5, cellPadding: { top: 1, bottom: 1, left: 3, right: 1 } } });
+            }
+            rows.push(row);
+          });
+
+          // Notes row (full width span)
+          if (noteText) {
+            rows.push([
+              { content: 'Opmerkingen: ' + noteText, colSpan: 5, styles: { fontSize: 7.5, textColor: [60, 60, 60], cellPadding: { top: 2, bottom: 3, left: 3, right: 3 } } }
+            ]);
+          }
+
+          return rows;
+        })(),
+        columnStyles: {
+          0: { cellWidth: 52 },  // Activiteit
+          1: { cellWidth: 48 },  // Subtype
+          2: { cellWidth: 28 },  // Tijd
+          3: { cellWidth: 22 },  // Personen
+          4: { cellWidth: 40 },  // Locatie
+        },
+        // Border around entire booking
+        tableLineWidth: 0.3,
+        tableLineColor: [190, 190, 190],
+        didDrawPage: function(data) {
+          // Reset y on new page
+        }
+      });
+
+      y = doc.lastAutoTable.finalY + 4;
     });
   });
 
