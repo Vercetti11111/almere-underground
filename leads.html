@@ -72,7 +72,7 @@
     .badge.bf { background: #3b82f622; color: #3b82f6; }
     .badge.ff { background: #7c3aed22; color: #7c3aed; }
     .badge.offerte { background: #22c55e22; color: #22c55e; }
-    .badge.opvolgen { background: #f59e0b22; color: #f59e0b; }
+    .badge.opvolgen { background: #ef444422; color: #ef4444; }
     .badge.paid { background: #22c55e22; color: #22c55e; }
     .badge.pending { background: #f59e0b22; color: #f59e0b; }
     .badge.partial { background: #3b82f622; color: #3b82f6; }
@@ -774,7 +774,7 @@ function pdfReserveringen() {
       const r = getBookingRow(b);
       return [r.tijd, r.bedrijf, r.klant, String(r.pax), r.activiteit, r.foods, r.drinks, r.begeleiding, {
         content: r.status,
-        styles: { textColor: r.status === 'Betaald' ? [21, 87, 36] : [180, 60, 0] }
+        styles: { textColor: r.status === 'Op te volgen' ? [239, 68, 68] : r.status === 'Bevestigd' ? [0, 0, 0] : r.status === 'Betaald' ? [21, 87, 36] : [180, 60, 0] }
       }];
     });
 
