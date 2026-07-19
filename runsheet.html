@@ -445,13 +445,28 @@ function downloadRunsheetPDF(date) {
     const acts = b.activities || [];
     if (!acts.length) return '';
     // Find earliest startTime across all activities
-    let earliest = null;
+    // startTime can be "14:00" (short) or full ISO string
+    let earliestStr = null;
+    let earliestMin = Infinity;
     for (const a of acts) {
       if (!a.startTime) continue;
-      const t = new Date(a.startTime);
-      if (!earliest || t < earliest) earliest = t;
+      const st = a.startTime;
+      let hh, mm;
+      if (st.length <= 5) {
+        // "14:00"
+        [hh, mm] = st.split(':').map(Number);
+      } else {
+        // ISO: extract HH:MM from position 11
+        hh = parseInt(st.substring(11, 13));
+        mm = parseInt(st.substring(14, 16));
+      }
+      const totalMin = hh * 60 + mm;
+      if (totalMin < earliestMin) {
+        earliestMin = totalMin;
+        earliestStr = String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+      }
     }
-    return earliest ? fmtTime(earliest.toISOString()) : '';
+    return earliestStr || '';
   }
 
   // Helper: has limo (subtype contains 'drank')
