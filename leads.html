@@ -70,6 +70,7 @@
     .badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
     .badge.kf { background: #ec489922; color: #ec4899; }
     .badge.bf { background: #3b82f622; color: #3b82f6; }
+    .badge.ff { background: #7c3aed22; color: #7c3aed; }
     .badge.offerte { background: #22c55e22; color: #22c55e; }
     .badge.opvolgen { background: #f59e0b22; color: #f59e0b; }
     .badge.paid { background: #22c55e22; color: #22c55e; }
@@ -91,6 +92,22 @@
     .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
     .empty-state p { font-size: 14px; }
 
+
+    /* Print table for reserveringen */
+    .print-section { display: none; }
+    .print-btn { background: #6366f1; border: none; color: white; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .print-btn:hover { opacity: 0.9; }
+    @media print {
+      body { background: #fff !important; color: #000 !important; }
+      .header, .tabs, .subtabs, .summary-grid, .refresh-bar, .no-print, .login-box { display: none !important; }
+      .print-section { display: block !important; }
+      .booking-row, .detail-panel, #bookingList { display: none !important; }
+      .container { max-width: 100% !important; padding: 0 !important; }
+      .print-table { width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }
+      .print-table th, .print-table td { border: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top; }
+      .print-table th { font-weight: bold; background: #eee; }
+      .print-date-header { font-weight: bold; font-size: 13px; margin: 16px 0 4px; text-decoration: underline; }
+    }
     /* Loading */
     .loading { text-align: center; padding: 60px 0; color: #888; }
     .loading .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #2a2a3a; border-top-color: #7c3aed; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
@@ -168,6 +185,20 @@
       <button class="refresh-btn" id="refreshBtn" onclick="doRefresh()">🔄 Ververs</button>
     </div>
 
+    <!-- Print controls (reservations tab only) -->
+    <div id="printControls" class="no-print" style="display:none;margin:8px 0;padding:10px;background:#1a1a24;border-radius:10px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:12px;color:#888;">Van:</label>
+        <input type="date" id="printFrom" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:4px 8px;color:#f1f1f5;font-size:12px;" />
+        <label style="font-size:12px;color:#888;">Tot:</label>
+        <input type="date" id="printTo" style="background:#0f0f13;border:1px solid #2a2a3a;border-radius:6px;padding:4px 8px;color:#f1f1f5;font-size:12px;" />
+        <button class="print-btn" onclick="printReserveringen()">🖨️ Print / Kopieer</button>
+      </div>
+    </div>
+
+    <!-- Print section (visible only in print) -->
+    <div class="print-section" id="printSection"></div>
+
     <!-- Booking list -->
     <div id="bookingList"></div>
   </div>
@@ -217,7 +248,7 @@ function applyViewMode() {
   if (mode === 'desktop') document.body.classList.add('force-desktop');
   else if (mode === 'mobile') document.body.classList.add('force-mobile');
   const btn = document.getElementById('view-toggle-btn');
-  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🔄' : '🖥️';
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '↩️' : '🖥️';
 }
 function toggleViewMode() {
   const cur = getViewMode();
@@ -370,6 +401,7 @@ function switchTab(tab) {
   document.getElementById('tabReservations').classList.toggle('active', tab === 'reservations');
   document.getElementById('tabLeads').classList.toggle('active', tab === 'leads');
   document.getElementById('subtabs').style.display = tab === 'leads' ? 'flex' : 'none';
+  document.getElementById('printControls').style.display = tab === 'reservations' ? 'block' : 'none';
   openDetailId = null;
   renderAll();
 }
@@ -386,7 +418,7 @@ function switchSubTab(sub) {
 function getFilteredBookings() {
   if (activeTab === 'reservations') {
     // Future VM bookings that are KF or BF
-    return allBookings.filter(b => b.isKF || b.isBF);
+    return allBookings.filter(b => b.isKF || b.isFF || b.isBF);
   } else {
     // Leads: unpaid VM bookings, exclude confirmed (partial payment received)
     let leads = allBookings.filter(b => b.amountOwing > 0 && b.leadCategory !== 'Bevestigd');
@@ -475,6 +507,8 @@ function renderList() {
     const isOpen = openDetailId === b.id;
     const typeBadge = b.isKF
       ? '<span class="badge kf">🎂 KF</span>'
+      : b.isFF
+      ? '<span class="badge ff">👨‍👩‍👧‍👦 FF</span>'
       : b.isBF
       ? '<span class="badge bf">🏢 BF</span>'
       : '';
@@ -493,7 +527,7 @@ function renderList() {
       <div class="booking-row" onclick="toggleDetail('${b.id}')">
         <div class="booking-info">
           <div class="booking-name">${b.name || '(geen naam)'} ${typeBadge}</div>
-          <div class="booking-meta">${fmtDate(b.bookingDate)} ${statusBadge}</div>
+          <div class="booking-meta">${b.startTime ? b.startTime + ' · ' : ''}${fmtDate(b.bookingDate)}${b.pax ? ' · ' + b.pax + ' pax' : ''} ${statusBadge}</div>
           ${productsSummary ? `<div class="booking-products">${productsSummary}</div>` : ''}
         </div>
         <div class="booking-amounts">
@@ -508,7 +542,11 @@ function renderList() {
         <div class="detail-row"><span class="detail-label">${t('total')}</span><span class="detail-value">${fmtEur(b.total)}</span></div>
         <div class="detail-row"><span class="detail-label">${t('paid')}</span><span class="detail-value" style="color:#22c55e">${fmtEur(b.amountPaid)}</span></div>
         <div class="detail-row"><span class="detail-label">${t('owing')}</span><span class="detail-value" style="color:#f59e0b">${fmtEur(b.amountOwing)}</span></div>
-        <div class="detail-row"><span class="detail-label">${t('summaryGuests')}</span><span class="detail-value">${b.totalGuests || '—'}</span></div>
+        <div class="detail-row"><span class="detail-label">Pax</span><span class="detail-value">${b.pax || b.totalGuests || '—'}</span></div>
+        ${b.startTime ? `<div class="detail-row"><span class="detail-label">Begintijd</span><span class="detail-value">${b.startTime}</span></div>` : ''}
+        ${(b.activityNames || []).length ? `<div class="detail-row"><span class="detail-label">Activiteiten</span><span class="detail-value">${b.activityNames.join(', ')}</span></div>` : ''}
+        ${(b.foods || []).length ? `<div class="detail-row"><span class="detail-label">Foods</span><span class="detail-value">${b.foods.join(', ')}</span></div>` : ''}
+        ${(b.drinks || []).length ? `<div class="detail-row"><span class="detail-label">Drinks</span><span class="detail-value">${b.drinks.join(', ')}</span></div>` : ''}
         ${(b.products || []).length > 0 ? `
           <div class="detail-products">
             <div style="font-size:11px;color:#888;margin-bottom:4px;">${t('products')}:</div>
@@ -569,8 +607,99 @@ async function doRefresh() {
   }
 }
 
+
+// ── Print reserveringen ──────────────────────────────────────────────────────
+function initPrintDates() {
+  const today = new Date();
+  const from = today.toISOString().substring(0, 10);
+  const future = new Date(today.getTime() + 60 * 24 * 3600 * 1000);
+  const to = future.toISOString().substring(0, 10);
+  document.getElementById('printFrom').value = from;
+  document.getElementById('printTo').value = to;
+}
+initPrintDates();
+
+function printReserveringen() {
+  const from = document.getElementById('printFrom').value;
+  const to = document.getElementById('printTo').value;
+  if (!from || !to) { alert('Selecteer een datumrange'); return; }
+
+  // Filter reserveringen within date range
+  const filtered = allBookings.filter(b => {
+    if (!b.isKF && !b.isFF && !b.isBF) return false;
+    const bd = (b.bookingDate || '').substring(0, 10);
+    return bd >= from && bd <= to;
+  });
+
+  // Sort by date then time
+  filtered.sort((a, b) => {
+    const da = (a.bookingDate || '').substring(0, 10);
+    const db = (b.bookingDate || '').substring(0, 10);
+    if (da !== db) return da.localeCompare(db);
+    return (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
+  });
+
+  // Group by date
+  const grouped = {};
+  for (const b of filtered) {
+    const d = (b.bookingDate || '').substring(0, 10);
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(b);
+  }
+
+  // Build print HTML
+  const dayNames = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
+  const monthNames = ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'];
+
+  function fmtPrintDate(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return dayNames[d.getDay()] + ' ' + d.getDate() + ' ' + monthNames[d.getMonth()];
+  }
+
+  let html = '';
+  for (const [dateStr, bookings] of Object.entries(grouped)) {
+    html += '<div class="print-date-header">' + fmtPrintDate(dateStr) + '</div>';
+    html += '<table class="print-table"><tr><th>Tijd</th><th>Bedrijf</th><th>Klantnaam</th><th>Pax</th><th>Activiteit</th><th>Foods</th><th>Drinks</th><th>Begeleiding</th><th>Status</th></tr>';
+    for (const b of bookings) {
+      const foods = (b.foods || []).length ? b.foods.join(', ') : '';
+      const drinks = (b.drinks || []).length ? b.drinks.join(', ') : '';
+      const foodsDisplay = foods || (!drinks ? 'Nacalculatie' : '-');
+      const drinksDisplay = drinks || (!foods ? 'Nacalculatie' : 'nacalculatie');
+      const activities = (b.activityNames || b.products || []).join(', ');
+      const status = b.leadCategory || (b.amountOwing <= 0 ? 'Betaald' : 'Open');
+      html += '<tr>';
+      html += '<td>' + (b.startTime || '-') + '</td>';
+      html += '<td>' + (b.name || '-') + '</td>';
+      html += '<td>' + (b.contactName || '-') + '</td>';
+      html += '<td>' + (b.pax || b.totalGuests || '-') + '</td>';
+      html += '<td>' + (activities || '-') + '</td>';
+      html += '<td>' + foodsDisplay + '</td>';
+      html += '<td>' + drinksDisplay + '</td>';
+      html += '<td></td>';
+      html += '<td>' + status + '</td>';
+      html += '</tr>';
+    }
+    html += '</table><br>';
+  }
+
+  if (!html) {
+    html = '<p>Geen reserveringen in de geselecteerde periode.</p>';
+  }
+
+  document.getElementById('printSection').innerHTML = html;
+
+  // Also build a copyable version
+  buildCopyableTable(grouped);
+
+  setTimeout(() => window.print(), 200);
+}
+
+function buildCopyableTable(grouped) {
+  // Already in printSection — the @media print CSS will handle visibility
+}
+
 // ── Auto-init (after all declarations) ────────────────────────────────────────
-if (CODE) init();
+if (CODE) { init(); document.getElementById('printControls').style.display = 'block'; }
 </script>
 </body>
 </html>

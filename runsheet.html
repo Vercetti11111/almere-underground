@@ -201,6 +201,7 @@ const WORKER = 'https://api.almereunderground.com';
 const TRANSLATIONS = {
   nl: {
     kfTitle: 'Kinderfeestjes (KF)',
+    ffTitle: 'Familie Feesten (FF)',
     bfTitle: 'Bedrijfsfeesten (BF)',
     booking: 'boeking',
     bookings: 'boekingen',
@@ -218,7 +219,7 @@ const TRANSLATIONS = {
     paidWord: 'betaald',
     openWord: 'open',
     downloadPdf: '📄 Download PDF',
-    noBookings: 'Geen KF/BF boekingen voor',
+    noBookings: 'Geen KF/FF/BF boekingen voor',
     runsheetTitle: 'Almere Underground — Run Sheet',
     accessCode: 'Toegangscode',
     loginBtn: 'Inloggen →',
@@ -231,6 +232,7 @@ const TRANSLATIONS = {
   },
   en: {
     kfTitle: 'Birthday Parties (KF)',
+    ffTitle: 'Family Parties (FF)',
     bfTitle: 'Corporate Events (BF)',
     booking: 'booking',
     bookings: 'bookings',
@@ -248,7 +250,7 @@ const TRANSLATIONS = {
     paidWord: 'paid',
     openWord: 'due',
     downloadPdf: '📄 Download PDF',
-    noBookings: 'No KF/BF bookings for',
+    noBookings: 'No KF/FF/BF bookings for',
     runsheetTitle: 'Almere Underground — Run Sheet',
     accessCode: 'Access code',
     loginBtn: 'Log in →',
@@ -324,7 +326,8 @@ function fmtEur(v) {
 }
 
 function fmtDateLong(s) {
-  return new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
+  const d = new Date(s + 'T00:00:00').toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
+  return d.charAt(0).toUpperCase() + d.slice(1);
 }
 
 function fmtDate(s) {
@@ -485,13 +488,19 @@ async function renderRunsheet(forceRefresh = false) {
         ${data.kf.map(renderBooking).join('')}
       </div>` : '';
 
+    const ffSection = data.ff?.length ? `
+      <div class="rs-section">
+        <div class="rs-section-header rs-ff" style="background:#7c3aed;">👨‍👩‍👧‍👦 ${t('ffTitle')} — ${bookingCount(data.ff.length)}</div>
+        ${data.ff.map(renderBooking).join('')}
+      </div>` : '';
+
     const bfSection = data.bf?.length ? `
       <div class="rs-section">
         <div class="rs-section-header rs-bf">🏢 ${t('bfTitle')} — ${bookingCount(data.bf.length)}</div>
         ${data.bf.map(renderBooking).join('')}
       </div>` : '';
 
-    const empty = (!data.kf?.length && !data.bf?.length) ?
+    const empty = (!data.kf?.length && !data.ff?.length && !data.bf?.length) ?
       `<div class="rs-empty">${t('noBookings')} ${fmtDate(rsDate)}</div>` : '';
 
     setContent(`
@@ -504,7 +513,7 @@ async function renderRunsheet(forceRefresh = false) {
         <div style="font-size:18pt;font-weight:800;">${t('runsheetTitle')}</div>
         <div style="font-size:12pt;color:#555;">${fmtDateLong(rsDate)}</div>
       </div>
-      ${kfSection}${bfSection}${empty}
+      ${kfSection}${ffSection}${bfSection}${empty}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
@@ -530,7 +539,7 @@ async function renderOverview(forceRefresh = false) {
     ovStaff = ovStaffFull.map(s => typeof s === 'string' ? s : s.name);
     ovAssignments = assignments || {};
 
-    const allBookings = [...(data.kf || []), ...(data.bf || [])];
+    const allBookings = [...(data.kf || []), ...(data.ff || []), ...(data.bf || [])];
 
     // Sort by earliest start time
     function getFirstTime(b) {
@@ -655,6 +664,7 @@ async function renderOverview(forceRefresh = false) {
     }
 
     const kfHtml = renderSection(data.kf || [], '🎂 ' + t('kfTitle'), 'rs-kf', '#7c1a1a');
+    const ffHtml = renderSection(data.ff || [], '👨‍👩‍👧‍👦 ' + t('ffTitle'), 'rs-ff', '#6b21a8');
     const bfHtml = renderSection(data.bf || [], '🏢 ' + t('bfTitle'), 'rs-bf', '#1a3060');
     const empty = !allBookings.length ? `<div class="rs-empty">${t('noBookings')} ${fmtDate(rsDate)}</div>` : '';
 
@@ -664,7 +674,7 @@ async function renderOverview(forceRefresh = false) {
       <div style="text-align:right;margin-bottom:14px;" class="no-print">
         <button onclick="downloadRunsheetPDF('${rsDate}')" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;">${t('downloadPdf')}</button>
       </div>
-      ${kfHtml}${bfHtml}${empty}
+      ${kfHtml}${ffHtml}${bfHtml}${empty}
       ${cacheLabel(data)}
     `);
   } catch (e) { setContent(errMsg(e.message)); }
@@ -822,6 +832,7 @@ async function downloadRunsheetPDF(date) {
   const fmtE = v => '\u20AC' + (v || 0).toLocaleString('nl-NL', {minimumFractionDigits:2, maximumFractionDigits:2});
   const shortN = n => { if (!n) return ''; const p = n.trim().split(/\s+/); return p.length <= 1 ? n : p[0] + ' ' + p[p.length-1][0] + '.'; };
   const allKF = data.kf || [];
+  const allFF = data.ff || [];
   const allBF = data.bf || [];
 
   // Load saved assignments for PDF
@@ -882,6 +893,7 @@ async function downloadRunsheetPDF(date) {
 
   // Color constants
   const kfRgb = [99, 102, 241];   // indigo
+  const ffRgb = [107, 33, 168];   // purple
   const bfRgb = [234, 88, 12];    // orange
   const leftM = 10;
 
@@ -987,6 +999,33 @@ async function downloadRunsheetPDF(date) {
         if (d.pageNumber > 1) {
           drawFrontpageHeader();
           drawSectionBarFP(kfLabel, kfRgb, 32);
+        }
+      }
+    }));
+    fy = doc.lastAutoTable.finalY + 12;
+  }
+
+  // Draw FF section
+  const sortedFF = sortByTime(allFF);
+  if (sortedFF.length) {
+    if (fy + 25 > 200) {
+      doc.addPage('a4', 'landscape');
+      frontpagePages.push(doc.internal.getNumberOfPages());
+      drawFrontpageHeader();
+      fy = 32;
+    }
+    const ffLabel = 'Familie Feesten (FF) \u2014 ' + (sortedFF.length === 1 ? '1 boeking' : sortedFF.length + ' boekingen');
+    fy = drawSectionBarFP(ffLabel, ffRgb, fy);
+
+    doc.autoTable(Object.assign({}, fpTableOpts, {
+      startY: fy,
+      body: buildOverviewRows(sortedFF),
+      didDrawPage: function(d) {
+        const pg = doc.internal.getNumberOfPages();
+        if (frontpagePages.indexOf(pg) === -1) frontpagePages.push(pg);
+        if (d.pageNumber > 1) {
+          drawFrontpageHeader();
+          drawSectionBarFP(ffLabel, ffRgb, 32);
         }
       }
     }));
@@ -1183,6 +1222,10 @@ async function downloadRunsheetPDF(date) {
   // Generate KF detail pages
   const kfLabel = allKF.length === 1 ? 'Kinderfeestje (1 boeking)' : 'Kinderfeestjes (' + allKF.length + ' boekingen)';
   renderDetailSection(allKF, kfLabel, false, kfRgb);
+
+  // Generate FF detail pages
+  const ffLabel = allFF.length === 1 ? 'Familie Feest (1 boeking)' : 'Familie Feesten (' + allFF.length + ' boekingen)';
+  renderDetailSection(allFF, ffLabel, false, ffRgb);
 
   // Generate BF detail pages
   const bfLabel = allBF.length === 1 ? 'Bedrijfsfeest (1 boeking)' : 'Bedrijfsfeesten (' + allBF.length + ' boekingen)';
