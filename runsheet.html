@@ -48,19 +48,22 @@
     .rs-section-header { padding:14px 16px 12px; font-size:14px; font-weight:800; letter-spacing:0.04em; }
     .rs-kf { background:#7c1a1a; }
     .rs-bf { background:#1a3060; }
-    .rs-booking { background:#1a1a24; margin-bottom:1px; padding:14px 16px; }
+    .rs-booking { background:#1a1a24; margin-bottom:1px; padding:0; }
     .rs-booking:last-child { border-radius:0 0 14px 14px; }
-    .rs-booking-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+    .rs-booking-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; padding:8px 16px 0; }
     .rs-booking-left { flex:1; min-width:0; }
     .rs-booking-right { flex-shrink:0; text-align:right; margin-left:12px; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
-    .rs-booking-name { font-size:15px; font-weight:700; }
-    .rs-booking-id { font-size:11px; color:#888; margin-top:3px; }
+    .rs-booking-name-header { font-size:14px; font-weight:800; letter-spacing:0.04em; padding:10px 16px 6px; background:#1a1a24; border-bottom:1px solid #2a2a38; }
+    .rs-booking-name-header:first-child { /* first booking after section header */ }
+    .rs-booking-id { font-size:12px; color:#ccc; }
     .rs-contact { font-size:12px; color:#999; margin-top:2px; }
-    .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; }
+    .rs-contact { font-size:12px; color:#999; margin-top:2px; }
+    .rs-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:10px; padding:0 16px; }
+    .rs-table th, .rs-table td { padding-left:16px; }
     .rs-table th { text-align:left; color:#888; font-weight:600; padding:4px 6px 4px 0; border-bottom:1px solid #2a2a38; }
     .rs-table td { padding:5px 6px 5px 0; vertical-align:top; border-bottom:1px solid #1e1e2a; color:#ddd; }
     .rs-table tr:last-child td { border-bottom:none; }
-    .rs-notes { background:#111118; border-radius:8px; padding:10px 12px; font-size:12px; color:#bbb; margin-top:8px; }
+    .rs-notes { background:#111118; border-radius:8px; padding:10px 12px; font-size:12px; color:#bbb; margin:8px 16px 14px; }
     .rs-notes-label { font-size:10px; color:#666; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
     .pay-badge { display:inline-block; padding:5px 10px; border-radius:10px; font-size:11px; font-weight:700; color:white; line-height:1.5; white-space:pre-line; text-align:left; }
     .rs-tafel { font-size:15px; font-weight:700; color:#f1f1f5; }
@@ -363,12 +366,15 @@ async function renderRunsheet(forceRefresh = false) {
 
       const notes = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ') || t('noNotes');
 
+      const contactLine = [b.contactName, b.contactPhone].filter(Boolean).join(' · ');
+
       return `
         <div class="rs-booking">
+          <div class="rs-booking-name-header">${b.name}</div>
           <div class="rs-booking-top">
             <div class="rs-booking-left">
-              <div class="rs-booking-name">${b.name}</div>
-              <div class="rs-booking-id">${t('bookingNr')}${b.id}${b.contactName || b.contactPhone ? '  ·  ' + (b.contactName || '') + (b.contactName && b.contactPhone ? ' · ' : '') + (b.contactPhone || '') : ''}</div>
+              <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
+              ${contactLine ? `<div class="rs-contact">${contactLine}</div>` : ''}
             </div>
             <div class="rs-booking-right">
               <span class="pay-badge ${payClass}">${payLabel}</span>
@@ -536,6 +542,13 @@ function downloadRunsheetPDF(date) {
 
       const padL = 5; // consistent left padding
 
+      // Booking name as sub-header above the table (same style as section header)
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text(name, leftM + padL, y + 5);
+      y += 9;
+
       doc.autoTable({
         startY: y,
         margin: { left: leftM, right: leftM },
@@ -546,20 +559,13 @@ function downloadRunsheetPDF(date) {
         body: (function() {
           const rows = [];
 
-          // Row 1: Name | Badge | Tafel
+          // Row 1: Booking ID + contact | Badge | Tafel
+          const idContactLine = bookingId + (contactInfo ? '\n' + contactInfo : '');
           rows.push([
-            { content: name, colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 5, bottom: 2, left: padL, right: 2 } } },
-            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 5, bottom: 2, left: 3, right: 3 } } },
-            { content: 'Tafel:', colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 5, bottom: 2, left: padL, right: 2 } } },
+            { content: idContactLine, colSpan: 2, styles: { fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', textColor: isPaid ? [21, 87, 36] : [133, 100, 0], fillColor: isPaid ? [212, 237, 218] : [255, 243, 205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
+            { content: 'Tafel:', colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
-
-          // Row 2: Booking ID + contact (grey)
-          const subLine = [bookingId, contactInfo].filter(Boolean).join('  \u00B7  ');
-          if (subLine) {
-            rows.push([
-              { content: subLine, colSpan: 5, styles: { fontSize: 8, textColor: [100, 100, 100], cellPadding: { top: 1, bottom: 3, left: padL, right: 2 } } }
-            ]);
-          }
 
           // Column headers
           if (colHeaders.length > 0) {
