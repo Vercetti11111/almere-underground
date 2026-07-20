@@ -144,7 +144,7 @@
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
     <div>
       <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
-      <div style="font-size:20px;font-weight:800;">📋 Leads & Reserveringen</div>
+      <div style="font-size:20px;font-weight:800;" id="pageTitle">📋 Leads & Reserveringen</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
@@ -451,7 +451,7 @@ function renderAll() {
   document.getElementById('subtabAll').innerHTML = t('subtabAll') + ` <span class="count" id="countAll">0</span>`;
   document.getElementById('subtabOpvolgen').innerHTML = t('subtabOpvolgen') + ` <span class="count" id="countOpvolgen">0</span>`;
   document.getElementById('subtabOfferte').innerHTML = t('subtabOfferte') + ` <span class="count" id="countOfferte">0</span>`;
-  document.getElementById('refreshBtn').textContent = t('refresh');
+  // refresh button is now in header
 
   // Counts for subtabs
   const allLeads = allBookings.filter(b => b.amountOwing > 0 && b.leadCategory !== 'Bevestigd');
@@ -598,7 +598,7 @@ function toggleDetail(id) {
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
 async function doRefresh() {
-  const btn = document.getElementById('refreshBtn');
+  const btn = document.getElementById('refresh-btn');
   btn.disabled = true;
   btn.textContent = t('refreshing');
   try {
