@@ -170,6 +170,7 @@
     <div class="tabs">
       <button class="tab active" id="tabReservations" onclick="switchTab('reservations')">📅 Reserveringen</button>
       <button class="tab" id="tabLeads" onclick="switchTab('leads')">🎯 Op te volgen</button>
+      <button class="tab" id="tabControle" onclick="switchTab('controle')">⚠️ Controle</button>
     </div>
 
     <!-- Summary -->
@@ -406,6 +407,7 @@ function switchTab(tab) {
   activeTab = tab;
   document.getElementById('tabReservations').classList.toggle('active', tab === 'reservations');
   document.getElementById('tabLeads').classList.toggle('active', tab === 'leads');
+  document.getElementById('tabControle').classList.toggle('active', tab === 'controle');
   document.getElementById('subtabs').style.display = tab === 'leads' ? 'flex' : 'none';
   document.getElementById('printControls').style.display = tab === 'reservations' ? 'block' : 'none';
   openDetailId = null;
@@ -425,6 +427,9 @@ function getFilteredBookings() {
   if (activeTab === 'reservations') {
     // Future VM bookings that are KF or BF
     return allBookings.filter(b => b.isKF || b.isFF || b.isBF);
+  } else if (activeTab === 'controle') {
+    // VenueManager bookings without KF/BF/FF/RR classification
+    return allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !/^RR\b/i.test(b.name || ''));
   } else {
     // Leads: unpaid VM bookings, exclude confirmed (partial payment received)
     let leads = allBookings.filter(b => b.amountOwing > 0 && b.leadCategory !== 'Bevestigd');
@@ -455,6 +460,9 @@ function renderAll() {
   document.getElementById('countAll').textContent = allLeads.length;
   document.getElementById('countOpvolgen').textContent = opvolgen.length;
   document.getElementById('countOfferte').textContent = offerte.length;
+  // Controle count
+  const controleCount = allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !/^RR\b/i.test(b.name || '')).length;
+  document.getElementById('tabControle').textContent = '⚠️ Controle (' + controleCount + ')';
 
   // Update time
   if (generatedAt) {
@@ -665,7 +673,7 @@ function getBookingRow(b) {
   const drinks = (b.drinks || []).length ? b.drinks.join(', ') : '';
   const foodsDisplay = foods || 'Nacalculatie';
   const drinksDisplay = drinks || 'Nacalculatie';
-  const activities = (b.activityNames || b.products || []).join(', ');
+  const activities = (b.activityNames || b.products || []).join('<br>');
   const status = b.leadCategory || (b.amountOwing <= 0 ? 'Betaald' : 'Open');
   return {
     tijd: b.startTime || '-',
@@ -709,10 +717,11 @@ async function copyReserveringen() {
       const vals = [r.tijd, r.bedrijf, r.klant, r.pax, r.activiteit, r.foods, r.drinks, r.begeleiding, r.status];
       html += '<tr>' + vals.map((v, i) => {
         let cellVal = v || '';
+        let extraStyle = '';
         if (i === vals.length - 1 && r.status === 'Op te volgen') {
-          cellVal = '<span style="color:red;font-weight:bold;">' + cellVal + '</span>';
+          extraStyle = 'color:#ff0000;font-weight:bold;';
         }
-        return '<td style="' + tdBase + 'width:' + colWidths[i] + ';">' + cellVal + '</td>';
+        return '<td style="' + tdBase + 'width:' + colWidths[i] + ';' + extraStyle + '">' + cellVal + '</td>';
       }).join('') + '</tr>';
       plain += vals.join('\t') + '\n';
     }
