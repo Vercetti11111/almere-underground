@@ -60,7 +60,7 @@
     max-width: 600px;
     margin: 0 auto 8px;
   }
-  @media (min-width: 500px) {
+  @media (min-width: 768px) {
     .cards { grid-template-columns: 1fr 1fr; }
   }
   .card {
@@ -288,6 +288,7 @@ function isWideView() {
   return m === 'desktop' || (m === 'auto' && window.innerWidth >= 768);
 }
 window.addEventListener('resize', applyViewMode);
+applyViewMode();
 
 
 const API = 'https://api.almereunderground.com';

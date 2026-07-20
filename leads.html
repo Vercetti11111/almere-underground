@@ -13,8 +13,11 @@
     .lang-switch { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; padding: 4px 8px; color: #f1f1f5; font-size: 12px; cursor: pointer; }
 
     /* View toggle desktop/mobile */
+    body.desktop-mode .container,
     body.force-desktop .container { max-width: 900px; }
+    body.desktop-mode .booking-row,
     body.force-desktop .booking-row { padding: 14px 16px; }
+    body.desktop-mode .booking-name,
     body.force-desktop .booking-name { font-size: 14px; }
     body.force-mobile .container { max-width: 400px !important; }
 
@@ -251,9 +254,10 @@ if (!CODE) {
 function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
 function applyViewMode() {
   const mode = getViewMode();
-  document.body.classList.remove('force-desktop', 'force-mobile');
+  document.body.classList.remove('desktop-mode','force-desktop','force-mobile');
   if (mode === 'desktop') document.body.classList.add('force-desktop');
   else if (mode === 'mobile') document.body.classList.add('force-mobile');
+  else if (window.innerWidth >= 768) document.body.classList.add('desktop-mode');
   const btn = document.getElementById('view-toggle-btn');
   if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
   if (btn) btn.title = {auto:'Automatisch — klik om te wisselen', desktop:'Desktop geforceerd', mobile:'Mobiel geforceerd'}[mode];
