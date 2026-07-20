@@ -12,9 +12,9 @@
     .container { max-width: 520px; margin: 0 auto; padding: 16px; min-height: 100vh; }
     
     /* Top bar */
-    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+
     .back-link { color: #6366f1; text-decoration: none; font-size: 14px; font-weight: 600; }
-    .top-bar-right { display: flex; gap: 8px; align-items: center; }
+
     #lang-select { background: #1a1a24; border: 1px solid #2a2a38; color: #f1f1f5; border-radius: 8px; padding: 5px 8px; font-size: 13px; cursor: pointer; }
     
     .page-title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
@@ -162,16 +162,20 @@
   <!-- Login -->
   <!-- SSO: login via landing page -->
   <div class="container" id="main-content">
-    <div class="top-bar">
-      <a href="index.html" class="back-link" id="back-link">← Menu</a>
-      <div class="top-bar-right">
-        <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
-        <select id="lang-select" onchange="setLang(this.value)">
-          <option value="nl">🇳🇱 NL</option>
-          <option value="en">🇬🇧 EN</option>
-        </select>
-      </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;">🔐 Gebruikersrechten</div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
+      <button id="refresh-btn" onclick="location.reload()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
+    </div>
+  </div>
     
     <div class="page-title" id="page-title">Gebruikersrechten</div>
     <div class="page-subtitle" id="page-subtitle">Beheer toegangscodes en rollen</div>

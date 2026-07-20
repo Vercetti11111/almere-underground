@@ -32,11 +32,8 @@
     padding: 16px;
   }
   .header {
-    text-align: center;
-    padding: 20px 0;
+    padding: 0;
   }
-  .header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
-  .header .subtitle { color: var(--muted); font-size: 0.85rem; }
 
   .section-title {
     max-width: 600px;
@@ -222,12 +219,11 @@
     body.force-desktop .section-title { max-width:900px; }
     body.desktop-mode .chart-container,
     body.force-desktop .chart-container { max-width:900px; }
-    body.desktop-mode .header,
-    body.force-desktop .header { max-width:900px; margin-left:auto; margin-right:auto; }
+
     body.force-mobile .cards { max-width:400px !important; grid-template-columns: 1fr !important; }
     body.force-mobile .section-title,
     body.force-mobile .chart-container,
-    body.force-mobile .header { max-width:400px !important; }
+
 
     /* View toggle */
     .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
@@ -237,11 +233,20 @@
 </head>
 <body>
 
-<div class="header" style="position:relative;">
-  <h1>📊 Social Stats</h1>
-  <div style="position:absolute;top:20px;right:0;display:flex;gap:8px;align-items:center;"><button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button></div>
-    <div class="subtitle">Almere Underground — Social Media & Reviews</div>
-</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;">📊 Social Stats</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
+      <button id="refresh-btn" onclick="loadData()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
+    </div>
+  </div>
 
 <div id="app">
   <div class="loading">
@@ -254,6 +259,8 @@
 <script>
 
 // ── View Mode Toggle ─────────────────────────────────────────────────────────
+function setLang(l) { /* Social Stats is NL-only for now */ }
+
 function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
 function applyViewMode() {
   const mode = getViewMode();
@@ -524,7 +531,7 @@ function render(data) {
       <canvas id="reviewsChart"></canvas>
     </div>
 
-    <div class="last-update">Laatste update: ${latest.date}</div>
+    <div class="last-update">Laatste verversing: ${latest.date} ${new Date().toLocaleTimeString("nl-NL", {hour:"2-digit",minute:"2-digit"})}</div>
     <a class="back-link" href="index.html">← Terug naar menu</a>
   `;
 

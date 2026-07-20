@@ -10,9 +10,6 @@
     .container { max-width: 480px; margin: 0 auto; padding: 0 12px 80px; }
 
     /* Header */
-    .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 8px; }
-    .header .back { color: #7c3aed; text-decoration: none; font-size: 14px; font-weight: 600; }
-    .header .title { font-size: 18px; font-weight: 800; }
     .lang-switch { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; padding: 4px 8px; color: #f1f1f5; font-size: 12px; cursor: pointer; }
 
     /* View toggle desktop/mobile */
@@ -144,15 +141,18 @@
 <body>
 <div class="container">
   <!-- Header -->
-  <div class="header">
-    <a class="back" href="index.html">← Menu</a>
-    <span class="title" id="pageTitle">📋 Leads</span>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
-      <select class="lang-switch" id="langSwitch" onchange="setLang(this.value)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;">📋 Leads & Reserveringen</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)" title="Language / Taal">
         <option value="nl">🇳🇱 NL</option>
         <option value="en">🇬🇧 EN</option>
       </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
+      <button id="refresh-btn" onclick="doRefresh()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Data verversen">🔄</button>
     </div>
   </div>
 
@@ -186,7 +186,7 @@
     <!-- Refresh bar -->
     <div class="refresh-bar">
       <span class="refresh-info" id="refreshInfo">—</span>
-      <button class="refresh-btn" id="refreshBtn" onclick="doRefresh()">🔄 Ververs</button>
+
     </div>
 
     <!-- Print controls (reservations tab only) -->
@@ -337,8 +337,8 @@ const T = {
 };
 let lang = localStorage.getItem('au_lang') || 'nl';
 function t(key) { return (T[lang] || T.nl)[key] || key; }
-function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('langSwitch').value = l; renderAll(); }
-document.getElementById('langSwitch').value = lang;
+function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('lang-select').value = l; renderAll(); }
+document.getElementById('lang-select').value = lang;
 
 function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
