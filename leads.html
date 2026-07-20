@@ -255,7 +255,8 @@ function applyViewMode() {
   if (mode === 'desktop') document.body.classList.add('force-desktop');
   else if (mode === 'mobile') document.body.classList.add('force-mobile');
   const btn = document.getElementById('view-toggle-btn');
-  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '↩️' : '🖥️';
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
+  if (btn) btn.title = {auto:'Automatisch — klik om te wisselen', desktop:'Desktop geforceerd', mobile:'Mobiel geforceerd'}[mode];
 }
 function toggleViewMode() {
   const cur = getViewMode();

@@ -33,6 +33,8 @@
   }
   .header {
     padding: 0;
+    max-width: 600px;
+    margin: 0 auto;
   }
 
   .section-title {
@@ -217,13 +219,15 @@
     body.force-desktop .cards { max-width:900px; grid-template-columns: repeat(4, 1fr); }
     body.desktop-mode .section-title,
     body.force-desktop .section-title { max-width:900px; }
+    body.desktop-mode .header,
+    body.force-desktop .header { max-width:900px; }
     body.desktop-mode .chart-container,
     body.force-desktop .chart-container { max-width:900px; }
 
     body.force-mobile .cards { max-width:400px !important; grid-template-columns: 1fr !important; }
     body.force-mobile .section-title,
     body.force-mobile .chart-container,
-
+    body.force-mobile .header { max-width:400px !important; }
 
     /* View toggle */
     .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
