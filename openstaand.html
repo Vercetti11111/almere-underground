@@ -354,7 +354,7 @@ function render() {
   const genTime = dataGeneratedAt ? new Date(dataGeneratedAt).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-';
   html += `<div class="refresh-bar">
     <span class="refresh-info">${t('refreshed')}: ${genTime}</span>
-    <button class="refresh-btn" onclick="loadData()">${t('refresh')}</button>
+
   </div>`;
 
   // Past bookings — grouped by month (collapsible)
