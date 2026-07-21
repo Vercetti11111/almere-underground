@@ -67,6 +67,17 @@
     .rs-notes-label { font-size:10px; color:#666; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
     .pay-badge { display:inline-block; padding:5px 10px; border-radius:10px; font-size:11px; font-weight:700; color:white; line-height:1.5; white-space:pre-line; text-align:left; }
     .rs-tafel { font-size:15px; font-weight:700; color:#f1f1f5; }
+    /* Multi-table selector */
+    .tafel-multi { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+    .tafel-chip { display:inline-flex; align-items:center; gap:2px; background:#7c3aed44; color:#a78bfa; border-radius:6px; padding:3px 8px; font-size:12px; font-weight:600; cursor:default; }
+    .tafel-chip .chip-x { cursor:pointer; margin-left:2px; font-size:14px; color:#888; }
+    .tafel-chip .chip-x:hover { color:#f44; }
+    .tafel-add-btn { background:none; border:1px dashed #555; color:#888; border-radius:6px; padding:3px 8px; font-size:12px; cursor:pointer; }
+    .tafel-add-btn:hover { border-color:#a78bfa; color:#a78bfa; }
+    .tafel-dropdown { position:absolute; z-index:100; background:#1e1e2a; border:1px solid #333; border-radius:8px; max-height:200px; overflow-y:auto; min-width:120px; box-shadow:0 4px 12px rgba(0,0,0,.5); }
+    .tafel-dropdown-item { padding:6px 12px; cursor:pointer; font-size:12px; color:#ddd; }
+    .tafel-dropdown-item:hover { background:#2a2a3a; }
+    .tafel-dropdown-item.disabled { color:#555; pointer-events:none; }
     .pay-paid { background:#166534; }
     .pay-unpaid { background:#92400e; }
     @media (max-width:600px) {
@@ -534,8 +545,11 @@ async function renderOverview(forceRefresh = false) {
     ]);
 
     lastRunsheetData = data;
-    // Strip "Tafel " prefix from table names — show only the number
-    ovTables = (tables || []).map(t => typeof t === 'string' ? t.replace(/^Tafel\s*/i, '') : t);
+    // Tables now come as [{name, capacity}] objects from KV
+    ovTables = (tables || []).map(t => {
+      if (typeof t === 'string') return { name: t.replace(/^Tafel\s*/i, ''), capacity: 0 };
+      return { name: (t.name || '').replace(/^Tafel\s*/i, ''), capacity: t.capacity || 0 };
+    });
     // Staff now comes as [{name, start, end}] — store full objects
     ovStaffFull = Array.isArray(staffRaw) ? staffRaw : [];
     ovStaff = ovStaffFull.map(s => typeof s === 'string' ? s : s.name);
@@ -603,10 +617,9 @@ async function renderOverview(forceRefresh = false) {
         const ft = getFirstTime(b);
         const timeStr = ft !== '99:99' ? ft : '—';
 
-        // Table dropdown — add "Anders..." option
-        const tableOptions = (ovTables || []).map(tn =>
-          `<option value="${tn}" ${assign.tafel === tn ? 'selected' : ''}>${tn}</option>`
-        ).join('');
+        // Multi-table chips
+        const selectedTables = Array.isArray(assign.tafels) ? assign.tafels : (assign.tafel ? [assign.tafel] : []);
+        const tableChipsHtml = renderTableChips(bid, selectedTables);
 
         // Staff dropdown — filter by booking start time + add "Anders..." option
         const filteredStaff = staffForTime(ft !== '99:99' ? ft : null);
@@ -626,12 +639,8 @@ async function renderOverview(forceRefresh = false) {
             <td class="ov-hide-mobile">${b.contactName || '—'}</td>
             <td class="ov-hide-mobile">${b.contactPhone || '—'}</td>
             <td class="ov-hide-mobile" style="color:#999;font-size:11px;">#${bid}</td>
-            <td>
-              <select class="ov-select" data-bid="${bid}" data-field="tafel" onchange="handleAssignmentChange(this,'${bid}','tafel')">
-                <option value="">— Kies —</option>
-                ${tableOptions}
-                <option value="__anders__">Anders…</option>
-              </select>
+            <td style="position:relative;">
+              ${tableChipsHtml}
             </td>
             <td>
               <select class="ov-select" data-bid="${bid}" data-field="begeleider" onchange="handleAssignmentChange(this,'${bid}','begeleider')">
@@ -682,6 +691,113 @@ async function renderOverview(forceRefresh = false) {
   } catch (e) { setContent(errMsg(e.message)); }
 }
 
+// ── Multi-table selector ─────────────────────────────────────────────────────
+
+function getTableLabel(tableName) {
+  const tObj = (ovTables || []).find(t => t.name === tableName);
+  return tObj && tObj.capacity ? `${tableName} (${tObj.capacity})` : tableName;
+}
+
+function renderTableChips(bid, selectedTables) {
+  const chips = selectedTables.map(tn =>
+    `<span class="tafel-chip">${getTableLabel(tn)}<span class="chip-x" onclick="removeTable('${bid}','${tn}')">&times;</span></span>`
+  ).join('');
+  return `<div class="tafel-multi" id="tafel-multi-${bid}">${chips}<button class="tafel-add-btn" onclick="showTableDropdown(event,'${bid}')">+ Tafel</button></div>`;
+}
+
+function showTableDropdown(evt, bid) {
+  evt.stopPropagation();
+  // Close any existing dropdown
+  closeTableDropdown();
+  const assign = ovAssignments[bid] || {};
+  const selected = Array.isArray(assign.tafels) ? assign.tafels : (assign.tafel ? [assign.tafel] : []);
+
+  const dd = document.createElement('div');
+  dd.className = 'tafel-dropdown';
+  dd.id = 'tafel-dropdown-active';
+
+  // Build items
+  for (const tObj of (ovTables || [])) {
+    const tn = tObj.name;
+    const isSelected = selected.includes(tn);
+    const item = document.createElement('div');
+    item.className = 'tafel-dropdown-item' + (isSelected ? ' disabled' : '');
+    item.textContent = getTableLabel(tn) + (isSelected ? ' ✓' : '');
+    if (!isSelected) {
+      item.onclick = () => { addTable(bid, tn); closeTableDropdown(); };
+    }
+    dd.appendChild(item);
+  }
+
+  // "Anders..." option
+  const anders = document.createElement('div');
+  anders.className = 'tafel-dropdown-item';
+  anders.style.borderTop = '1px solid #333';
+  anders.textContent = 'Anders…';
+  anders.onclick = () => {
+    closeTableDropdown();
+    const custom = prompt('Voer een tafelnummer in:');
+    if (custom && custom.trim()) addTable(bid, custom.trim());
+  };
+  dd.appendChild(anders);
+
+  // Position dropdown near button
+  const btn = evt.currentTarget;
+  const container = btn.closest('td');
+  container.appendChild(dd);
+
+  // Close on outside click
+  setTimeout(() => document.addEventListener('click', closeTableDropdown, { once: true }), 10);
+}
+
+function closeTableDropdown() {
+  const dd = document.getElementById('tafel-dropdown-active');
+  if (dd) dd.remove();
+}
+
+function addTable(bid, tableName) {
+  if (!ovAssignments[bid]) ovAssignments[bid] = {};
+  const assign = ovAssignments[bid];
+  const current = Array.isArray(assign.tafels) ? assign.tafels : (assign.tafel ? [assign.tafel] : []);
+
+  // Conflict check
+  const conflicts = [];
+  for (const [otherBid, a] of Object.entries(ovAssignments)) {
+    if (otherBid === bid) continue;
+    const otherTables = Array.isArray(a.tafels) ? a.tafels : (a.tafel ? [a.tafel] : []);
+    if (otherTables.includes(tableName)) {
+      const allB = window._ovAllBookings || [];
+      const match = allB.find(b => String(b.id || b.bookingReference || '') === otherBid);
+      conflicts.push(match ? match.name : `#${otherBid}`);
+    }
+  }
+  if (conflicts.length > 0) {
+    const msg = `⚠️ Tafel ${tableName} is al toegewezen aan:\n\n${conflicts.map(c => '• ' + c).join('\n')}\n\nWeet je zeker dat je deze tafel wilt toewijzen?`;
+    if (!confirm(msg)) return;
+  }
+
+  if (!current.includes(tableName)) current.push(tableName);
+  assign.tafels = current;
+  assign.tafel = current[0] || ''; // backward compat
+  updateTableChipsUI(bid, current);
+  saveAssignments();
+}
+
+function removeTable(bid, tableName) {
+  if (!ovAssignments[bid]) return;
+  const assign = ovAssignments[bid];
+  const current = Array.isArray(assign.tafels) ? assign.tafels : (assign.tafel ? [assign.tafel] : []);
+  assign.tafels = current.filter(t => t !== tableName);
+  assign.tafel = assign.tafels[0] || '';
+  updateTableChipsUI(bid, assign.tafels);
+  saveAssignments();
+}
+
+function updateTableChipsUI(bid, selectedTables) {
+  const container = document.getElementById(`tafel-multi-${bid}`);
+  if (container) container.outerHTML = renderTableChips(bid, selectedTables);
+}
+
 // ── Assignment handler (conflict check + "Anders" popup) ─────────────────────
 let saveTimer = null;
 let ovStaffFull = []; // [{name, start, end}]
@@ -691,49 +807,23 @@ function handleAssignmentChange(selectEl, bookingId, field) {
 
   // "Anders…" → prompt for manual input
   if (value === '__anders__') {
-    const label = field === 'tafel' ? 'Voer een tafelnummer in:' : 'Voer een naam in:';
+    const label = 'Voer een naam in:';
     const custom = prompt(label);
     if (!custom || !custom.trim()) {
-      // Cancelled → revert to previous value
       const prev = (ovAssignments[bookingId] || {})[field] || '';
       selectEl.value = prev;
       return;
     }
     const val = custom.trim();
-    // Add custom option to select
     const opt = document.createElement('option');
     opt.value = val;
     opt.textContent = val;
     opt.selected = true;
-    // Insert before "Anders…"
     const andersOpt = selectEl.querySelector('option[value="__anders__"]');
     selectEl.insertBefore(opt, andersOpt);
     selectEl.value = val;
     doSaveAssignment(bookingId, field, val, selectEl);
     return;
-  }
-
-  // Conflict check for tafel
-  if (field === 'tafel' && value) {
-    // Find other bookings assigned to the same table
-    const conflicts = [];
-    for (const [bid, a] of Object.entries(ovAssignments)) {
-      if (bid !== bookingId && a.tafel === value) {
-        // Find booking name
-        const allB = window._ovAllBookings || [];
-        const match = allB.find(b => String(b.id || b.bookingReference || '') === bid);
-        conflicts.push(match ? match.name : `#${bid}`);
-      }
-    }
-    if (conflicts.length > 0) {
-      const msg = `⚠️ Tafel ${value} is al toegewezen aan:\n\n${conflicts.map(c => '• ' + c).join('\n')}\n\nWeet je zeker dat je deze tafel wilt toewijzen?`;
-      if (!confirm(msg)) {
-        // Revert to previous value
-        const prev = (ovAssignments[bookingId] || {})[field] || '';
-        selectEl.value = prev;
-        return;
-      }
-    }
   }
 
   doSaveAssignment(bookingId, field, value, selectEl);
@@ -742,8 +832,10 @@ function handleAssignmentChange(selectEl, bookingId, field) {
 function doSaveAssignment(bookingId, field, value, selectEl) {
   if (!ovAssignments[bookingId]) ovAssignments[bookingId] = {};
   ovAssignments[bookingId][field] = value;
+  saveAssignments(selectEl);
+}
 
-  // Debounce save
+function saveAssignments(flashEl) {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
@@ -753,18 +845,16 @@ function doSaveAssignment(bookingId, field, value, selectEl) {
         headers: { 'Content-Type': 'application/json', 'X-Access-Code': accessCode },
         body: JSON.stringify(ovAssignments)
       });
-      // Keep local cache in sync so tab switch doesn't revert
       cache[`/api/runsheet-assignments?date=${rsDate}`] = JSON.parse(JSON.stringify(ovAssignments));
-      // Flash save indicator on the select
-      if (selectEl) {
-        selectEl.style.borderColor = '#22c55e';
-        setTimeout(() => { selectEl.style.borderColor = ''; }, 800);
+      if (flashEl) {
+        flashEl.style.borderColor = '#22c55e';
+        setTimeout(() => { flashEl.style.borderColor = ''; }, 800);
       }
     } catch (e) {
       console.error('Save failed:', e);
-      if (selectEl) {
-        selectEl.style.borderColor = '#ef4444';
-        setTimeout(() => { selectEl.style.borderColor = ''; }, 800);
+      if (flashEl) {
+        flashEl.style.borderColor = '#ef4444';
+        setTimeout(() => { flashEl.style.borderColor = ''; }, 800);
       }
     }
   }, 300);
@@ -893,6 +983,13 @@ async function downloadRunsheetPDF(date) {
     );
   }
 
+  // Helper: get tafels display string from assignment
+  function getTafelsStr(assign) {
+    if (!assign) return '';
+    const arr = Array.isArray(assign.tafels) ? assign.tafels : (assign.tafel ? [assign.tafel] : []);
+    return arr.map(t => t.replace(/^Tafel\s*/i, '')).join(', ');
+  }
+
   // Color constants
   const kfRgb = [99, 102, 241];   // indigo
   const ffRgb = [107, 33, 168];   // purple
@@ -946,7 +1043,7 @@ async function downloadRunsheetPDF(date) {
         b.contactPhone || '',
         '#' + (bid || ''),
         getPax(b),
-        (assign.tafel || '').replace(/^Tafel\s*/i, ''),
+        getTafelsStr(assign),
         shortN(assign.begeleider || ''),
         firstTime(b),
         { content: payStr, styles: { textColor: isPaid ? [21, 87, 36] : [180, 60, 0] } }
@@ -1179,7 +1276,7 @@ async function downloadRunsheetPDF(date) {
             { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: rightCell, styles: { fontStyle: 'bold', fontSize: 10, textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
-            { content: 'Tafel: ' + (bkAssign.tafel || '').replace(/^Tafel\s*/i, ''), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: 'Tafel: ' + getTafelsStr(bkAssign), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
           // Column headers
           const hdrRow = [];
@@ -1266,7 +1363,7 @@ async function downloadRunsheetPDF(date) {
       return [
         b.name || '',
         getPax(b),          // PAX
-        (ca.tafel || '').replace(/^Tafel\s*/i, ''),     // Tafel
+        getTafelsStr(ca),     // Tafel
         shortN(ca.begeleider || ''),  // Begeleider
         firstTime(b),       // Aankomsttijd
         hasLimo(b) ? 'Ja' : 'Nee',  // Limo
