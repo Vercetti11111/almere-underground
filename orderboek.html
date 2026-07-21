@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Almere Underground – Orderboek</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  ::-webkit-scrollbar { display: none; }
+  body { margin: 0; background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; transition:max-width .3s; }
+  .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
+  .kpi-card { background:#1a1a24; border-radius:12px; padding:12px 8px; text-align:center; }
+  .kpi-label { font-size:11px; color:#888; margin-bottom:2px; }
+  .kpi-value { font-size:16px; font-weight:700; }
+  .section-title { font-size:12px; font-weight:700; color:#aaa; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.05em; }
+  .spinner { width:32px; height:32px; border:3px solid #2a2a38; border-top-color:#7c3aed; border-radius:50%; animation:spin 0.8s linear infinite; margin:48px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .err-msg { text-align:center; padding:40px 20px; color:#ef4444; font-size:13px; line-height:1.6; }
+  #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+
+  @media (min-width: 768px) {
+    body.desktop-mode #app-screen { max-width:1100px; padding:24px 32px 60px; }
+    body.desktop-mode .kpi-card { padding:16px 12px; }
+    body.desktop-mode .kpi-value { font-size:20px; }
+  }
+  body.force-desktop #app-screen { max-width:1100px !important; padding:24px 32px 60px !important; }
+  body.force-mobile #app-screen { max-width:480px !important; }
+  .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+  .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
+
+  .tab-bar { display:flex; gap:4px; margin-bottom:16px; overflow-x:auto; }
+  .tab-btn { flex:1; padding:8px 4px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; border:none; background:#1a1a24; color:#888; white-space:nowrap; min-width:70px; }
+  .tab-btn.active { background:#7c3aed; color:white; }
+
+  table.ob-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px; }
+  table.ob-table th { text-align:left; padding:8px 6px; color:#888; font-weight:600; font-size:11px; text-transform:uppercase; border-bottom:1px solid #2a2a38; }
+  table.ob-table td { padding:8px 6px; border-bottom:1px solid #1e1e2a; }
+  table.ob-table tr:hover td { background:#12121c; }
+
+  .trend-up { color:#10b981; }
+  .trend-down { color:#ef4444; }
+  .trend-neutral { color:#888; }
+
+  .comparison-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+  .comparison-card { background:#12121c; border-radius:10px; padding:14px; }
+  .comparison-card .year { font-size:11px; color:#7c3aed; font-weight:600; margin-bottom:4px; }
+  .comparison-card .val { font-size:18px; font-weight:800; }
+  .comparison-card .sub { font-size:11px; color:#888; margin-top:2px; }
+
+  .cat-badge { display:inline-block; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700; }
+  .cat-KF { background:#7c3aed33; color:#a78bfa; }
+  .cat-BF { background:#3b82f633; color:#60a5fa; }
+  .cat-FF { background:#f59e0b33; color:#fbbf24; }
+  .cat-RR { background:#10b98133; color:#34d399; }
+
+  .month-bar { display:flex; align-items:flex-end; gap:2px; height:80px; margin-bottom:4px; }
+  .month-bar-segment { border-radius:3px 3px 0 0; min-width:8px; transition:height .3s; }
+</style>
+</head>
+<body>
+<div id="app-screen">
+  <div class="header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;" id="page-title">📒 Orderboek</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
+      <button id="refresh-btn" onclick="doRefresh()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Verversen">🔄</button>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const WORKER = 'https://api.almereunderground.com';
+const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_session || !_session.code || (_session.expiresAt && Date.now() > _session.expiresAt)) {
+  localStorage.removeItem('au_session');
+  window.location.href = 'index.html';
+}
+const accessCode = _session ? _session.code : '';
+
+// View mode
+function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
+function applyViewMode() {
+  const mode = getViewMode();
+  document.body.classList.remove('desktop-mode','force-desktop','force-mobile');
+  if (mode === 'desktop') document.body.classList.add('force-desktop');
+  else if (mode === 'mobile') document.body.classList.add('force-mobile');
+  else if (window.innerWidth >= 768) document.body.classList.add('desktop-mode');
+  const btn = document.getElementById('view-toggle-btn');
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
+}
+function toggleViewMode() {
+  const modes = ['auto','desktop','mobile'];
+  const cur = getViewMode();
+  localStorage.setItem('au_view_mode', modes[(modes.indexOf(cur)+1)%3]);
+  applyViewMode();
+}
+window.addEventListener('resize', applyViewMode);
+
+// i18n
+const TRANSLATIONS = {
+  nl: {
+    pageTitle: '📒 Orderboek',
+    tabOverview: 'Overzicht', tabKF: 'Kinderfeestjes', tabBF: 'Bedrijfsfeesten', tabAll: 'Alle boekingen',
+    year: 'Jaar', count: 'Aantal', value: 'Waarde', cancelled: 'Geannuleerd', pax: 'PAX',
+    confirmed: 'Bevestigd', option: 'Optie', total: 'Totaal',
+    noData: 'Geen data beschikbaar',
+    next6m: 'Komende 6 maanden (orderboek)',
+    vsLY: 'vs vorig jaar', vsCurrent: 'huidig',
+    monthLabel: 'Maand', category: 'Categorie',
+    bmiNote: 'BMI historisch (excl. 9% BTW)', rollerNote: 'Roller (mei 2026+)',
+  },
+  en: {
+    pageTitle: '📒 Order Book',
+    tabOverview: 'Overview', tabKF: 'Birthday Parties', tabBF: 'Corporate Events', tabAll: 'All Bookings',
+    year: 'Year', count: 'Count', value: 'Value', cancelled: 'Cancelled', pax: 'PAX',
+    confirmed: 'Confirmed', option: 'Option', total: 'Total',
+    noData: 'No data available',
+    next6m: 'Next 6 months (order book)',
+    vsLY: 'vs last year', vsCurrent: 'current',
+    monthLabel: 'Month', category: 'Category',
+    bmiNote: 'BMI historical (excl. 9% VAT)', rollerNote: 'Roller (May 2026+)',
+  }
+};
+let lang = localStorage.getItem('au_lang') || 'nl';
+function t(key) { return (TRANSLATIONS[lang] || TRANSLATIONS.nl)[key] || key; }
+function locale() { return lang === 'en' ? 'en-GB' : 'nl-NL'; }
+function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('lang-select').value = l; document.getElementById('page-title').textContent = t('pageTitle'); render(); }
+
+function fmtEur(v) { if (v == null || isNaN(v)) return '—'; return '€\u00a0' + v.toLocaleString(locale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+function setContent(html) { document.getElementById('content').innerHTML = html; }
+function spinner() { return '<div class="spinner"></div>'; }
+
+// Data
+let orderData = null;
+let currentTab = 'overview';
+
+async function loadData(force = false) {
+  const sep = '?';
+  const url = `${WORKER}/api/orderboek${sep}code=${accessCode}`;
+  const r = await fetch(url, { headers: { 'X-Access-Code': accessCode } });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+async function doRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try { orderData = null; await render(true); } finally { if (btn) { btn.disabled = false; btn.textContent = '🔄'; } }
+}
+
+function categorize(b) {
+  // Normalize status
+  const s = (b.status || b.staat || '').toLowerCase();
+  const isCancelled = b.isCancelled || s.includes('cancel') || s === 'cancellation';
+  const isOption = s === 'option' || s === 'pendingpayment';
+  const isConfirmed = !isCancelled && !isOption;
+  return { ...b, _cancelled: isCancelled, _option: isOption, _confirmed: isConfirmed };
+}
+
+function buildComparison(allBookings) {
+  const today = new Date();
+  const thisYear = today.getFullYear();
+  const refMonth = today.getMonth(); // 0-based
+  const refDay = today.getDate();
+
+  // Build 3-year comparison windows
+  const years = [thisYear, thisYear - 1, thisYear - 2];
+  const results = {};
+
+  for (const year of years) {
+    const refDate = `${year}-${String(refMonth + 1).padStart(2, '0')}-${String(refDay).padStart(2, '0')}`;
+    const windowEnd = new Date(year, refMonth + 6, refDay);
+    const windowEndStr = windowEnd.toISOString().slice(0, 10);
+
+    // Filter bookings:
+    // - Created by refDate (or no created date for Roller 2026)
+    // - Event in next 6 months from refDate
+    const filtered = allBookings.filter(b => {
+      const eventDate = (b.eventDate || '').substring(0, 10);
+      if (!eventDate) return false;
+      if (eventDate < refDate || eventDate > windowEndStr) return false;
+
+      // Created date check
+      const created = b.createdDate || b.aangemaakt || '';
+      if (created && created > refDate) return false;
+
+      // For Roller 2026: no created date, but all are current
+      if (!created && b.source === 'Roller' && year !== thisYear) return false;
+      if (!created && b.source === 'BMI' && year !== thisYear) return false;
+
+      return true;
+    }).map(categorize);
+
+    // Aggregate by category
+    const byCat = { KF: [], BF: [], FF: [], RR: [] };
+    for (const b of filtered) {
+      const cat = b.category;
+      if (byCat[cat]) byCat[cat].push(b);
+    }
+
+    // Monthly breakdown
+    const byMonth = {};
+    for (const b of filtered) {
+      const m = (b.eventDate || '').substring(0, 7); // YYYY-MM
+      if (!byMonth[m]) byMonth[m] = { count: 0, value: 0, cancelled: 0 };
+      byMonth[m].count++;
+      if (!b._cancelled) byMonth[m].value += b.amountExclBtw || 0;
+      if (b._cancelled) byMonth[m].cancelled++;
+    }
+
+    const calcStats = (arr) => ({
+      total: arr.length,
+      confirmed: arr.filter(b => b._confirmed).length,
+      option: arr.filter(b => b._option).length,
+      cancelled: arr.filter(b => b._cancelled).length,
+      value: arr.filter(b => !b._cancelled).reduce((s, b) => s + (b.amountExclBtw || 0), 0),
+      pax: arr.filter(b => !b._cancelled).reduce((s, b) => s + (b.pax || 0), 0),
+      bookings: arr
+    });
+
+    results[year] = {
+      refDate,
+      windowEnd: windowEndStr,
+      all: calcStats(filtered),
+      KF: calcStats(byCat.KF),
+      BF: calcStats(byCat.BF),
+      FF: calcStats(byCat.FF),
+      RR: calcStats(byCat.RR),
+      byMonth
+    };
+  }
+  return results;
+}
+
+function trendIcon(current, previous) {
+  if (!previous || previous === 0) return '';
+  const pct = ((current - previous) / previous * 100).toFixed(0);
+  if (current > previous) return `<span class="trend-up">▲ ${pct}%</span>`;
+  if (current < previous) return `<span class="trend-down">▼ ${pct}%</span>`;
+  return `<span class="trend-neutral">— 0%</span>`;
+}
+
+function renderOverview(comp) {
+  const thisYear = new Date().getFullYear();
+  const cy = comp[thisYear];
+  const ly = comp[thisYear - 1];
+  const y2 = comp[thisYear - 2];
+
+  let html = `<div class="section-title">${t('next6m')}</div>`;
+
+  // Top KPI cards
+  html += `<div class="comparison-grid">
+    <div class="comparison-card">
+      <div class="year">${thisYear} ${t('vsCurrent')}</div>
+      <div class="val">${fmtEur(cy?.all.value || 0)}</div>
+      <div class="sub">${cy?.all.total - cy?.all.cancelled || 0} boekingen · ${cy?.all.pax || 0} PAX</div>
+    </div>
+    <div class="comparison-card">
+      <div class="year">${thisYear - 1} ${t('vsLY')}</div>
+      <div class="val">${fmtEur(ly?.all.value || 0)}</div>
+      <div class="sub">${ly?.all.total - ly?.all.cancelled || 0} boekingen · ${ly?.all.pax || 0} PAX</div>
+    </div>
+  </div>`;
+
+  // Trend
+  if (ly) {
+    const valDiff = (cy?.all.value || 0) - (ly?.all.value || 0);
+    const valPct = ly.all.value > 0 ? ((valDiff / ly.all.value) * 100).toFixed(0) : '∞';
+    const countDiff = (cy?.all.total - cy?.all.cancelled) - (ly?.all.total - ly?.all.cancelled);
+    const trendColor = valDiff >= 0 ? '#10b981' : '#ef4444';
+    const arrow = valDiff >= 0 ? '▲' : '▼';
+    html += `<div class="card" style="text-align:center;">
+      <div style="font-size:24px;font-weight:800;color:${trendColor};">${arrow} ${valPct}%</div>
+      <div style="font-size:12px;color:#888;margin-top:4px;">${fmtEur(Math.abs(valDiff))} ${valDiff >= 0 ? 'meer' : 'minder'} omzet · ${Math.abs(countDiff)} ${countDiff >= 0 ? 'meer' : 'minder'} boekingen</div>
+    </div>`;
+  }
+
+  // Category breakdown table
+  html += `<div class="section-title">${t('category')} vergelijking</div>`;
+  html += `<div class="card" style="overflow-x:auto;"><table class="ob-table">
+    <tr><th>${t('category')}</th><th>${thisYear}</th><th>${thisYear - 1}</th><th>Trend</th></tr>`;
+  for (const cat of ['BF', 'KF', 'FF', 'RR']) {
+    const c = cy?.[cat] || { total: 0, cancelled: 0, value: 0 };
+    const l = ly?.[cat] || { total: 0, cancelled: 0, value: 0 };
+    const cActive = c.total - c.cancelled;
+    const lActive = l.total - l.cancelled;
+    if (cActive === 0 && lActive === 0) continue;
+    html += `<tr>
+      <td><span class="cat-badge cat-${cat}">${cat}</span></td>
+      <td>${cActive} · ${fmtEur(c.value)}</td>
+      <td>${lActive} · ${fmtEur(l.value)}</td>
+      <td>${trendIcon(c.value, l.value)}</td>
+    </tr>`;
+  }
+  html += `</table></div>`;
+
+  // Monthly chart
+  html += `<div class="section-title">${t('monthLabel')} overzicht</div>`;
+  const months = [];
+  for (let m = 0; m < 6; m++) {
+    const d = new Date(new Date().getFullYear(), new Date().getMonth() + m, 1);
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const monthsLY = months.map(m => {
+    const [y, mm] = m.split('-');
+    return `${parseInt(y) - 1}-${mm}`;
+  });
+
+  const maxVal = Math.max(1, ...months.map(m => cy?.byMonth[m]?.value || 0), ...monthsLY.map(m => ly?.byMonth[m]?.value || 0));
+
+  html += `<div class="card"><div style="display:flex;gap:12px;justify-content:center;margin-bottom:12px;">
+    <span style="font-size:11px;color:#7c3aed;">● ${thisYear}</span>
+    <span style="font-size:11px;color:#3b82f6;">● ${thisYear - 1}</span>
+  </div>`;
+  html += `<div style="display:flex;gap:4px;align-items:flex-end;">`;
+  for (let i = 0; i < months.length; i++) {
+    const cyVal = cy?.byMonth[months[i]]?.value || 0;
+    const lyVal = ly?.byMonth[monthsLY[i]]?.value || 0;
+    const cyH = Math.max(4, (cyVal / maxVal) * 80);
+    const lyH = Math.max(4, (lyVal / maxVal) * 80);
+    const cyCount = cy?.byMonth[months[i]]?.count || 0;
+    const lyCount = ly?.byMonth[monthsLY[i]]?.count || 0;
+    const monthName = new Date(months[i] + '-01').toLocaleDateString(locale(), { month: 'short' });
+    html += `<div style="flex:1;text-align:center;">
+      <div style="display:flex;gap:2px;justify-content:center;align-items:flex-end;height:80px;">
+        <div style="width:40%;background:#3b82f6;height:${lyH}px;border-radius:3px 3px 0 0;opacity:0.7;" title="${thisYear-1}: ${fmtEur(lyVal)} (${lyCount})"></div>
+        <div style="width:40%;background:#7c3aed;height:${cyH}px;border-radius:3px 3px 0 0;" title="${thisYear}: ${fmtEur(cyVal)} (${cyCount})"></div>
+      </div>
+      <div style="font-size:10px;color:#888;margin-top:4px;">${monthName}</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // Status breakdown for current year
+  if (cy) {
+    const confirmed = cy.all.confirmed;
+    const options = cy.all.option;
+    const cancelled = cy.all.cancelled;
+    html += `<div class="section-title">Status ${thisYear}</div>`;
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+      <div class="kpi-card"><div class="kpi-label">✅ ${t('confirmed')}</div><div class="kpi-value" style="color:#10b981;">${confirmed}</div></div>
+      <div class="kpi-card"><div class="kpi-label">⏳ ${t('option')}</div><div class="kpi-value" style="color:#f59e0b;">${options}</div></div>
+      <div class="kpi-card"><div class="kpi-label">❌ ${t('cancelled')}</div><div class="kpi-value" style="color:#ef4444;">${cancelled}</div></div>
+    </div>`;
+  }
+
+  // Data source note
+  html += `<div style="font-size:10px;color:#444;text-align:center;margin-top:16px;">
+    📊 ${t('bmiNote')} + ${t('rollerNote')}<br>
+    BMI: ${orderData?.bmi?.length || 0} boekingen · Roller: ${orderData?.roller?.length || 0} boekingen
+  </div>`;
+
+  return html;
+}
+
+function renderCategoryDetail(comp, cat) {
+  const thisYear = new Date().getFullYear();
+  const cy = comp[thisYear]?.[cat] || { bookings: [], total: 0, cancelled: 0, value: 0, pax: 0 };
+  const ly = comp[thisYear - 1]?.[cat] || { bookings: [], total: 0, cancelled: 0, value: 0, pax: 0 };
+
+  const catLabels = { KF: 'Kinderfeestjes', BF: 'Bedrijfsfeesten', FF: 'Familie/Vrienden', RR: 'Overig (RR)' };
+  const catLabel = catLabels[cat] || cat;
+
+  let html = `<div class="section-title">${catLabel}</div>`;
+
+  // KPI cards
+  html += `<div class="comparison-grid">
+    <div class="comparison-card">
+      <div class="year">${thisYear}</div>
+      <div class="val">${fmtEur(cy.value)}</div>
+      <div class="sub">${cy.total - cy.cancelled} boekingen · ${cy.pax} PAX</div>
+    </div>
+    <div class="comparison-card">
+      <div class="year">${thisYear - 1}</div>
+      <div class="val">${fmtEur(ly.value)}</div>
+      <div class="sub">${ly.total - ly.cancelled} boekingen · ${ly.pax} PAX</div>
+    </div>
+  </div>`;
+
+  // Bookings table (current year)
+  const activeBookings = cy.bookings.filter(b => !b._cancelled).sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''));
+  if (activeBookings.length > 0) {
+    html += `<div class="section-title">Boekingen ${thisYear}</div>`;
+    html += `<div class="card" style="overflow-x:auto;"><table class="ob-table">
+      <tr><th>Naam</th><th>Datum</th><th>PAX</th><th>Waarde</th><th>Status</th></tr>`;
+    for (const b of activeBookings) {
+      const dateStr = b.eventDate ? new Date(b.eventDate + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' }) : '—';
+      const statusColor = b._confirmed ? '#10b981' : '#f59e0b';
+      const statusLabel = b._confirmed ? '✅' : '⏳';
+      const linkStart = b.source === 'Roller' ? `<a href="https://manage.roller.app/booking/${b.id}" target="_blank" style="color:#a78bfa;text-decoration:none;">` : '';
+      const linkEnd = b.source === 'Roller' ? '</a>' : '';
+      html += `<tr>
+        <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${b.name}">${linkStart}${b.name}${linkEnd}</td>
+        <td style="white-space:nowrap;">${dateStr}</td>
+        <td>${b.pax || '—'}</td>
+        <td>${fmtEur(b.amountExclBtw)}</td>
+        <td>${statusLabel}</td>
+      </tr>`;
+    }
+    html += `</table></div>`;
+  }
+
+  return html;
+}
+
+function renderAllBookings(comp) {
+  const thisYear = new Date().getFullYear();
+  const cy = comp[thisYear];
+  if (!cy) return `<div class="err-msg">${t('noData')}</div>`;
+
+  const all = cy.all.bookings.sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''));
+  let html = `<div class="section-title">Alle boekingen ${thisYear} (${all.length})</div>`;
+  html += `<div class="card" style="overflow-x:auto;"><table class="ob-table">
+    <tr><th>Cat</th><th>Naam</th><th>Datum</th><th>PAX</th><th>Waarde</th><th>Bron</th></tr>`;
+  for (const b of all) {
+    if (b._cancelled) continue;
+    const dateStr = b.eventDate ? new Date(b.eventDate + 'T00:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'short' }) : '—';
+    const linkStart = b.source === 'Roller' ? `<a href="https://manage.roller.app/booking/${b.id}" target="_blank" style="color:#a78bfa;text-decoration:none;">` : '';
+    const linkEnd = b.source === 'Roller' ? '</a>' : '';
+    html += `<tr>
+      <td><span class="cat-badge cat-${b.category}">${b.category}</span></td>
+      <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${b.name}">${linkStart}${b.name}${linkEnd}</td>
+      <td style="white-space:nowrap;">${dateStr}</td>
+      <td>${b.pax || '—'}</td>
+      <td>${fmtEur(b.amountExclBtw)}</td>
+      <td style="font-size:10px;color:#666;">${b.source}</td>
+    </tr>`;
+  }
+  html += `</table></div>`;
+  return html;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderContent();
+}
+
+function renderContent() {
+  if (!orderData) return;
+  const allBookings = [...(orderData.bmi || []), ...(orderData.roller || [])];
+  const comp = buildComparison(allBookings);
+  const el = document.getElementById('tab-content');
+  if (!el) return;
+
+  if (currentTab === 'overview') el.innerHTML = renderOverview(comp);
+  else if (currentTab === 'KF') el.innerHTML = renderCategoryDetail(comp, 'KF');
+  else if (currentTab === 'BF') el.innerHTML = renderCategoryDetail(comp, 'BF');
+  else if (currentTab === 'all') el.innerHTML = renderAllBookings(comp);
+}
+
+async function render(force = false) {
+  setContent(spinner());
+  try {
+    if (!orderData || force) orderData = await loadData(force);
+
+    let html = `<div class="tab-bar">
+      <button class="tab-btn ${currentTab==='overview'?'active':''}" data-tab="overview" onclick="switchTab('overview')">📊 ${t('tabOverview')}</button>
+      <button class="tab-btn ${currentTab==='KF'?'active':''}" data-tab="KF" onclick="switchTab('KF')">🎂 ${t('tabKF')}</button>
+      <button class="tab-btn ${currentTab==='BF'?'active':''}" data-tab="BF" onclick="switchTab('BF')">🏢 ${t('tabBF')}</button>
+      <button class="tab-btn ${currentTab==='all'?'active':''}" data-tab="all" onclick="switchTab('all')">📋 ${t('tabAll')}</button>
+    </div>
+    <div id="tab-content"></div>`;
+
+    setContent(html);
+    renderContent();
+  } catch (e) { setContent(`<div class="err-msg">⚠️ ${e.message}</div>`); }
+}
+
+// Start
+applyViewMode();
+document.getElementById('lang-select').value = lang;
+if (accessCode) render();
+</script>
+</body>
+</html>
