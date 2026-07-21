@@ -75,9 +75,11 @@
     .tafel-add-btn { background:none; border:1px dashed #555; color:#888; border-radius:6px; padding:3px 8px; font-size:12px; cursor:pointer; }
     .tafel-add-btn:hover { border-color:#a78bfa; color:#a78bfa; }
     .tafel-dropdown { position:absolute; z-index:100; background:#1e1e2a; border:1px solid #333; border-radius:8px; max-height:200px; overflow-y:auto; min-width:120px; box-shadow:0 4px 12px rgba(0,0,0,.5); }
-    .tafel-dropdown-item { padding:6px 12px; cursor:pointer; font-size:12px; color:#ddd; }
+    .tafel-dropdown-item { padding:6px 12px; cursor:pointer; font-size:12px; color:#ddd; display:flex; align-items:center; gap:6px; }
     .tafel-dropdown-item:hover { background:#2a2a3a; }
-    .tafel-dropdown-item.disabled { color:#555; pointer-events:none; }
+    .tafel-dropdown-item .td-check { width:16px; height:16px; border-radius:4px; border:1.5px solid #555; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
+    .tafel-dropdown-item.checked .td-check { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+    .tafel-dropdown-item.checked { color:#a78bfa; }
     .pay-paid { background:#166534; }
     .pay-unpaid { background:#92400e; }
     @media (max-width:600px) {
@@ -709,32 +711,22 @@ function showTableDropdown(evt, bid) {
   evt.stopPropagation();
   // Close any existing dropdown
   closeTableDropdown();
-  const assign = ovAssignments[bid] || {};
-  const selected = Array.isArray(assign.tafels) ? assign.tafels : (assign.tafel ? [assign.tafel] : []);
 
   const dd = document.createElement('div');
   dd.className = 'tafel-dropdown';
   dd.id = 'tafel-dropdown-active';
+  dd.dataset.bid = bid;
+  dd.onclick = e => e.stopPropagation(); // keep open on clicks inside
 
-  // Build items
-  for (const tObj of (ovTables || [])) {
-    const tn = tObj.name;
-    const isSelected = selected.includes(tn);
-    const item = document.createElement('div');
-    item.className = 'tafel-dropdown-item' + (isSelected ? ' disabled' : '');
-    item.textContent = getTableLabel(tn) + (isSelected ? ' ✓' : '');
-    if (!isSelected) {
-      item.onclick = () => { addTable(bid, tn); closeTableDropdown(); };
-    }
-    dd.appendChild(item);
-  }
+  rebuildDropdownItems(dd, bid);
 
   // "Anders..." option
   const anders = document.createElement('div');
   anders.className = 'tafel-dropdown-item';
   anders.style.borderTop = '1px solid #333';
-  anders.textContent = 'Anders…';
-  anders.onclick = () => {
+  anders.innerHTML = '<span class="td-check" style="border:none"></span>Anders…';
+  anders.onclick = (e) => {
+    e.stopPropagation();
     closeTableDropdown();
     const custom = prompt('Voer een tafelnummer in:');
     if (custom && custom.trim()) addTable(bid, custom.trim());
@@ -748,6 +740,33 @@ function showTableDropdown(evt, bid) {
 
   // Close on outside click
   setTimeout(() => document.addEventListener('click', closeTableDropdown, { once: true }), 10);
+}
+
+function rebuildDropdownItems(dd, bid) {
+  // Remove existing table items (keep "Anders..." at end)
+  dd.querySelectorAll('.tafel-dd-table').forEach(el => el.remove());
+  const assign = ovAssignments[bid] || {};
+  const selected = Array.isArray(assign.tafels) ? assign.tafels : (assign.tafel ? [assign.tafel] : []);
+  const anders = dd.querySelector('.tafel-dropdown-item:last-child');
+
+  for (const tObj of (ovTables || [])) {
+    const tn = tObj.name;
+    const isChecked = selected.includes(tn);
+    const item = document.createElement('div');
+    item.className = 'tafel-dropdown-item tafel-dd-table' + (isChecked ? ' checked' : '');
+    item.innerHTML = `<span class="td-check">${isChecked ? '✓' : ''}</span>${getTableLabel(tn)}`;
+    item.onclick = (e) => {
+      e.stopPropagation();
+      if (isChecked) {
+        removeTable(bid, tn);
+      } else {
+        addTable(bid, tn);
+      }
+      // Rebuild dropdown items to reflect new state
+      rebuildDropdownItems(dd, bid);
+    };
+    dd.insertBefore(item, anders);
+  }
 }
 
 function closeTableDropdown() {
