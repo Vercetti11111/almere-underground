@@ -54,6 +54,7 @@
   .cat-BF { background:#3b82f633; color:#60a5fa; }
   .cat-FF { background:#f59e0b33; color:#fbbf24; }
   .cat-RR { background:#10b98133; color:#34d399; }
+  .cat-Overig { background:#6b728033; color:#9ca3af; }
 
   .month-bar { display:flex; align-items:flex-end; gap:2px; height:80px; margin-bottom:4px; }
   .month-bar-segment { border-radius:3px 3px 0 0; min-width:8px; transition:height .3s; }
@@ -203,9 +204,9 @@ function buildComparison(allBookings) {
     }).map(categorize);
 
     // Aggregate by category
-    const byCat = { KF: [], BF: [], FF: [], RR: [] };
+    const byCat = { KF: [], BF: [], FF: [], RR: [], Overig: [] };
     for (const b of filtered) {
-      const cat = b.category;
+      const cat = b.category || 'Overig';
       if (byCat[cat]) byCat[cat].push(b);
     }
 
@@ -237,6 +238,7 @@ function buildComparison(allBookings) {
       BF: calcStats(byCat.BF),
       FF: calcStats(byCat.FF),
       RR: calcStats(byCat.RR),
+      Overig: calcStats(byCat.Overig),
       byMonth
     };
   }
@@ -290,7 +292,7 @@ function renderOverview(comp) {
   html += `<div class="section-title">${t('category')} vergelijking</div>`;
   html += `<div class="card" style="overflow-x:auto;"><table class="ob-table">
     <tr><th>${t('category')}</th><th>${thisYear}</th><th>${thisYear - 1}</th><th>Trend</th></tr>`;
-  for (const cat of ['BF', 'KF', 'FF', 'RR']) {
+  for (const cat of ['BF', 'KF', 'FF', 'RR', 'Overig']) {
     const c = cy?.[cat] || { total: 0, cancelled: 0, value: 0 };
     const l = ly?.[cat] || { total: 0, cancelled: 0, value: 0 };
     const cActive = c.total - c.cancelled;
@@ -369,7 +371,7 @@ function renderCategoryDetail(comp, cat) {
   const cy = comp[thisYear]?.[cat] || { bookings: [], total: 0, cancelled: 0, value: 0, pax: 0 };
   const ly = comp[thisYear - 1]?.[cat] || { bookings: [], total: 0, cancelled: 0, value: 0, pax: 0 };
 
-  const catLabels = { KF: 'Kinderfeestjes', BF: 'Bedrijfsfeesten', FF: 'Familie/Vrienden', RR: 'Overig (RR)' };
+  const catLabels = { KF: 'Kinderfeestjes', BF: 'Bedrijfsfeesten', FF: 'Familie/Vrienden', RR: 'Regulier (RR)', Overig: 'Overig' };
   const catLabel = catLabels[cat] || cat;
 
   let html = `<div class="section-title">${catLabel}</div>`;
@@ -449,7 +451,11 @@ function switchTab(tab) {
 
 function renderContent() {
   if (!orderData) return;
-  const allBookings = [...(orderData.bmi || []), ...(orderData.roller || [])];
+  // Normalize: BMI uses 'type', Roller uses 'category'
+  const allBookings = [
+    ...(orderData.bmi || []).map(b => ({ ...b, category: b.type || b.category || 'Overig', source: 'BMI' })),
+    ...(orderData.roller || []).map(b => ({ ...b, category: b.category || 'Overig', source: 'Roller' }))
+  ];
   const comp = buildComparison(allBookings);
   const el = document.getElementById('tab-content');
   if (!el) return;
@@ -457,6 +463,7 @@ function renderContent() {
   if (currentTab === 'overview') el.innerHTML = renderOverview(comp);
   else if (currentTab === 'KF') el.innerHTML = renderCategoryDetail(comp, 'KF');
   else if (currentTab === 'BF') el.innerHTML = renderCategoryDetail(comp, 'BF');
+  else if (currentTab === 'Overig') el.innerHTML = renderCategoryDetail(comp, 'Overig');
   else if (currentTab === 'all') el.innerHTML = renderAllBookings(comp);
 }
 
@@ -469,6 +476,7 @@ async function render(force = false) {
       <button class="tab-btn ${currentTab==='overview'?'active':''}" data-tab="overview" onclick="switchTab('overview')">📊 ${t('tabOverview')}</button>
       <button class="tab-btn ${currentTab==='KF'?'active':''}" data-tab="KF" onclick="switchTab('KF')">🎂 ${t('tabKF')}</button>
       <button class="tab-btn ${currentTab==='BF'?'active':''}" data-tab="BF" onclick="switchTab('BF')">🏢 ${t('tabBF')}</button>
+      <button class="tab-btn ${currentTab==='Overig'?'active':''}" data-tab="Overig" onclick="switchTab('Overig')">📁 Overig</button>
       <button class="tab-btn ${currentTab==='all'?'active':''}" data-tab="all" onclick="switchTab('all')">📋 ${t('tabAll')}</button>
     </div>
     <div id="tab-content"></div>`;
