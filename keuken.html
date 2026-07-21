@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Almere Underground – Keuken</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  ::-webkit-scrollbar { display: none; }
+  body { margin: 0; background: #0f0f13; color: #f1f1f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  #app-screen { display:block; max-width:480px; margin:0 auto; padding:16px 12px 90px; transition:max-width .3s; }
+  .card { background:#1a1a24; border-radius:16px; padding:16px; margin-bottom:12px; }
+  .kpi-card { background:#1a1a24; border-radius:12px; padding:12px 8px; text-align:center; }
+  .kpi-label { font-size:11px; color:#888; margin-bottom:2px; }
+  .kpi-value { font-size:18px; font-weight:700; }
+  .section-title { font-size:12px; font-weight:700; color:#aaa; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.05em; }
+  .spinner { width:32px; height:32px; border:3px solid #2a2a38; border-top-color:#f59e0b; border-radius:50%; animation:spin 0.8s linear infinite; margin:48px auto; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .err-msg { text-align:center; padding:40px 20px; color:#ef4444; font-size:13px; }
+  #lang-select { background:#1a1a24; border:1px solid #2a2a38; color:#f1f1f5; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+
+  @media (min-width: 768px) {
+    body.desktop-mode #app-screen { max-width:900px; padding:24px 32px 60px; }
+    body.desktop-mode .day-grid { grid-template-columns: 1fr 1fr; }
+  }
+  body.force-desktop #app-screen { max-width:900px !important; padding:24px 32px 60px !important; }
+  body.force-desktop .day-grid { grid-template-columns: 1fr 1fr !important; }
+  body.force-mobile #app-screen { max-width:480px !important; }
+  .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
+  .view-toggle:hover { border-color:#f59e0b; color:#e0e0f0; }
+
+  .tab-bar { display:flex; gap:4px; margin-bottom:16px; overflow-x:auto; }
+  .tab-btn { flex:1; padding:8px 4px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer; border:none; background:#1a1a24; color:#888; white-space:nowrap; min-width:60px; }
+  .tab-btn.active { background:#f59e0b; color:#000; }
+
+  .party-card { background:#12121c; border-radius:10px; padding:14px; margin-bottom:8px; border-left:4px solid #2a2a38; }
+  .party-card.KF { border-left-color:#a78bfa; }
+  .party-card.BF { border-left-color:#60a5fa; }
+  .party-card.FF { border-left-color:#fbbf24; }
+  .party-card.RR { border-left-color:#34d399; }
+  .party-card.has-taart { border-right:3px solid #f59e0b; }
+
+  .party-name { font-size:14px; font-weight:700; color:#e0e0f0; }
+  .party-meta { font-size:12px; color:#888; margin-top:4px; }
+  .party-notes { font-size:12px; color:#aaa; margin-top:8px; background:#0a0a12; border-radius:6px; padding:10px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+  .party-foods { font-size:12px; margin-top:6px; }
+  .food-tag { display:inline-block; background:#f59e0b22; color:#f59e0b; padding:2px 8px; border-radius:4px; font-size:11px; margin:2px 2px 0 0; }
+  .drink-tag { display:inline-block; background:#3b82f622; color:#60a5fa; padding:2px 8px; border-radius:4px; font-size:11px; margin:2px 2px 0 0; }
+  .taart-highlight { background:#f59e0b33; color:#fbbf24; padding:1px 4px; border-radius:3px; font-weight:700; }
+
+  .day-header { font-size:14px; font-weight:800; color:#f59e0b; margin:20px 0 8px; padding-bottom:6px; border-bottom:1px solid #2a2a38; }
+  .day-header:first-child { margin-top:0; }
+  .day-grid { display:grid; grid-template-columns:1fr; gap:8px; }
+
+  .taart-row { display:flex; justify-content:space-between; align-items:center; background:#12121c; border-radius:10px; padding:12px 16px; margin-bottom:6px; border-left:4px solid #f59e0b; }
+  .taart-name { font-size:13px; font-weight:600; }
+  .taart-date { font-size:12px; color:#888; }
+  .taart-note { font-size:11px; color:#aaa; margin-top:4px; }
+
+  .empty-state { text-align:center; padding:40px 20px; color:#444; }
+  .empty-state .icon { font-size:48px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<div id="app-screen">
+  <div class="header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <a href="index.html" style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;text-decoration:none;">← Almere Underground</a>
+      <div style="font-size:20px;font-weight:800;" id="page-title">🍽️ Keuken</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <select id="lang-select" onchange="setLang(this.value)">
+        <option value="nl">🇳🇱 NL</option>
+        <option value="en">🇬🇧 EN</option>
+      </select>
+      <button id="view-toggle-btn" class="view-toggle" onclick="toggleViewMode()" title="Wissel weergave">🖥️</button>
+      <button id="refresh-btn" onclick="doRefresh()" style="background:#1a1a24;border:1px solid #2a2a38;color:#aaa;border-radius:8px;padding:6px 10px;font-size:16px;cursor:pointer;line-height:1;" title="Verversen">🔄</button>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+const WORKER = 'https://api.almereunderground.com';
+const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_session || !_session.code || (_session.expiresAt && Date.now() > _session.expiresAt)) {
+  localStorage.removeItem('au_session');
+  window.location.href = 'index.html';
+}
+const accessCode = _session ? _session.code : '';
+
+// View mode
+function getViewMode() { return localStorage.getItem('au_view_mode') || 'auto'; }
+function applyViewMode() {
+  const mode = getViewMode();
+  document.body.classList.remove('desktop-mode','force-desktop','force-mobile');
+  if (mode === 'desktop') document.body.classList.add('force-desktop');
+  else if (mode === 'mobile') document.body.classList.add('force-mobile');
+  else if (window.innerWidth >= 768) document.body.classList.add('desktop-mode');
+  const btn = document.getElementById('view-toggle-btn');
+  if (btn) btn.textContent = mode === 'desktop' ? '📱' : mode === 'mobile' ? '🖥️' : (window.innerWidth >= 768 ? '📱' : '🖥️');
+}
+function toggleViewMode() {
+  const modes = ['auto','desktop','mobile'];
+  const cur = getViewMode();
+  localStorage.setItem('au_view_mode', modes[(modes.indexOf(cur)+1)%3]);
+  applyViewMode();
+}
+window.addEventListener('resize', applyViewMode);
+
+// i18n
+const T = {
+  nl: {
+    pageTitle: '🍽️ Keuken',
+    tabOverview: 'Overzicht',
+    tabTaarten: 'Taarten',
+    tabMorgen: 'Morgen',
+    parties: 'feesten',
+    noParties: 'Geen feesten gepland',
+    noTaarten: 'Geen taarten gevonden',
+    pax: 'PAX',
+    tomorrow: 'Morgen',
+    today: 'Vandaag',
+    defrost: '❄️ Uit de vriezer halen',
+    thisWeek: 'Deze week',
+    nextWeek: 'Volgende week',
+    week: 'Week',
+    notes: 'Opmerkingen',
+    next14d: 'Komende 2 weken',
+    taartOrders: 'Taart bestellingen',
+    time: 'Tijd',
+  },
+  en: {
+    pageTitle: '🍽️ Kitchen',
+    tabOverview: 'Overview',
+    tabTaarten: 'Cakes',
+    tabMorgen: 'Tomorrow',
+    parties: 'parties',
+    noParties: 'No parties scheduled',
+    noTaarten: 'No cakes found',
+    pax: 'PAX',
+    tomorrow: 'Tomorrow',
+    today: 'Today',
+    defrost: '❄️ Take out of freezer',
+    thisWeek: 'This week',
+    nextWeek: 'Next week',
+    week: 'Week',
+    notes: 'Notes',
+    next14d: 'Next 2 weeks',
+    taartOrders: 'Cake orders',
+    time: 'Time',
+  }
+};
+let lang = localStorage.getItem('au_lang') || 'nl';
+function t(key) { return (T[lang] || T.nl)[key] || key; }
+function setLang(l) { lang = l; localStorage.setItem('au_lang', l); document.getElementById('lang-select').value = l; document.getElementById('page-title').textContent = t('pageTitle'); render(); }
+
+function setContent(html) { document.getElementById('content').innerHTML = html; }
+function spinner() { return '<div class="spinner"></div>'; }
+
+let leadsData = null;
+let currentTab = 'overview';
+
+const TAART_KEYWORDS = ['taart','tart','cake','gebak','cupcake','muffin','brownie'];
+function hasTaart(b) {
+  const text = ((b.bookingNotes || '') + ' ' + (b.posNotes || '') + ' ' + (b.foods || []).join(' ')).toLowerCase();
+  return TAART_KEYWORDS.some(kw => text.includes(kw));
+}
+function extractTaartInfo(b) {
+  const notes = (b.bookingNotes || '') + '\n' + (b.posNotes || '');
+  const lines = notes.split('\n').filter(l => TAART_KEYWORDS.some(kw => l.toLowerCase().includes(kw)));
+  return lines.join('\n').trim() || 'Taart (zie opmerkingen)';
+}
+
+function highlightTaart(text) {
+  if (!text) return '';
+  let result = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  for (const kw of TAART_KEYWORDS) {
+    const regex = new RegExp(`(${kw})`, 'gi');
+    result = result.replace(regex, '<span class="taart-highlight">$1</span>');
+  }
+  return result;
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const dayNames = lang === 'nl' 
+    ? ['Zo','Ma','Di','Wo','Do','Vr','Za']
+    : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const monthNames = lang === 'nl'
+    ? ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']
+    : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const prefix = d.getTime() === today.getTime() ? `${t('today')} · ` 
+    : d.getTime() === tomorrow.getTime() ? `${t('tomorrow')} · ` : '';
+  return `${prefix}${dayNames[d.getDay()]} ${d.getDate()} ${monthNames[d.getMonth()]}`;
+}
+
+function partyCategory(b) {
+  if (b.isKF) return 'KF';
+  if (b.isBF) return 'BF';
+  if (b.isFF) return 'FF';
+  return 'RR';
+}
+
+function renderPartyCard(b) {
+  const cat = partyCategory(b);
+  const taart = hasTaart(b);
+  const foods = b.foods || [];
+  const drinks = b.drinks || [];
+  const notes = (b.bookingNotes || '').trim();
+  
+  let html = `<div class="party-card ${cat} ${taart ? 'has-taart' : ''}">`;
+  html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;">`;
+  html += `<div class="party-name">${taart ? '🎂 ' : ''}${b.name || '—'}</div>`;
+  html += `<div style="text-align:right;">`;
+  if (b.pax) html += `<div style="font-size:13px;font-weight:700;color:#f59e0b;">${b.pax} PAX</div>`;
+  if (b.startTime) html += `<div style="font-size:11px;color:#888;">🕐 ${b.startTime}</div>`;
+  html += `</div></div>`;
+  
+  html += `<div class="party-meta">`;
+  html += `<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:${cat==='KF'?'#7c3aed33':cat==='BF'?'#3b82f633':cat==='FF'?'#f59e0b33':'#10b98133'};color:${cat==='KF'?'#a78bfa':cat==='BF'?'#60a5fa':cat==='FF'?'#fbbf24':'#34d399'};font-weight:600;">${b.type || cat}</span>`;
+  if (b.contactName) html += ` · 👤 ${b.contactName}`;
+  if (b.contactPhone) html += ` · 📞 <a href="tel:${b.contactPhone}" style="color:#60a5fa;text-decoration:none;">${b.contactPhone}</a>`;
+  html += `</div>`;
+  
+  if (foods.length > 0 || drinks.length > 0) {
+    html += `<div class="party-foods">`;
+    for (const f of foods) html += `<span class="food-tag">🍽️ ${f}</span>`;
+    for (const d of drinks) html += `<span class="drink-tag">🍺 ${d}</span>`;
+    html += `</div>`;
+  }
+  
+  if (notes) {
+    html += `<div class="party-notes">${highlightTaart(notes)}</div>`;
+  }
+  
+  html += `</div>`;
+  return html;
+}
+
+function getUpcoming14d(bookings) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const end = new Date(today); end.setDate(end.getDate() + 14);
+  const todayStr = today.toISOString().slice(0,10);
+  const endStr = end.toISOString().slice(0,10);
+  return bookings.filter(b => b.bookingDate >= todayStr && b.bookingDate <= endStr)
+    .sort((a, b) => (a.bookingDate + (a.startTime||'')).localeCompare(b.bookingDate + (b.startTime||'')));
+}
+
+function renderOverview(bookings) {
+  const upcoming = getUpcoming14d(bookings);
+  
+  if (upcoming.length === 0) {
+    return `<div class="empty-state"><div class="icon">🍽️</div><div>${t('noParties')}</div></div>`;
+  }
+  
+  // KPI cards
+  const totalParties = upcoming.length;
+  const totalPax = upcoming.reduce((s, b) => s + (b.pax || 0), 0);
+  const taartCount = upcoming.filter(hasTaart).length;
+  
+  let html = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+    <div class="kpi-card"><div class="kpi-label">🎉 ${t('parties')}</div><div class="kpi-value">${totalParties}</div></div>
+    <div class="kpi-card"><div class="kpi-label">👥 PAX</div><div class="kpi-value">${totalPax}</div></div>
+    <div class="kpi-card"><div class="kpi-label">🎂 Taarten</div><div class="kpi-value" style="color:#f59e0b;">${taartCount}</div></div>
+  </div>`;
+  
+  // Group by date
+  const byDate = {};
+  for (const b of upcoming) {
+    const d = b.bookingDate;
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(b);
+  }
+  
+  html += `<div class="section-title">${t('next14d')}</div>`;
+  for (const [date, parties] of Object.entries(byDate)) {
+    const paxSum = parties.reduce((s, b) => s + (b.pax || 0), 0);
+    html += `<div class="day-header">${fmtDate(date)} <span style="font-size:12px;font-weight:400;color:#888;">(${parties.length} ${t('parties')} · ${paxSum} PAX)</span></div>`;
+    html += `<div class="day-grid">`;
+    for (const b of parties) {
+      html += renderPartyCard(b);
+    }
+    html += `</div>`;
+  }
+  
+  return html;
+}
+
+function renderTaarten(bookings) {
+  const upcoming = getUpcoming14d(bookings);
+  const taartBookings = upcoming.filter(hasTaart);
+  
+  if (taartBookings.length === 0) {
+    return `<div class="empty-state"><div class="icon">🎂</div><div>${t('noTaarten')}</div></div>`;
+  }
+  
+  // Group: tomorrow defrost, this week, next week
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0,10);
+  
+  const defrost = taartBookings.filter(b => b.bookingDate === tomorrowStr);
+  const thisWeekEnd = new Date(today); thisWeekEnd.setDate(thisWeekEnd.getDate() + 7);
+  const thisWeek = taartBookings.filter(b => b.bookingDate > tomorrowStr && b.bookingDate <= thisWeekEnd.toISOString().slice(0,10));
+  const later = taartBookings.filter(b => b.bookingDate > thisWeekEnd.toISOString().slice(0,10));
+  
+  let html = '';
+  
+  // Defrost section - prominent
+  if (defrost.length > 0) {
+    html += `<div class="card" style="border:2px solid #f59e0b;background:#1a1a20;">
+      <div style="font-size:14px;font-weight:800;color:#f59e0b;margin-bottom:12px;">${t('defrost')}</div>`;
+    for (const b of defrost) {
+      html += `<div class="taart-row">
+        <div>
+          <div class="taart-name">${b.name}</div>
+          <div class="taart-note">${extractTaartInfo(b)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:13px;font-weight:700;color:#f59e0b;">${b.pax || '?'} PAX</div>
+          ${b.startTime ? `<div style="font-size:11px;color:#888;">🕐 ${b.startTime}</div>` : ''}
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  
+  // Weekly overview
+  const renderSection = (title, items) => {
+    if (items.length === 0) return '';
+    let h = `<div class="section-title">${title}</div>`;
+    for (const b of items) {
+      h += `<div class="taart-row">
+        <div>
+          <div class="taart-name">${b.name}</div>
+          <div class="taart-note">${extractTaartInfo(b)}</div>
+          <div style="font-size:11px;color:#666;margin-top:2px;">${fmtDate(b.bookingDate)}${b.startTime ? ' · 🕐 ' + b.startTime : ''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:13px;font-weight:700;">${b.pax || '?'} PAX</div>
+        </div>
+      </div>`;
+    }
+    return h;
+  };
+  
+  html += renderSection(t('thisWeek'), thisWeek);
+  html += renderSection(t('nextWeek'), later);
+  
+  return html;
+}
+
+function renderTomorrow(bookings) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0,10);
+  
+  const tomorrowParties = bookings.filter(b => b.bookingDate === tomorrowStr)
+    .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+  
+  if (tomorrowParties.length === 0) {
+    return `<div class="empty-state"><div class="icon">✨</div><div>${t('noParties')} ${t('tomorrow').toLowerCase()}</div></div>`;
+  }
+  
+  const totalPax = tomorrowParties.reduce((s, b) => s + (b.pax || 0), 0);
+  const taartCount = tomorrowParties.filter(hasTaart).length;
+  
+  let html = `<div style="display:grid;grid-template-columns:1fr 1fr${taartCount > 0 ? ' 1fr' : ''};gap:8px;margin-bottom:16px;">
+    <div class="kpi-card"><div class="kpi-label">🎉 ${t('parties')}</div><div class="kpi-value">${tomorrowParties.length}</div></div>
+    <div class="kpi-card"><div class="kpi-label">👥 PAX</div><div class="kpi-value">${totalPax}</div></div>
+    ${taartCount > 0 ? `<div class="kpi-card"><div class="kpi-label">🎂 Taarten</div><div class="kpi-value" style="color:#f59e0b;">${taartCount}</div></div>` : ''}
+  </div>`;
+  
+  html += `<div class="day-header">${fmtDate(tomorrowStr)}</div>`;
+  for (const b of tomorrowParties) {
+    html += renderPartyCard(b);
+  }
+  
+  return html;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  renderContent();
+}
+
+function renderContent() {
+  if (!leadsData) return;
+  const el = document.getElementById('tab-content');
+  if (!el) return;
+  const bookings = leadsData.bookings || [];
+  
+  if (currentTab === 'overview') el.innerHTML = renderOverview(bookings);
+  else if (currentTab === 'taarten') el.innerHTML = renderTaarten(bookings);
+  else if (currentTab === 'morgen') el.innerHTML = renderTomorrow(bookings);
+}
+
+async function doRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try { leadsData = null; await render(true); } finally { if (btn) { btn.disabled = false; btn.textContent = '🔄'; } }
+}
+
+async function render(force = false) {
+  setContent(spinner());
+  try {
+    if (!leadsData || force) {
+      const r = await fetch(`${WORKER}/api/leads?code=${accessCode}`, { headers: { 'X-Access-Code': accessCode } });
+      leadsData = await r.json();
+      if (leadsData.error) throw new Error(leadsData.error);
+    }
+    
+    const bookings = leadsData.bookings || [];
+    const upcoming = getUpcoming14d(bookings);
+    const taartCount = upcoming.filter(hasTaart).length;
+    
+    let html = `<div class="tab-bar">
+      <button class="tab-btn ${currentTab==='overview'?'active':''}" data-tab="overview" onclick="switchTab('overview')">📋 ${t('tabOverview')}</button>
+      <button class="tab-btn ${currentTab==='taarten'?'active':''}" data-tab="taarten" onclick="switchTab('taarten')">🎂 ${t('tabTaarten')}${taartCount > 0 ? ' ('+taartCount+')' : ''}</button>
+      <button class="tab-btn ${currentTab==='morgen'?'active':''}" data-tab="morgen" onclick="switchTab('morgen')">⏰ ${t('tabMorgen')}</button>
+    </div>
+    <div id="tab-content"></div>`;
+    
+    setContent(html);
+    renderContent();
+  } catch (e) { setContent(`<div class="err-msg">⚠️ ${e.message}</div>`); }
+}
+
+// Start
+applyViewMode();
+document.getElementById('lang-select').value = lang;
+if (accessCode) render();
+</script>
+</body>
+</html>
