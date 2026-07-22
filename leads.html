@@ -611,6 +611,13 @@ function renderAll() {
     document.getElementById('refreshInfo').textContent = `${t('lastUpdate')}: ${d.toLocaleDateString('nl-NL')} ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
+  // Update tab-dependent visibility
+  document.getElementById('subtabs').style.display = activeTab === 'leads' ? 'flex' : 'none';
+  document.getElementById('resCatTabs').style.display = activeTab === 'reservations' ? 'flex' : 'none';
+  document.getElementById('statusFilter').style.display = (activeTab === 'reservations' || activeTab === 'controle') ? 'block' : 'none';
+  document.getElementById('sortBar').style.display = activeTab === 'leads' ? 'block' : 'none';
+  document.getElementById('printControls').style.display = activeTab === 'reservations' ? 'block' : 'none';
+
   renderStatusFilterButtons();
   renderSummary();
   renderList();
