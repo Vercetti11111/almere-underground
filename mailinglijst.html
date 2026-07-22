@@ -85,6 +85,19 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
       </div>
       <div class="hint">Selecteer welke automatische rapportages naar deze lijst worden gestuurd</div>
     </div>
+    <div class="form-group">
+      <label>Frequentie</label>
+      <select id="edit-freq" style="width:100%;padding:8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;">
+        <option value="">Geen automatische verzending</option>
+        <option value="daily">Dagelijks</option>
+        <option value="weekly">Wekelijks</option>
+        <option value="monthly">Maandelijks</option>
+      </select>
+      <div id="freq-day-picker" style="display:none;margin-top:8px;">
+        <label id="freq-day-label">Verzenddag</label>
+        <select id="edit-freq-day" style="width:100%;padding:8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;"></select>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal()">Annuleren</button>
       <button class="btn btn-sm" onclick="saveList()">Opslaan</button>
@@ -156,15 +169,15 @@ function openModal(list) {
   document.getElementById('edit-id').value = list ? list.id : '';
   document.getElementById('list-name').value = list ? list.name : '';
   document.getElementById('list-emails').value = list ? (list.emails || []).join('\n') : '';
-  // Set checkboxes
   // Set frequency
-    const freqSel = document.getElementById('edit-freq');
-    freqSel.value = list.schedule ? list.schedule.frequency : '';
-    freqSel.dispatchEvent(new Event('change'));
-    if (list.schedule && list.schedule.day) {
-      setTimeout(() => { document.getElementById('edit-freq-day').value = list.schedule.day; }, 50);
-    }
-    document.querySelectorAll('.checkbox-group input').forEach(cb => {
+  const freqSel = document.getElementById('edit-freq');
+  freqSel.value = (list && list.schedule) ? list.schedule.frequency : '';
+  freqSel.dispatchEvent(new Event('change'));
+  if (list && list.schedule && list.schedule.day) {
+    setTimeout(() => { document.getElementById('edit-freq-day').value = list.schedule.day; }, 50);
+  }
+  // Set checkboxes
+  document.querySelectorAll('.checkbox-group input').forEach(cb => {
     cb.checked = list ? (list.reports || []).includes(cb.value) : false;
   });
   document.getElementById('modal-overlay').classList.add('active');
@@ -186,6 +199,11 @@ async function saveList() {
   const emails = emailsRaw.split('\n').map(e => e.trim()).filter(e => e && e.includes('@'));
   const reports = [];
   document.querySelectorAll('.checkbox-group input:checked').forEach(cb => reports.push(cb.value));
+  const freq = document.getElementById('edit-freq').value;
+  const schedule = freq ? { frequency: freq } : null;
+  if (freq === 'weekly' || freq === 'monthly') {
+    schedule.day = parseInt(document.getElementById('edit-freq-day').value) || 1;
+  }
 
   if (!name) { showToast('Naam is verplicht', true); return; }
   if (emails.length === 0) { showToast('Voeg minimaal één e-mailadres toe', true); return; }
@@ -193,7 +211,7 @@ async function saveList() {
   try {
     const result = await apiFetch('/api/mailing-lists', {
       method: 'POST',
-      body: JSON.stringify({ id, name, emails, reports })
+      body: JSON.stringify({ id, name, emails, reports, schedule })
     });
     if (result.error) throw new Error(result.error);
     lists = result.lists || [];
