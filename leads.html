@@ -74,6 +74,21 @@
     .badge.offerte { background: #22c55e22; color: #22c55e; }
     .badge.opvolgen { background: #ef444422; color: #ef4444; }
     .badge.paid { background: #22c55e22; color: #22c55e; }
+    .badge.deels { background: #3b82f622; color: #3b82f6; }
+    .status-filter-btn, .sort-btn {
+      background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 16px;
+      padding: 4px 12px; color: #888; font-size: 11px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .status-filter-btn.active, .sort-btn.active {
+      background: #6366f133; border-color: #6366f1; color: #a5b4fc;
+    }
+    .days-indicator {
+      font-size: 10px; padding: 2px 6px; border-radius: 8px; margin-left: 4px;
+    }
+    .days-ok { background: #22c55e22; color: #22c55e; }
+    .days-warn { background: #f59e0b22; color: #f59e0b; }
+    .days-danger { background: #ef444422; color: #ef4444; }
     .badge.pending { background: #f59e0b22; color: #f59e0b; }
     .badge.partial { background: #3b82f622; color: #3b82f6; }
 
@@ -186,6 +201,28 @@
       <div class="subtab" id="subtabOfferte" onclick="switchSubTab('offerte')">Offerte Akkoord <span class="count" id="countOfferte">0</span></div>
     </div>
 
+    <!-- Status filter -->
+    <div id="statusFilter" style="display:none;padding:6px 16px;">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <span style="font-size:11px;color:#888;font-weight:600;margin-right:4px;">Filter:</span>
+        <button class="status-filter-btn active" data-status="all" onclick="setStatusFilter('all')">Alle</button>
+        <button class="status-filter-btn" data-status="Open" onclick="setStatusFilter('Open')">Open</button>
+        <button class="status-filter-btn" data-status="Offerte Akkoord" onclick="setStatusFilter('Offerte Akkoord')">Offerte Akkoord</button>
+        <button class="status-filter-btn" data-status="Deels betaald" onclick="setStatusFilter('Deels betaald')">Deels betaald</button>
+        <button class="status-filter-btn" data-status="Betaald" onclick="setStatusFilter('Betaald')">Betaald</button>
+      </div>
+    </div>
+
+    <!-- Sorting (leads tab only) -->
+    <div id="sortBar" style="display:none;padding:4px 16px;">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span style="font-size:11px;color:#888;font-weight:600;margin-right:4px;">Sorteer:</span>
+        <button class="sort-btn active" data-sort="eventDate" onclick="setSortOrder('eventDate')">📅 Datum</button>
+        <button class="sort-btn" data-sort="createdDate" onclick="setSortOrder('createdDate')">🕐 Aangemaakt</button>
+        <button class="sort-btn" data-sort="updatedDate" onclick="setSortOrder('updatedDate')">✏️ Gewijzigd</button>
+      </div>
+    </div>
+
     <!-- Refresh bar -->
     <div class="refresh-bar">
       <span class="refresh-info" id="refreshInfo">—</span>
@@ -248,6 +285,8 @@ const ROLLER_BASE = 'https://manage.roller.app/legacy/booking/';
 let allBookings = [];
 let activeTab = 'reservations';
 let activeSubTab = 'all';
+let activeStatusFilter = 'all';
+let activeSortOrder = 'eventDate';
 let openDetailId = null;
 let generatedAt = '';
 
@@ -304,7 +343,7 @@ const T = {
     tabReservations: '📅 Reserveringen',
     tabLeads: '🎯 Op te volgen',
     subtabAll: 'Alle',
-    subtabOpvolgen: 'Op te volgen',
+    subtabOpvolgen: 'Open',
     subtabOfferte: 'Offerte Akkoord',
     summaryCount: 'Aantal',
     summaryValue: 'Waarde',
@@ -337,7 +376,7 @@ const T = {
     tabReservations: '📅 Reservations',
     tabLeads: '🎯 Follow up',
     subtabAll: 'All',
-    subtabOpvolgen: 'To follow up',
+    subtabOpvolgen: 'Open',
     subtabOfferte: 'Quote Accepted',
     summaryCount: 'Count',
     summaryValue: 'Value',
@@ -417,6 +456,7 @@ async function init() {
       const data = await r.json();
       allBookings = data.bookings || [];
       generatedAt = data.generatedAt || '';
+      document.getElementById('statusFilter').style.display = 'block';
       renderAll();
     } else if (r.status === 404) {
       // No leads data yet - try refresh
@@ -453,19 +493,56 @@ function switchSubTab(sub) {
   renderList();
 }
 
+// ── Status filter & sort ──────────────────────────────────────────────────────
+function setStatusFilter(status) {
+  activeStatusFilter = status;
+  document.querySelectorAll('.status-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.status === status));
+  renderAll();
+}
+
+function setSortOrder(order) {
+  activeSortOrder = order;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b.dataset.sort === order));
+  renderList();
+}
+
+function applyStatusFilter(list) {
+  if (activeStatusFilter === 'all') return list;
+  return list.filter(b => b.leadCategory === activeStatusFilter);
+}
+
+function applySorting(list) {
+  const order = activeSortOrder;
+  return [...list].sort((a, b) => {
+    let va, vb;
+    if (order === 'createdDate') {
+      va = a.createdDate || a.createdAt || '9999';
+      vb = b.createdDate || b.createdAt || '9999';
+    } else if (order === 'updatedDate') {
+      va = a.updatedDate || a.lastPaymentDate || a.createdDate || '9999';
+      vb = b.updatedDate || b.lastPaymentDate || b.createdDate || '9999';
+    } else {
+      va = a.bookingDate || '9999';
+      vb = b.bookingDate || '9999';
+    }
+    return va.localeCompare(vb);
+  });
+}
+
 // ── Filtering ─────────────────────────────────────────────────────────────────
 function getFilteredBookings() {
   if (activeTab === 'reservations') {
-    // Future VM bookings that are KF or BF
-    return allBookings.filter(b => b.isKF || b.isFF || b.isBF);
+    // Future VM bookings that are KF, BF, or FF — including paid
+    let list = allBookings.filter(b => b.isKF || b.isFF || b.isBF);
+    return applyStatusFilter(list);
   } else if (activeTab === 'controle') {
     // VenueManager bookings without KF/BF/FF/RR classification
     return allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !/^RR\b/i.test(b.name || ''));
   } else {
-    // Leads: unpaid VM bookings, exclude confirmed (partial payment received)
-    let leads = allBookings.filter(b => b.amountOwing > 0 && b.leadCategory !== 'Bevestigd');
+    // Op te volgen: only Open + Offerte Akkoord (not deels betaald / betaald)
+    let leads = allBookings.filter(b => b.leadCategory === 'Open' || b.leadCategory === 'Offerte Akkoord');
     if (activeSubTab === 'opvolgen') {
-      leads = leads.filter(b => b.leadCategory === 'Op te volgen');
+      leads = leads.filter(b => b.leadCategory === 'Open');
     } else if (activeSubTab === 'offerte') {
       leads = leads.filter(b => b.leadCategory === 'Offerte Akkoord');
     }
@@ -485,8 +562,8 @@ function renderAll() {
   // refresh button is now in header
 
   // Counts for subtabs
-  const allLeads = allBookings.filter(b => b.amountOwing > 0 && b.leadCategory !== 'Bevestigd');
-  const opvolgen = allLeads.filter(b => b.leadCategory === 'Op te volgen');
+  const allLeads = allBookings.filter(b => b.leadCategory === 'Open' || b.leadCategory === 'Offerte Akkoord');
+  const opvolgen = allLeads.filter(b => b.leadCategory === 'Open');
   const offerte = allLeads.filter(b => b.leadCategory === 'Offerte Akkoord');
   document.getElementById('countAll').textContent = allLeads.length;
   document.getElementById('countOpvolgen').textContent = opvolgen.length;
@@ -515,11 +592,12 @@ function renderSummary() {
   const totalGuests = filtered.reduce((s, b) => s + (b.totalGuests || 0), 0);
 
   const grid = document.getElementById('summaryGrid');
+  const paidCount = filtered.filter(b => b.leadCategory === 'Betaald').length;
   if (activeTab === 'reservations') {
     grid.innerHTML = `
       <div class="summary-card"><div class="label">${t('summaryCount')}</div><div class="value purple">${count}</div></div>
       <div class="summary-card"><div class="label">${t('summaryValue')}</div><div class="value green">${fmtEur(totalValue)}</div></div>
-      <div class="summary-card"><div class="label">${t('summaryGuests')}</div><div class="value">${totalGuests}</div></div>
+      <div class="summary-card"><div class="label">✅ Betaald</div><div class="value" style="color:#22c55e">${paidCount}/${count}</div></div>
     `;
   } else {
     grid.innerHTML = `
@@ -547,8 +625,9 @@ function renderList() {
     return;
   }
 
+  const sorted = (activeTab === 'leads') ? applySorting(filtered) : filtered;
   let html = '';
-  for (const b of filtered) {
+  for (const b of sorted) {
     const isOpen = openDetailId === b.id;
     const typeBadge = b.isKF
       ? '<span class="badge kf">🎂 KF</span>'
@@ -572,7 +651,8 @@ function renderList() {
       <div class="booking-row" onclick="toggleDetail('${b.id}')">
         <div class="booking-info">
           <div class="booking-name">${b.name || '(geen naam)'} ${typeBadge}</div>
-          <div class="booking-meta"><span style="color:#888;font-size:10px">#${b.id}</span> · ${b.startTime ? b.startTime + ' · ' : ''}${fmtDate(b.bookingDate)}${b.pax ? ' · ' + b.pax + ' pax' : ''} ${statusBadge}</div>
+          <div class="booking-meta"><span style="color:#888;font-size:10px">#${b.id}</span> · ${b.startTime ? b.startTime + ' · ' : ''}${fmtDate(b.bookingDate)}${b.pax ? ' · ' + b.pax + ' pax' : ''} ${statusBadge}${activeTab === 'leads' ? getDaysIndicator(b) : ''}</div>
+          ${activeTab === 'leads' ? `<div style="font-size:10px;color:#666;margin-top:2px;">📝 ${fmtDate(b.createdDate || b.createdAt)}${getLastModified(b) ? ' · ✏️ ' + fmtDate(getLastModified(b)) : ''}</div>` : ''}
           ${productsSummary ? `<div class="booking-products">${productsSummary}</div>` : ''}
         </div>
         <div class="booking-amounts">
@@ -584,6 +664,7 @@ function renderList() {
         <div class="detail-row"><span class="detail-label">Booking ID</span><span class="detail-value" style="font-family:monospace">${b.id}</span></div>
         <div class="detail-row"><span class="detail-label">${t('date')}</span><span class="detail-value">${fmtDate(b.bookingDate)}</span></div>
         <div class="detail-row"><span class="detail-label">${t('created')}</span><span class="detail-value">${fmtDate(b.createdDate || b.createdAt)}</span></div>
+        ${(b.updatedDate || b.lastPaymentDate) ? `<div class="detail-row"><span class="detail-label">Laatste wijziging</span><span class="detail-value">${fmtDate(b.updatedDate || b.lastPaymentDate)}</span></div>` : ''}
         ${b.lastPaymentDate ? `<div class="detail-row"><span class="detail-label">${t('lastPayment')}</span><span class="detail-value">${fmtDate(b.lastPaymentDate)}</span></div>` : ''}
         <div class="detail-row"><span class="detail-label">${t('total')}</span><span class="detail-value">${fmtEur(b.total)}</span></div>
         <div class="detail-row"><span class="detail-label">${t('paid')}</span><span class="detail-value" style="color:#22c55e">${fmtEur(b.amountPaid)}</span></div>
@@ -621,6 +702,21 @@ function renderList() {
   }
 
   el.innerHTML = html;
+}
+
+function getLastModified(b) {
+  return b.updatedDate || b.lastPaymentDate || '';
+}
+
+function getDaysIndicator(b) {
+  const created = b.createdDate || b.createdAt;
+  if (!created) return '';
+  const now = new Date();
+  const createdDate = new Date(created + 'T00:00:00');
+  const days = Math.floor((now - createdDate) / 86400000);
+  if (days <= 7) return ` <span class="days-indicator days-ok">${days}d</span>`;
+  if (days <= 14) return ` <span class="days-indicator days-warn">${days}d</span>`;
+  return ` <span class="days-indicator days-danger">${days}d</span>`;
 }
 
 function toggleDetail(id) {
@@ -750,7 +846,7 @@ async function copyReserveringen() {
       html += '<tr>' + vals.map((v, i) => {
         let cellVal = String(v || '').replace(/\n/g, '<br>');
         let extraStyle = '';
-        if (i === vals.length - 1 && r.status === 'Op te volgen') {
+        if (i === vals.length - 1 && r.status === 'Open') {
           extraStyle = 'color:#ff0000;font-weight:bold;';
         }
         return '<td style="' + tdBase + 'width:' + colWidths[i] + ';' + extraStyle + '">' + cellVal + '</td>';
@@ -855,7 +951,7 @@ function pdfReserveringen() {
       const r = getBookingRow(b);
       return [r.tijd, r.bedrijf, r.klant, String(r.pax), r.activiteit, r.foods, r.drinks, r.begeleiding, {
         content: r.status,
-        styles: { textColor: r.status === 'Op te volgen' ? [239, 68, 68] : r.status === 'Bevestigd' ? [0, 0, 0] : r.status === 'Betaald' ? [21, 87, 36] : [180, 60, 0] }
+        styles: { textColor: r.status === 'Open' ? [239, 68, 68] : r.status === 'Bevestigd' ? [0, 0, 0] : r.status === 'Betaald' ? [21, 87, 36] : [180, 60, 0] }
       }];
     });
 
@@ -950,7 +1046,7 @@ async function sendMail() {
       html += '<tr>' + vals.map((v, i) => {
         let cellVal = String(v || '').replace(/\n/g, '<br>');
         let extraStyle = '';
-        if (i === vals.length - 1 && r.status === 'Op te volgen') extraStyle = 'color:#ff0000;font-weight:bold;';
+        if (i === vals.length - 1 && r.status === 'Open') extraStyle = 'color:#ff0000;font-weight:bold;';
         return '<td style="' + tdBase + extraStyle + '">' + cellVal + '</td>';
       }).join('') + '</tr>';
     }
