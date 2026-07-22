@@ -327,9 +327,9 @@ function render() {
 
   // Calculate totals for PAST bookings only
   const pastTotal = past.reduce((s, b) => s + (b.total || 0), 0);
-  const pastOwing = past.reduce((s, b) => s + (b.owing || 0), 0);
+  const pastOwing = past.reduce((s, b) => s + (b.amountOwing || 0), 0);
   const pastPaid = pastTotal - pastOwing;
-  const futureOwing = future.reduce((s, b) => s + (b.owing || 0), 0);
+  const futureOwing = future.reduce((s, b) => s + (b.amountOwing || 0), 0);
   const futureTotal = future.reduce((s, b) => s + (b.total || 0), 0);
 
   let html = '';
@@ -421,7 +421,7 @@ function renderPastGrouped(bookings, totalOwing) {
 
   let groupIdx = 0;
   for (const [monthKey, monthBookings] of sortedGroups) {
-    const monthOwing = monthBookings.reduce((s, b) => s + (b.owing || 0), 0);
+    const monthOwing = monthBookings.reduce((s, b) => s + (b.amountOwing || 0), 0);
     const isOpen = monthKey === curKey;
     const gid = `pg-${groupIdx++}`;
 
@@ -452,7 +452,7 @@ function renderPastGrouped(bookings, totalOwing) {
           </div>
         </div>
         <div class="booking-amounts">
-          <div class="booking-owing">${fmtEur(b.owing)}</div>
+          <div class="booking-owing">${fmtEur(b.amountOwing)}</div>
           <div class="booking-total">/ ${fmtEur(b.total)}</div>
         </div>
       </div>`;
@@ -491,7 +491,7 @@ function renderFutureGrouped(bookings, totalOwing) {
 
   let groupIdx = 0;
   for (const [monthKey, monthBookings] of groups) {
-    const monthOwing = monthBookings.reduce((s, b) => s + (b.owing || 0), 0);
+    const monthOwing = monthBookings.reduce((s, b) => s + (b.amountOwing || 0), 0);
     const isOpen = monthKey === curKey || monthKey === nextKey;
     const gid = `mg-${groupIdx++}`;
 
@@ -519,7 +519,7 @@ function renderFutureGrouped(bookings, totalOwing) {
           </div>
         </div>
         <div class="booking-amounts">
-          <div class="booking-owing">${fmtEur(b.owing)}</div>
+          <div class="booking-owing">${fmtEur(b.amountOwing)}</div>
           <div class="booking-total">/ ${fmtEur(b.total)}</div>
         </div>
       </div>`;
@@ -576,7 +576,7 @@ function renderSection(title, bookings, totalOwing, isPast) {
         </div>
       </div>
       <div class="booking-amounts">
-        <div class="booking-owing">${fmtEur(b.owing)}</div>
+        <div class="booking-owing">${fmtEur(b.amountOwing)}</div>
         <div class="booking-total">/ ${fmtEur(b.total)}</div>
       </div>
     </div>`;
