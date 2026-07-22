@@ -1065,8 +1065,9 @@ async function openMailModal() {
     const resp = await fetch(API + '/api/mailing-lists?code=' + CODE, { headers: { 'Origin': location.origin } });
     mailLists = await resp.json();
     if (!Array.isArray(mailLists) || mailLists.length === 0) {
-      sel.innerHTML = '<option value="">Geen lijsten — maak eerst een mailinglijst aan</option>';
+      sel.innerHTML = '<option value="_anders">✏️ Anders (handmatig e-mailadres)</option>';
       document.getElementById('mailRecipients').textContent = '';
+      updateMailRecipients();
       return;
     }
     sel.innerHTML = mailLists.map(l => `<option value="${l.id}">${l.name} (${(l.emails||[]).length})</option>`).join('') + '<option value="_anders">✏️ Anders (handmatig)</option>';
