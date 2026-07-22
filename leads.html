@@ -195,9 +195,16 @@
     <div class="summary-grid" id="summaryGrid"></div>
 
     <!-- Sub-tabs (leads only) -->
+    <!-- Reservation category tabs -->
+    <div class="subtabs" id="resCatTabs" style="display:none;">
+      <div class="subtab active" id="resCatAll" onclick="switchResCat('all')">Alle <span class="count" id="countResAll">0</span></div>
+      <div class="subtab" id="resCatBf" onclick="switchResCat('bf')">🏢 Bedrijf <span class="count" id="countResBf">0</span></div>
+      <div class="subtab" id="resCatKf" onclick="switchResCat('kf')">🎂 KF/FF <span class="count" id="countResKf">0</span></div>
+    </div>
+    <!-- Op te volgen sub-tabs -->
     <div class="subtabs" id="subtabs" style="display:none;">
       <div class="subtab active" id="subtabAll" onclick="switchSubTab('all')">Alle <span class="count" id="countAll">0</span></div>
-      <div class="subtab" id="subtabOpvolgen" onclick="switchSubTab('opvolgen')">Op te volgen <span class="count" id="countOpvolgen">0</span></div>
+      <div class="subtab" id="subtabOpvolgen" onclick="switchSubTab('opvolgen')">Open <span class="count" id="countOpvolgen">0</span></div>
       <div class="subtab" id="subtabOfferte" onclick="switchSubTab('offerte')">Offerte Akkoord <span class="count" id="countOfferte">0</span></div>
     </div>
 
@@ -253,6 +260,9 @@
           <select id="mailListSelect" style="width:100%;background:#0e0e10;border:1px solid #2a2a3e;color:#e0e0e0;padding:10px;border-radius:8px;font-size:0.95em;">
             <option value="">Laden...</option>
           </select>
+          <div id="manualEmailRow" style="display:none;margin-top:8px;">
+            <input id="manualEmailInput" type="text" placeholder="email@voorbeeld.nl (meerdere scheiden met komma)" style="width:100%;padding:8px;background:#0e0e10;border:1px solid #2a2a3e;border-radius:8px;color:#e0e0e0;font-size:0.9em;" />
+          </div>
         </div>
         <div style="margin-bottom:12px;">
           <label style="display:block;margin-bottom:6px;font-size:0.9em;color:#888;">Onderwerp</label>
@@ -287,6 +297,7 @@ let activeTab = 'reservations';
 let activeSubTab = 'all';
 let activeStatusFilter = 'all';
 let activeSortOrder = 'eventDate';
+let activeResCat = 'all'; // all / bf / kf
 let openDetailId = null;
 let generatedAt = '';
 
@@ -456,7 +467,7 @@ async function init() {
       const data = await r.json();
       allBookings = data.bookings || [];
       generatedAt = data.generatedAt || '';
-      document.getElementById('statusFilter').style.display = 'block';
+      // statusFilter visibility handled by switchTab/renderAll
       renderAll();
     } else if (r.status === 404) {
       // No leads data yet - try refresh
@@ -480,17 +491,28 @@ function switchTab(tab) {
   document.getElementById('tabLeads').classList.toggle('active', tab === 'leads');
   document.getElementById('tabControle').classList.toggle('active', tab === 'controle');
   document.getElementById('subtabs').style.display = tab === 'leads' ? 'flex' : 'none';
+  document.getElementById('resCatTabs').style.display = tab === 'reservations' ? 'flex' : 'none';
   document.getElementById('printControls').style.display = tab === 'reservations' ? 'block' : 'none';
+  document.getElementById('statusFilter').style.display = (tab === 'reservations' || tab === 'controle') ? 'block' : 'none';
+  activeStatusFilter = 'all'; // reset filter on tab switch
   openDetailId = null;
   renderAll();
 }
 
 function switchSubTab(sub) {
   activeSubTab = sub;
-  document.querySelectorAll('.subtab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('#subtabs .subtab').forEach(el => el.classList.remove('active'));
   document.getElementById('subtab' + sub.charAt(0).toUpperCase() + sub.slice(1)).classList.add('active');
   openDetailId = null;
   renderList();
+}
+
+function switchResCat(cat) {
+  activeResCat = cat;
+  document.querySelectorAll('#resCatTabs .subtab').forEach(el => el.classList.remove('active'));
+  document.getElementById('resCat' + cat.charAt(0).toUpperCase() + cat.slice(1)).classList.add('active');
+  openDetailId = null;
+  renderAll();
 }
 
 // ── Status filter & sort ──────────────────────────────────────────────────────
@@ -532,15 +554,19 @@ function applySorting(list) {
 // ── Filtering ─────────────────────────────────────────────────────────────────
 function getFilteredBookings() {
   if (activeTab === 'reservations') {
-    // Future VM bookings that are KF, BF, or FF — including paid
+    // 2a: BF + KF/FF bookings with all statuses (incl betaald, geannuleerd)
     let list = allBookings.filter(b => b.isKF || b.isFF || b.isBF);
+    // Apply category sub-filter
+    if (activeResCat === 'bf') list = list.filter(b => b.isBF);
+    else if (activeResCat === 'kf') list = list.filter(b => b.isKF || b.isFF);
+    // Apply status filter
     return applyStatusFilter(list);
   } else if (activeTab === 'controle') {
-    // VenueManager bookings without KF/BF/FF/RR classification
-    return allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !/^RR\b/i.test(b.name || ''));
+    // 2c: VenueManager bookings WITHOUT BF/KF/FF/RR
+    return allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !b.isRR && !/^RR\b/i.test(b.name || ''));
   } else {
-    // Op te volgen: only Open + Offerte Akkoord (not deels betaald / betaald)
-    let leads = allBookings.filter(b => b.leadCategory === 'Open' || b.leadCategory === 'Offerte Akkoord');
+    // 2b: Op te volgen — BF/KF/FF bookings with status Open or Offerte Akkoord only
+    let leads = allBookings.filter(b => (b.isKF || b.isFF || b.isBF) && (b.leadCategory === 'Open' || b.leadCategory === 'Offerte Akkoord'));
     if (activeSubTab === 'opvolgen') {
       leads = leads.filter(b => b.leadCategory === 'Open');
     } else if (activeSubTab === 'offerte') {
@@ -561,15 +587,22 @@ function renderAll() {
   document.getElementById('subtabOfferte').innerHTML = t('subtabOfferte') + ` <span class="count" id="countOfferte">0</span>`;
   // refresh button is now in header
 
-  // Counts for subtabs
-  const allLeads = allBookings.filter(b => b.leadCategory === 'Open' || b.leadCategory === 'Offerte Akkoord');
+  // Counts for op te volgen subtabs
+  const allLeads = allBookings.filter(b => (b.isKF || b.isFF || b.isBF) && (b.leadCategory === 'Open' || b.leadCategory === 'Offerte Akkoord'));
   const opvolgen = allLeads.filter(b => b.leadCategory === 'Open');
   const offerte = allLeads.filter(b => b.leadCategory === 'Offerte Akkoord');
   document.getElementById('countAll').textContent = allLeads.length;
   document.getElementById('countOpvolgen').textContent = opvolgen.length;
   document.getElementById('countOfferte').textContent = offerte.length;
+  // Counts for reserveringen category tabs
+  const allRes = allBookings.filter(b => b.isKF || b.isFF || b.isBF);
+  const resBf = allRes.filter(b => b.isBF);
+  const resKf = allRes.filter(b => b.isKF || b.isFF);
+  document.getElementById('countResAll').textContent = allRes.length;
+  document.getElementById('countResBf').textContent = resBf.length;
+  document.getElementById('countResKf').textContent = resKf.length;
   // Controle count
-  const controleCount = allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !/^RR\b/i.test(b.name || '')).length;
+  const controleCount = allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !b.isRR && !/^RR\b/i.test(b.name || '')).length;
   document.getElementById('tabControle').textContent = '⚠️ Controle (' + controleCount + ')';
 
   // Update time
@@ -578,11 +611,39 @@ function renderAll() {
     document.getElementById('refreshInfo').textContent = `${t('lastUpdate')}: ${d.toLocaleDateString('nl-NL')} ${d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
+  renderStatusFilterButtons();
   renderSummary();
   renderList();
 }
 
 function fmtEur(n) { return '€' + Number(n || 0).toLocaleString('nl-NL', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+
+function renderStatusFilterButtons() {
+  const container = document.getElementById('statusFilterBtns');
+  if (!container) return;
+  let btns = '<span style="font-size:11px;color:#888;font-weight:600;margin-right:4px;">Filter:</span>';
+  if (activeTab === 'reservations') {
+    // Reserveringen: alle / open / offerte akkoord / deels betaald / betaald / geannuleerd
+    const filters = [
+      ['all', 'Alle'], ['Open', 'Open'], ['Offerte Akkoord', 'Offerte Akkoord'],
+      ['Deels betaald', 'Deels betaald'], ['Betaald', 'Betaald'], ['Geannuleerd', 'Geannuleerd']
+    ];
+    for (const [val, label] of filters) {
+      btns += `<button class="status-filter-btn${activeStatusFilter === val ? ' active' : ''}" data-status="${val}" onclick="setStatusFilter('${val}')">${label}</button>`;
+    }
+  } else if (activeTab === 'controle') {
+    // Controle: alle / open / offerte akkoord / deels betaald / betaald / geannuleerd
+    const filters = [
+      ['all', 'Alle'], ['Open', 'Open'], ['Offerte Akkoord', 'Offerte Akkoord'],
+      ['Deels betaald', 'Deels betaald'], ['Betaald', 'Betaald'], ['Geannuleerd', 'Geannuleerd']
+    ];
+    for (const [val, label] of filters) {
+      btns += `<button class="status-filter-btn${activeStatusFilter === val ? ' active' : ''}" data-status="${val}" onclick="setStatusFilter('${val}')">${label}</button>`;
+    }
+  }
+  // Op te volgen has no status filter (only subtabs)
+  container.innerHTML = btns;
+}
 
 function renderSummary() {
   const filtered = getFilteredBookings();
@@ -637,7 +698,9 @@ function renderList() {
       ? '<span class="badge bf">🏢 BF</span>'
       : '';
 
-    const statusBadge = b.amountOwing <= 0
+    const statusBadge = b.leadCategory === 'Geannuleerd'
+      ? '<span class="badge" style="background:#64748b22;color:#94a3b8">❌ Geannuleerd</span>'
+      : b.amountOwing <= 0
       ? `<span class="badge paid">${t('paid')}</span>`
       : b.leadCategory === 'Offerte Akkoord'
       ? '<span class="badge offerte">📝 Offerte</span>'
@@ -981,11 +1044,6 @@ function pdfReserveringen() {
 
 // ── Mail functions ──
 let mailLists = [];
-async function toggleManualEmail() {
-  const sel = document.getElementById('mail-list-select');
-  document.getElementById('manual-email-row').style.display = sel.value === '_anders' ? 'block' : 'none';
-}
-
 async function openMailModal() {
   const modal = document.getElementById('mailModal');
   modal.style.display = 'flex';
@@ -1004,7 +1062,7 @@ async function openMailModal() {
       document.getElementById('mailRecipients').textContent = '';
       return;
     }
-    sel.innerHTML = mailLists.map(l => `<option value="${l.id}">${l.name} (${(l.emails||[]).length})</option>`).join('');
+    sel.innerHTML = mailLists.map(l => `<option value="${l.id}">${l.name} (${(l.emails||[]).length})</option>`).join('') + '<option value="_anders">✏️ Anders (handmatig)</option>';
     updateMailRecipients();
   } catch(e) {
     sel.innerHTML = '<option value="">Fout bij laden</option>';
@@ -1013,8 +1071,15 @@ async function openMailModal() {
 
 function updateMailRecipients() {
   const sel = document.getElementById('mailListSelect');
-  const list = mailLists.find(l => l.id === sel.value);
-  document.getElementById('mailRecipients').textContent = list ? (list.emails || []).join(', ') : '';
+  const manualRow = document.getElementById('manualEmailRow');
+  if (sel.value === '_anders') {
+    document.getElementById('mailRecipients').textContent = '';
+    if (manualRow) manualRow.style.display = 'block';
+  } else {
+    const list = mailLists.find(l => l.id === sel.value);
+    document.getElementById('mailRecipients').textContent = list ? (list.emails || []).join(', ') : '';
+    if (manualRow) manualRow.style.display = 'none';
+  }
 }
 
 function closeMailModal() {
@@ -1024,8 +1089,9 @@ function closeMailModal() {
 async function sendMail() {
   const listId = document.getElementById('mailListSelect').value;
   const subject = document.getElementById('mailSubject').value.trim();
-  if (!listId) { alert('Selecteer een mailinglijst'); return; }
-    if (listId === '_anders' && !manualEmail) { alert('Vul een e-mailadres in'); return; }
+  const manualEmail = (document.getElementById('manualEmailInput')?.value || '').trim();
+  if (!listId) { alert('Selecteer een mailinglijst of kies Anders'); return; }
+  if (listId === '_anders' && !manualEmail) { alert('Vul een e-mailadres in'); return; }
   if (!subject) { alert('Onderwerp is verplicht'); return; }
 
   const grouped = getFilteredReserveringen();
@@ -1069,7 +1135,7 @@ async function sendMail() {
     const resp = await fetch(API + '/api/send-report?code=' + CODE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
-      body: JSON.stringify({ listId, subject, html })
+      body: JSON.stringify({ listId: listId === '_anders' ? null : listId, subject, html, manualEmails: listId === '_anders' ? manualEmail.split(/[,;\s]+/).filter(Boolean) : undefined })
     });
     const result = await resp.json();
     if (result.error) throw new Error(result.error);
