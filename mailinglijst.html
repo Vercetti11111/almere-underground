@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mailinglijsten — Almere Underground</title>
+<style>
+:root { --bg: #0e0e10; --card: #1a1a2e; --accent: #00d4ff; --text: #e0e0e0; --muted: #888; --border: #2a2a3e; --danger: #ff4757; --success: #2ed573; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+.top-bar { background: var(--card); padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.top-bar a { color: var(--accent); text-decoration: none; font-size: 1.2em; }
+.top-bar h1 { font-size: 1.1em; flex: 1; }
+.container { max-width: 800px; margin: 0 auto; padding: 16px; }
+.btn { background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9em; }
+.btn:hover { opacity: 0.85; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-sm { padding: 6px 14px; font-size: 0.85em; }
+.btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+
+.list-card { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+.list-card h3 { color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+.list-card .emails { color: var(--muted); font-size: 0.9em; line-height: 1.6; }
+.list-card .email-tag { display: inline-block; background: #2a2a3e; padding: 3px 10px; border-radius: 12px; margin: 2px 4px 2px 0; font-size: 0.85em; }
+.list-card .reports-label { color: var(--muted); font-size: 0.8em; margin-top: 8px; }
+.list-card .report-tag { display: inline-block; background: #1a3a2e; color: var(--success); padding: 2px 8px; border-radius: 8px; margin: 2px 4px 2px 0; font-size: 0.8em; }
+.list-card .actions { margin-top: 12px; display: flex; gap: 8px; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
+.modal-overlay.active { display: flex; }
+.modal { background: var(--card); border-radius: 16px; padding: 24px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border); }
+.modal h2 { color: var(--accent); margin-bottom: 16px; font-size: 1.1em; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; margin-bottom: 6px; font-size: 0.9em; color: var(--muted); }
+.form-group input, .form-group textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 8px; font-size: 0.95em; }
+.form-group textarea { resize: vertical; min-height: 80px; }
+.form-group .hint { font-size: 0.8em; color: var(--muted); margin-top: 4px; }
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.checkbox-group label { display: flex; align-items: center; gap: 6px; background: var(--bg); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.9em; }
+.checkbox-group input[type="checkbox"] { accent-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-state .icon { font-size: 3em; margin-bottom: 16px; }
+
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--success); color: #000; padding: 10px 24px; border-radius: 8px; font-weight: 600; z-index: 200; display: none; }
+.toast.error { background: var(--danger); color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <a href="index.html">← Terug</a>
+  <h1>📧 Mailinglijsten</h1>
+  <button class="btn btn-sm" onclick="openModal()">+ Nieuwe lijst</button>
+</div>
+
+<div class="container" id="lists-container">
+  <div class="empty-state" id="loading">
+    <div class="icon">⏳</div>
+    <p>Laden...</p>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <h2 id="modal-title">Nieuwe mailinglijst</h2>
+    <input type="hidden" id="edit-id">
+    <div class="form-group">
+      <label>Naam</label>
+      <input type="text" id="list-name" placeholder="Bijv. Management, Sales Team">
+    </div>
+    <div class="form-group">
+      <label>E-mailadressen</label>
+      <textarea id="list-emails" placeholder="frank@example.com&#10;john@example.com&#10;(één per regel)"></textarea>
+      <div class="hint">Eén e-mailadres per regel</div>
+    </div>
+    <div class="form-group">
+      <label>Automatische rapportages</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" value="reserveringen"> Reserveringen</label>
+        <label><input type="checkbox" value="dagomzet"> Dagomzet</label>
+      </div>
+      <div class="hint">Selecteer welke automatische rapportages naar deze lijst worden gestuurd</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-sm" onclick="saveList()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://api.almereunderground.com';
+const code = localStorage.getItem('access_code') || '';
+const ORIGIN = 'https://dashboard.almereunderground.com';
+
+const REPORT_LABELS = {
+  reserveringen: '📋 Reserveringen',
+  dagomzet: '💰 Dagomzet'
+};
+
+let lists = [];
+
+async function apiFetch(path, opts = {}) {
+  const sep = path.includes('?') ? '&' : '?';
+  const url = `${API}${path}${sep}code=${code}`;
+  const headers = { 'Origin': ORIGIN, 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const resp = await fetch(url, { ...opts, headers });
+  return resp.json();
+}
+
+async function loadLists() {
+  try {
+    const data = await apiFetch('/api/mailing-lists');
+    if (data.error) throw new Error(data.error);
+    lists = Array.isArray(data) ? data : [];
+    renderLists();
+  } catch (e) {
+    document.getElementById('lists-container').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+function renderLists() {
+  const container = document.getElementById('lists-container');
+  if (lists.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>Nog geen mailinglijsten aangemaakt</p><button class="btn" onclick="openModal()" style="margin-top:16px">+ Eerste lijst aanmaken</button></div>`;
+    return;
+  }
+  container.innerHTML = lists.map(l => `
+    <div class="list-card">
+      <h3>
+        <span>${escHtml(l.name)}</span>
+        <span style="font-size:0.8em;color:var(--muted)">${(l.emails||[]).length} ontvanger${(l.emails||[]).length !== 1 ? 's' : ''}</span>
+      </h3>
+      <div class="emails">${(l.emails||[]).map(e => `<span class="email-tag">${escHtml(e)}</span>`).join('')}</div>
+      ${(l.reports||[]).length > 0 ? `<div class="reports-label">Automatische rapportages:</div><div>${l.reports.map(r => `<span class="report-tag">${REPORT_LABELS[r] || r}</span>`).join('')}</div>` : ''}
+      <div class="actions">
+        <button class="btn btn-sm btn-outline" onclick="editList('${l.id}')">✏️ Bewerken</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteList('${l.id}', '${escHtml(l.name)}')">🗑️ Verwijderen</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function openModal(list) {
+  document.getElementById('modal-title').textContent = list ? 'Lijst bewerken' : 'Nieuwe mailinglijst';
+  document.getElementById('edit-id').value = list ? list.id : '';
+  document.getElementById('list-name').value = list ? list.name : '';
+  document.getElementById('list-emails').value = list ? (list.emails || []).join('\n') : '';
+  // Set checkboxes
+  document.querySelectorAll('.checkbox-group input').forEach(cb => {
+    cb.checked = list ? (list.reports || []).includes(cb.value) : false;
+  });
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+}
+
+function editList(id) {
+  const list = lists.find(l => l.id === id);
+  if (list) openModal(list);
+}
+
+async function saveList() {
+  const id = document.getElementById('edit-id').value || undefined;
+  const name = document.getElementById('list-name').value.trim();
+  const emailsRaw = document.getElementById('list-emails').value.trim();
+  const emails = emailsRaw.split('\n').map(e => e.trim()).filter(e => e && e.includes('@'));
+  const reports = [];
+  document.querySelectorAll('.checkbox-group input:checked').forEach(cb => reports.push(cb.value));
+
+  if (!name) { showToast('Naam is verplicht', true); return; }
+  if (emails.length === 0) { showToast('Voeg minimaal één e-mailadres toe', true); return; }
+
+  try {
+    const result = await apiFetch('/api/mailing-lists', {
+      method: 'POST',
+      body: JSON.stringify({ id, name, emails, reports })
+    });
+    if (result.error) throw new Error(result.error);
+    lists = result.lists || [];
+    renderLists();
+    closeModal();
+    showToast(id ? 'Lijst bijgewerkt' : 'Lijst aangemaakt');
+  } catch (e) {
+    showToast(e.message, true);
+  }
+}
+
+async function deleteList(id, name) {
+  if (!confirm(`Weet je zeker dat je "${name}" wilt verwijderen?`)) return;
+  try {
+    const result = await apiFetch(`/api/mailing-lists?id=${id}`, { method: 'DELETE' });
+    if (result.error) throw new Error(result.error);
+    lists = result.lists || [];
+    renderLists();
+    showToast('Lijst verwijderd');
+  } catch (e) {
+    showToast(e.message, true);
+  }
+}
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '');
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+loadLists();
+</script>
+</body>
+</html>

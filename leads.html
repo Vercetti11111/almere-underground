@@ -203,6 +203,32 @@
       <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;">
         <button class="print-btn" onclick="copyReserveringen()" style="background:#10b981;">📋 Kopieer</button>
         <button class="print-btn" onclick="pdfReserveringen()">🖨️ PDF</button>
+        <button class="print-btn" onclick="openMailModal()" style="background:#f59e0b;color:#000;">📧 Mail</button>
+      </div>
+    </div>
+
+    <!-- Mail modal -->
+    <div id="mailModal" class="no-print" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:200;justify-content:center;align-items:center;" onclick="if(event.target===this)closeMailModal()">
+      <div style="background:#1a1a2e;border-radius:16px;padding:24px;width:90%;max-width:420px;border:1px solid #2a2a3e;">
+        <h3 style="color:#00d4ff;margin-bottom:16px;font-size:1.1em;">📧 Reserveringen mailen</h3>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:6px;font-size:0.9em;color:#888;">Mailinglijst</label>
+          <select id="mailListSelect" style="width:100%;background:#0e0e10;border:1px solid #2a2a3e;color:#e0e0e0;padding:10px;border-radius:8px;font-size:0.95em;">
+            <option value="">Laden...</option>
+          </select>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:6px;font-size:0.9em;color:#888;">Onderwerp</label>
+          <input type="text" id="mailSubject" style="width:100%;background:#0e0e10;border:1px solid #2a2a3e;color:#e0e0e0;padding:10px;border-radius:8px;font-size:0.95em;" />
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:6px;font-size:0.9em;color:#888;">Ontvangers</label>
+          <div id="mailRecipients" style="color:#888;font-size:0.85em;"></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button class="print-btn" onclick="closeMailModal()" style="background:transparent;border:1px solid #00d4ff;color:#00d4ff;">Annuleren</button>
+          <button class="print-btn" id="mailSendBtn" onclick="sendMail()" style="background:#f59e0b;color:#000;">Versturen</button>
+        </div>
       </div>
     </div>
 
@@ -856,6 +882,107 @@ function pdfReserveringen() {
   const fn = 'Reserveringen_' + from + '_' + to + '.pdf';
   doc.save(fn);
 }
+
+// ── Mail functions ──
+let mailLists = [];
+async function openMailModal() {
+  const modal = document.getElementById('mailModal');
+  modal.style.display = 'flex';
+  // Set default subject
+  const from = document.getElementById('printFrom').value;
+  const to = document.getElementById('printTo').value;
+  document.getElementById('mailSubject').value = 'Reserveringen overzicht — ' + fmtPrintDate(from) + ' t/m ' + fmtPrintDate(to);
+  // Load mailing lists
+  const sel = document.getElementById('mailListSelect');
+  sel.innerHTML = '<option value="">Laden...</option>';
+  try {
+    const resp = await fetch(API + '/api/mailing-lists?code=' + CODE, { headers: { 'Origin': location.origin } });
+    mailLists = await resp.json();
+    if (!Array.isArray(mailLists) || mailLists.length === 0) {
+      sel.innerHTML = '<option value="">Geen lijsten — maak eerst een mailinglijst aan</option>';
+      document.getElementById('mailRecipients').textContent = '';
+      return;
+    }
+    sel.innerHTML = mailLists.map(l => `<option value="${l.id}">${l.name} (${(l.emails||[]).length})</option>`).join('');
+    updateMailRecipients();
+  } catch(e) {
+    sel.innerHTML = '<option value="">Fout bij laden</option>';
+  }
+}
+
+function updateMailRecipients() {
+  const sel = document.getElementById('mailListSelect');
+  const list = mailLists.find(l => l.id === sel.value);
+  document.getElementById('mailRecipients').textContent = list ? (list.emails || []).join(', ') : '';
+}
+
+function closeMailModal() {
+  document.getElementById('mailModal').style.display = 'none';
+}
+
+async function sendMail() {
+  const listId = document.getElementById('mailListSelect').value;
+  const subject = document.getElementById('mailSubject').value.trim();
+  if (!listId) { alert('Selecteer een mailinglijst'); return; }
+  if (!subject) { alert('Onderwerp is verplicht'); return; }
+
+  const grouped = getFilteredReserveringen();
+  if (!grouped) return;
+
+  // Build HTML email body (same as copy format)
+  const cols = ['Tijd','Bedrijf','Klantnaam','Pax','Activiteit','Foods','Drinks','Begeleiding','Status'];
+  const colWidths = ['70px','150px','120px','50px','180px','160px','130px','85px','55px'];
+  const thBase = 'background:#1e293b;color:#fff;padding:6px 8px;text-align:left;font-size:13px;border:1px solid #334155;';
+  const tdBase = 'padding:5px 8px;font-size:13px;border:1px solid #e2e8f0;vertical-align:top;';
+  const tableStyle = 'border-collapse:collapse;width:100%;margin-bottom:12px;';
+
+  let html = '<div style="font-family:Arial,sans-serif;max-width:900px;">';
+  html += '<h2 style="color:#1e293b;margin-bottom:4px;">Reserveringen</h2>';
+  html += '<p style="color:#666;margin:0 0 16px;">' + subject + '</p>';
+
+  for (const [dateStr, bookings] of Object.entries(grouped)) {
+    html += '<p style="font-weight:bold;font-size:14px;margin:16px 0 4px;color:#1e293b;">' + fmtPrintDate(dateStr) + '</p>';
+    html += '<table style="' + tableStyle + '">';
+    html += '<tr>' + cols.map((c, i) => '<th style="' + thBase + '">' + c + '</th>').join('') + '</tr>';
+    for (const b of bookings) {
+      const r = getBookingRow(b);
+      const vals = [r.tijd, r.bedrijf, r.klant, r.pax, r.activiteit, r.foods, r.drinks, r.begeleiding, r.status];
+      html += '<tr>' + vals.map((v, i) => {
+        let cellVal = String(v || '').replace(/\n/g, '<br>');
+        let extraStyle = '';
+        if (i === vals.length - 1 && r.status === 'Op te volgen') extraStyle = 'color:#ff0000;font-weight:bold;';
+        return '<td style="' + tdBase + extraStyle + '">' + cellVal + '</td>';
+      }).join('') + '</tr>';
+    }
+    html += '</table>';
+  }
+  html += '<p style="color:#999;font-size:11px;margin-top:16px;">Verzonden vanuit Almere Underground Dashboard</p>';
+  html += '</div>';
+
+  const btn = document.getElementById('mailSendBtn');
+  btn.textContent = '⏳ Verzenden...';
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch(API + '/api/send-report?code=' + CODE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Origin': location.origin },
+      body: JSON.stringify({ listId, subject, html })
+    });
+    const result = await resp.json();
+    if (result.error) throw new Error(result.error);
+    closeMailModal();
+    alert('✅ Mail verzonden naar ' + result.recipients + ' ontvanger(s)!');
+  } catch(e) {
+    alert('❌ Fout: ' + e.message);
+  } finally {
+    btn.textContent = 'Versturen';
+    btn.disabled = false;
+  }
+}
+
+// Add event listener for list select
+document.getElementById('mailListSelect')?.addEventListener('change', updateMailRecipients);
 
 // ── Auto-init (after all declarations) ────────────────────────────────────────
 if (CODE) { init(); document.getElementById('printControls').style.display = 'block'; }
