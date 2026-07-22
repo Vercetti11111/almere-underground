@@ -41,24 +41,29 @@
     .menu-desc { font-size: 12px; color: #888; line-height: 1.4; }
     .menu-arrow { font-size: 18px; color: #555; flex-shrink: 0; }
 
-    /* Desktop: 4-column tile grid */
-    @media (min-width: 900px) {
-      .container { max-width: 1100px; padding: 40px 32px; }
-      .menu { flex-direction: row; flex-wrap: wrap; gap: 16px; }
-      .menu-card {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        width: calc(25% - 12px);
-        padding: 28px 16px;
-        min-height: 160px;
-        justify-content: center;
-      }
-      .menu-icon { font-size: 40px; margin-bottom: 4px; }
-      .menu-arrow { display: none; }
-      .menu-title { font-size: 15px; }
-      .menu-desc { font-size: 11px; }
+    /* Desktop tile grid (toggled via body.desktop-mode) */
+    body.desktop-mode .container { max-width: 1100px; padding: 40px 32px; }
+    body.desktop-mode .menu { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+    body.desktop-mode .menu-card {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: calc(25% - 12px);
+      padding: 28px 16px;
+      min-height: 160px;
+      justify-content: center;
     }
+    body.desktop-mode .menu-icon { font-size: 40px; margin-bottom: 4px; }
+    body.desktop-mode .menu-arrow { display: none; }
+    body.desktop-mode .menu-title { font-size: 15px; }
+    body.desktop-mode .menu-desc { font-size: 11px; }
+
+    .view-toggle {
+      background: #1a1a24; border: 1px solid #2a2a38; border-radius: 8px;
+      color: #888; padding: 5px 10px; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; line-height: 1;
+    }
+    .view-toggle:active { background: #2a2a38; }
     
     .footer { text-align: center; margin-top: 48px; font-size: 11px; color: #444; }
     
@@ -135,6 +140,7 @@
         <span id="user-name"></span>
       </div>
       <div class="top-bar-right">
+        <button class="view-toggle" id="view-toggle" onclick="toggleView()" title="Wissel weergave">📱</button>
         <select id="lang-select" onchange="setLang(this.value)">
           <option value="nl">🇳🇱 NL</option>
           <option value="en">🇬🇧 EN</option>
@@ -349,6 +355,30 @@ if (savedSession) {
     }
   } catch { /* invalid JSON, show login */ }
 }
+
+// View toggle (mobile ↔ desktop)
+function applyView(mode) {
+  if (mode === 'desktop') {
+    document.body.classList.add('desktop-mode');
+    document.getElementById('view-toggle').textContent = '📱';
+    document.getElementById('view-toggle').title = 'Mobiele weergave';
+  } else {
+    document.body.classList.remove('desktop-mode');
+    document.getElementById('view-toggle').textContent = '🖥️';
+    document.getElementById('view-toggle').title = 'Desktop weergave';
+  }
+}
+
+function toggleView() {
+  const isDesktop = document.body.classList.contains('desktop-mode');
+  const newMode = isDesktop ? 'mobile' : 'desktop';
+  localStorage.setItem('au_view', newMode);
+  applyView(newMode);
+}
+
+// Init view from saved preference, default to desktop on wide screens
+const savedView = localStorage.getItem('au_view') || (window.innerWidth >= 900 ? 'desktop' : 'mobile');
+applyView(savedView);
 
 document.getElementById('lang-select').value = lang;
 setLang(lang);
