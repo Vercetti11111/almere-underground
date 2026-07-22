@@ -986,7 +986,7 @@ async function toggleManualEmail() {
   document.getElementById('manual-email-row').style.display = sel.value === '_anders' ? 'block' : 'none';
 }
 
-function openMailModal() {
+async function openMailModal() {
   const modal = document.getElementById('mailModal');
   modal.style.display = 'flex';
   // Set default subject
