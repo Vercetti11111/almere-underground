@@ -96,7 +96,9 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 
 <script>
 const API = 'https://api.almereunderground.com';
-const code = localStorage.getItem('access_code') || '';
+const _s = JSON.parse(localStorage.getItem('au_session') || 'null');
+if (!_s) { location.href = 'index.html'; }
+const code = _s ? _s.code : '';
 const ORIGIN = 'https://dashboard.almereunderground.com';
 
 const REPORT_LABELS = {
@@ -155,7 +157,14 @@ function openModal(list) {
   document.getElementById('list-name').value = list ? list.name : '';
   document.getElementById('list-emails').value = list ? (list.emails || []).join('\n') : '';
   // Set checkboxes
-  document.querySelectorAll('.checkbox-group input').forEach(cb => {
+  // Set frequency
+    const freqSel = document.getElementById('edit-freq');
+    freqSel.value = list.schedule ? list.schedule.frequency : '';
+    freqSel.dispatchEvent(new Event('change'));
+    if (list.schedule && list.schedule.day) {
+      setTimeout(() => { document.getElementById('edit-freq-day').value = list.schedule.day; }, 50);
+    }
+    document.querySelectorAll('.checkbox-group input').forEach(cb => {
     cb.checked = list ? (list.reports || []).includes(cb.value) : false;
   });
   document.getElementById('modal-overlay').classList.add('active');
@@ -216,6 +225,26 @@ function showToast(msg, isError) {
   t.style.display = 'block';
   setTimeout(() => t.style.display = 'none', 3000);
 }
+
+
+// ── Frequency picker logic ──
+document.getElementById('edit-freq').addEventListener('change', function() {
+  const picker = document.getElementById('freq-day-picker');
+  const sel = document.getElementById('edit-freq-day');
+  const lbl = document.getElementById('freq-day-label');
+  if (this.value === 'weekly') {
+    picker.style.display = 'block';
+    lbl.textContent = 'Verzenddag';
+    sel.innerHTML = ['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag','Zondag']
+      .map((d,i) => `<option value="${i+1}">${d}</option>`).join('');
+  } else if (this.value === 'monthly') {
+    picker.style.display = 'block';
+    lbl.textContent = 'Dag van de maand';
+    sel.innerHTML = Array.from({length:28}, (_,i) => `<option value="${i+1}">${i+1}</option>`).join('');
+  } else {
+    picker.style.display = 'none';
+  }
+});
 
 loadLists();
 </script>

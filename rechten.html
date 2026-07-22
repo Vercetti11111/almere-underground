@@ -215,9 +215,12 @@
           <label class="checkbox-item"><input type="checkbox" value="personeel" /> 👥 Personeelsplanning</label>
           <label class="checkbox-item"><input type="checkbox" value="kpi" /> 📈 KPI Dashboard</label>
           <label class="checkbox-item"><input type="checkbox" value="social" /> 📱 Social Stats</label>
+          <label class="checkbox-item"><input type="checkbox" value="keuken" /> 🍰 Keuken</label>
           <label class="checkbox-item"><input type="checkbox" value="runsheet" /> 📋 Run Sheet</label>
           <label class="checkbox-item"><input type="checkbox" value="openstaand" /> 💰 Openstaande Posten</label>
           <label class="checkbox-item"><input type="checkbox" value="leads" /> 🎯 Leads & Reserveringen</label>
+          <label class="checkbox-item"><input type="checkbox" value="orderboek" /> 📒 Orderboek</label>
+          <label class="checkbox-item"><input type="checkbox" value="mailinglijst" /> 📧 Mailinglijst</label>
           <label class="checkbox-item"><input type="checkbox" value="rechten" /> 🔐 Gebruikersrechten</label>
         </div>
       </div>
@@ -336,6 +339,9 @@ const PAGE_LABELS = {
   runsheet: () => t('pageRunsheet'),
   openstaand: () => t('pageOpenstaand'),
   leads: () => t('pageLeads'),
+  keuken: () => '🍰 Keuken',
+  orderboek: () => '📒 Orderboek',
+  mailinglijst: () => '📧 Mailinglijst',
   rechten: () => t('pageRechten'),
 };
 
@@ -350,7 +356,7 @@ function renderRoles() {
     <div class="role-card">
       <div class="role-header">
         <span class="role-name">${escHtml(r.name)}</span>
-        <span class="role-badge ${r.role}">${r.role}</span>
+        <span class="role-badge ${r.role}" style="text-transform:capitalize">${r.role}</span>
       </div>
       <div class="role-code">Code: <code>${escHtml(r.code)}</code></div>
       <div class="role-pages">
@@ -380,7 +386,7 @@ function openModal(code) {
   
   // Update checkbox labels
   const checkboxes = document.querySelectorAll('#pages-checkboxes .checkbox-item');
-  const pageIds = ['dashboard', 'personeel', 'kpi', 'social', 'keuken', 'runsheet', 'openstaand', 'leads', 'orderboek', 'rechten'];
+  const pageIds = ['dashboard', 'personeel', 'kpi', 'social', 'keuken', 'runsheet', 'openstaand', 'leads', 'orderboek', 'mailinglijst', 'rechten'];
   checkboxes.forEach((cb, i) => {
     cb.querySelector('input').checked = false;
     const label = cb.childNodes[cb.childNodes.length - 1];

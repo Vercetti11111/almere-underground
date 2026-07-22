@@ -981,7 +981,12 @@ function pdfReserveringen() {
 
 // ── Mail functions ──
 let mailLists = [];
-async function openMailModal() {
+async function toggleManualEmail() {
+  const sel = document.getElementById('mail-list-select');
+  document.getElementById('manual-email-row').style.display = sel.value === '_anders' ? 'block' : 'none';
+}
+
+function openMailModal() {
   const modal = document.getElementById('mailModal');
   modal.style.display = 'flex';
   // Set default subject
@@ -1020,6 +1025,7 @@ async function sendMail() {
   const listId = document.getElementById('mailListSelect').value;
   const subject = document.getElementById('mailSubject').value.trim();
   if (!listId) { alert('Selecteer een mailinglijst'); return; }
+    if (listId === '_anders' && !manualEmail) { alert('Vul een e-mailadres in'); return; }
   if (!subject) { alert('Onderwerp is verplicht'); return; }
 
   const grouped = getFilteredReserveringen();
