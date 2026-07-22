@@ -33,12 +33,32 @@
       cursor: pointer;
     }
     .menu-card:active { background: #2a2a38; transform: scale(0.98); }
+    .menu-card:hover { background: #22222e; border-color: #3a3a4a; }
     
     .menu-icon { font-size: 32px; flex-shrink: 0; }
     .menu-text { flex: 1; }
     .menu-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
     .menu-desc { font-size: 12px; color: #888; line-height: 1.4; }
     .menu-arrow { font-size: 18px; color: #555; flex-shrink: 0; }
+
+    /* Desktop: 4-column tile grid */
+    @media (min-width: 900px) {
+      .container { max-width: 1100px; padding: 40px 32px; }
+      .menu { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+      .menu-card {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        width: calc(25% - 12px);
+        padding: 28px 16px;
+        min-height: 160px;
+        justify-content: center;
+      }
+      .menu-icon { font-size: 40px; margin-bottom: 4px; }
+      .menu-arrow { display: none; }
+      .menu-title { font-size: 15px; }
+      .menu-desc { font-size: 11px; }
+    }
     
     .footer { text-align: center; margin-top: 48px; font-size: 11px; color: #444; }
     
