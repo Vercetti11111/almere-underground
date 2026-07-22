@@ -546,7 +546,7 @@ function renderList() {
       <div class="booking-row" onclick="toggleDetail('${b.id}')">
         <div class="booking-info">
           <div class="booking-name">${b.name || '(geen naam)'} ${typeBadge}</div>
-          <div class="booking-meta">${b.startTime ? b.startTime + ' · ' : ''}${fmtDate(b.bookingDate)}${b.pax ? ' · ' + b.pax + ' pax' : ''} ${statusBadge}</div>
+          <div class="booking-meta"><span style="color:#888;font-size:10px">#${b.id}</span> · ${b.startTime ? b.startTime + ' · ' : ''}${fmtDate(b.bookingDate)}${b.pax ? ' · ' + b.pax + ' pax' : ''} ${statusBadge}</div>
           ${productsSummary ? `<div class="booking-products">${productsSummary}</div>` : ''}
         </div>
         <div class="booking-amounts">
@@ -555,6 +555,7 @@ function renderList() {
         </div>
       </div>
       <div class="detail-panel ${isOpen ? 'open' : ''}" id="detail-${b.id}">
+        <div class="detail-row"><span class="detail-label">Booking ID</span><span class="detail-value" style="font-family:monospace">${b.id}</span></div>
         <div class="detail-row"><span class="detail-label">${t('date')}</span><span class="detail-value">${fmtDate(b.bookingDate)}</span></div>
         <div class="detail-row"><span class="detail-label">${t('created')}</span><span class="detail-value">${fmtDate(b.createdDate || b.createdAt)}</span></div>
         ${b.lastPaymentDate ? `<div class="detail-row"><span class="detail-label">${t('lastPayment')}</span><span class="detail-value">${fmtDate(b.lastPaymentDate)}</span></div>` : ''}
