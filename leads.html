@@ -60,7 +60,10 @@
     .booking-row:active { background: #22222e; }
     .booking-info { flex: 1; min-width: 0; }
     .booking-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .booking-meta { font-size: 11px; color: #888; margin-top: 2px; }
+    .booking-meta { font-size: 11px; color: #888; margin-top: 2px; display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+    .copy-id-btn { background: none; border: none; cursor: pointer; font-size: 11px; padding: 0 4px; margin: 0; line-height: 1; opacity: 0.5; transition: opacity 0.15s; }
+    .copy-id-btn:hover { opacity: 1; }
+    .copy-id-btn.copied { opacity: 1; }
     .booking-products { font-size: 10px; color: #666; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
     .booking-amounts { text-align: right; flex-shrink: 0; }
     .booking-owing { font-size: 14px; font-weight: 800; color: #f59e0b; }
@@ -425,6 +428,25 @@ function escHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
+function copyBookingId(id, btn) {
+  navigator.clipboard.writeText(id).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+  }).catch(() => {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = id; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    const orig = btn.textContent;
+    btn.textContent = '✅';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+  });
+}
+
 const changelogFieldLabels = {
   status: 'Status', total: 'Totaal', amountOwing: 'Openstaand', amountPaid: 'Betaald',
   bookingDate: 'Datum', leadCategory: 'Categorie', bookingNotes: 'Boekingsnotities', posNotes: 'POS notities'
@@ -721,7 +743,7 @@ function renderList() {
       <div class="booking-row" onclick="toggleDetail('${b.id}')">
         <div class="booking-info">
           <div class="booking-name">${b.name || '(geen naam)'} ${typeBadge}</div>
-          <div class="booking-meta"><span style="color:#888;font-size:10px">#${b.id}</span> · ${b.startTime ? b.startTime + ' · ' : ''}${fmtDate(b.bookingDate)}${b.pax ? ' · ' + b.pax + ' pax' : ''} ${statusBadge}${activeTab === 'leads' ? getDaysIndicator(b) : ''}</div>
+          <div class="booking-meta"><span style="color:#888;font-size:10px">#${b.id}</span><button class="copy-id-btn" onclick="event.stopPropagation();copyBookingId('${b.id}',this)" title="Kopieer reserveringsnummer">📋</button> · ${b.startTime ? b.startTime + ' · ' : ''}${fmtDate(b.bookingDate)}${b.pax ? ' · ' + b.pax + ' pax' : ''} ${statusBadge}${activeTab === 'leads' ? getDaysIndicator(b) : ''}</div>
           ${activeTab === 'leads' ? `<div style="font-size:10px;color:#666;margin-top:2px;">📝 ${fmtDate(b.createdDate || b.createdAt)}${getLastModified(b) ? ' · ✏️ ' + fmtDate(getLastModified(b)) : ''}</div>` : ''}
           ${productsSummary ? `<div class="booking-products">${productsSummary}</div>` : ''}
         </div>
