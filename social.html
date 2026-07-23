@@ -394,7 +394,7 @@ function renderGoogleInsights() {
   const pct = total ? Math.round(answered / total * 100) : 0;
   const uColor = unanswered > 20 ? '#ef4444' : unanswered > 5 ? '#f59e0b' : '#22c55e';
 
-  // Star distribution
+  // Star distribution — ALL Google reviews
   const dist = gd.star_distribution || {};
   const maxCount = Math.max(...Object.values(dist), 1);
   const starColors = {5:'#22c55e',4:'#84cc16',3:'#eab308',2:'#f97316',1:'#ef4444'};
@@ -410,30 +410,43 @@ function renderGoogleInsights() {
   }
   starHtml += '</div>';
 
-  // Unanswered column
+  // Unanswered column — with Google branding
   document.getElementById('insightsUnanswered').innerHTML = `
-    <div class="insights-label">📩 Onbeantwoorde reviews <span style="font-size:10px;color:#888;">(laatste 2 maanden)</span></div>
+    <div class="insights-label">📩 Onbeantwoorde Google reviews <span style="font-size:10px;color:#888;">(laatste 2 maanden)</span></div>
     <div class="insights-big" style="color:${uColor};">${unanswered}</div>
-    <div class="insights-sub">van ${total} reviews · ${pct}% beantwoord${gd.unanswered_total ? ' (totaal ' + gd.unanswered_total + ' onbeantwoord)' : ''}</div>
+    <div class="insights-sub">van ${total} Google reviews · ${pct}% beantwoord${gd.unanswered_total ? ' (totaal ' + gd.unanswered_total + ' onbeantwoord)' : ''}</div>
     <div class="insights-bar"><div class="insights-bar-fill" style="width:${pct}%;background:${uColor};"></div></div>
-    <div class="insights-label" style="margin-top:14px;">📊 Sterren verdeling</div>
+    <div class="insights-label" style="margin-top:14px;">📊 Google sterren verdeling <span style="font-size:10px;color:#888;">(alle ${total} reviews)</span></div>
     ${starHtml}
   `;
 
-  // Sentiment column — use combined sentiment if available, fall back to Google-only
-  const cs = (window._allReviewData?.combined?.combined_sentiment) || {};
-  const posThemes = (cs.positive_themes || gd.positive_themes || []).slice(0, 6);
-  const negThemes = (cs.negative_themes || gd.negative_themes || []).slice(0, 6);
-  const tendency = cs.tendency || null;
-  const tendencyBadge = tendency === 'good' ? '<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">✅ Goed</span>'
-    : tendency === 'mixed' ? '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">⚠️ Gemengd</span>'
-    : tendency === 'improvable' ? '<span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">🔴 Verbeterbaar</span>'
+  // Sentiment column — Google-only, last 3 months
+  // Compute 3-month sentiment from individual reviews
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const threeMonthStr = threeMonthsAgo.toISOString().slice(0, 10);
+  
+  const allGoogleReviews = window._allReviewData?.google?.reviews || gd.reviews || [];
+  const recent3m = allGoogleReviews.filter(r => (r.date || '') >= threeMonthStr);
+  const neg3m = recent3m.filter(r => r.stars && r.stars <= 3);
+  
+  // Use Google-only sentiment (not combined)
+  const posThemes = (gd.positive_themes || []).slice(0, 6);
+  const negThemes = (gd.negative_themes || []).slice(0, 6);
+  
+  // Tendency based on 3-month data
+  const recent3mAvg = recent3m.length > 0 ? recent3m.reduce((s, r) => s + (r.stars || 0), 0) / recent3m.length : 0;
+  const tendencyBadge = recent3mAvg >= 4.5 ? '<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">✅ Goed</span>'
+    : recent3mAvg >= 3.5 ? '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">⚠️ Gemengd</span>'
+    : recent3mAvg > 0 ? '<span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">🔴 Verbeterbaar</span>'
     : '';
+  
   const posHtml = posThemes.map(t => `<span class="sentiment-tag pos">👍 ${t.theme} (${t.count})</span>`).join('');
   const negHtml = negThemes.map(t => `<span class="sentiment-tag neg">👎 ${t.theme} (${t.count})</span>`).join('');
-  const sentLabel = cs.positive_themes ? '💬 Gecombineerd sentiment (alle platforms)' : '💬 Sentiment (afgelopen 3 maanden)';
+  
   document.getElementById('insightsSentiment').innerHTML = `
-    <div class="insights-label">${sentLabel} ${tendencyBadge}</div>
+    <div class="insights-label">💬 Google sentiment <span style="font-size:10px;color:#888;">(afgelopen 3 maanden)</span> ${tendencyBadge}</div>
+    <div class="insights-sub" style="margin-bottom:8px;">${recent3m.length} reviews · gemiddeld ${recent3mAvg ? recent3mAvg.toFixed(2) : '—'}★ · ${neg3m.length} negatief (≤3★)</div>
     <div class="sentiment-section">
       <div class="sentiment-row-label">Goed:</div>
       <div class="sentiment-tags">${posHtml || '<span style="color:#888;font-size:12px;">—</span>'}</div>
@@ -444,25 +457,29 @@ function renderGoogleInsights() {
     </div>
   `;
 
-  // Negative reviews expandable detail — use combined if available
-  const negReviews = cs.negative_reviews || gd.negative_reviews || [];
-  if (negReviews.length) {
+  // Negative reviews — only last 3 months
+  if (neg3m.length) {
     document.getElementById('insightsNegDetail').innerHTML = `
-      <div class="neg-reviews-toggle" onclick="const list=this.nextElementSibling;list.classList.toggle('open');this.textContent=list.classList.contains('open')?'▾ Verberg negatieve reviews':'▸ ${negReviews.length} negatieve reviews bekijken'">▸ ${negReviews.length} negatieve reviews bekijken</div>
+      <div class="neg-reviews-toggle" onclick="const list=this.nextElementSibling;list.classList.toggle('open');this.textContent=list.classList.contains('open')?'▾ Verberg negatieve reviews':'▸ ${neg3m.length} negatieve Google reviews (laatste 3 maanden)'">▸ ${neg3m.length} negatieve Google reviews (laatste 3 maanden)</div>
       <div class="neg-reviews-list">
-        ${negReviews.map(r => `<div class="neg-review-item">
+        ${neg3m.map(r => `<div class="neg-review-item">
           <div class="neg-review-header">
             <span class="neg-stars">${'⭐'.repeat(r.stars)}</span>
             <strong>${r.author}</strong>
             <span style="color:#888;font-size:11px;margin-left:6px;">${r.date}</span>
-            ${r.platform && r.platform !== 'google' ? '<span style="background:#333;color:#ccc;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px;">' + r.platform + '</span>' : ''}
+            <span style="background:rgba(66,133,244,0.15);color:#4285F4;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px;">Google</span>
             ${r.replied ? '<span class="replied-badge">✅ beantwoord</span>' : '<span class="unreplied-badge">⚠️ onbeantwoord</span>'}
           </div>
           <div class="neg-review-text">${(r.text || '').substring(0, 300)}${(r.text || '').length > 300 ? '…' : ''}</div>
         </div>`).join('')}
       </div>
     `;
+  } else {
+    document.getElementById('insightsNegDetail').innerHTML = '<div style="color:#22c55e;font-size:13px;padding:8px 16px;">✅ Geen negatieve Google reviews in de afgelopen 3 maanden!</div>';
   }
+  
+  // ===== Rating trend chart (monthly, 12 months, moving avg, L3M) =====
+  renderRatingTrend(allGoogleReviews);
 }
 
 function renderExtraReviews() {
@@ -781,8 +798,8 @@ function render(data) {
     <!-- Google Reviews Insights (wide card) -->
     <div class="google-insights-card" id="googleInsightsCard" style="display:none;">
       <div class="insights-header">
-        <span class="insights-icon">⭐</span>
-        <span class="insights-title">Reviews Insights</span>
+        <span class="insights-icon"><svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#34A853" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg></span>
+        <span class="insights-title">Google Reviews Insights</span>
       </div>
       <div class="insights-body">
         <div class="insights-col unanswered-col" id="insightsUnanswered"></div>
@@ -790,6 +807,18 @@ function render(data) {
         <div class="insights-col sentiment-col" id="insightsSentiment"></div>
       </div>
       <div class="insights-neg-detail" id="insightsNegDetail"></div>
+    </div>
+
+    <!-- Google Rating Trend Chart (monthly) -->
+    <div class="google-insights-card" id="ratingTrendCard" style="display:none;">
+      <div class="insights-header">
+        <span class="insights-icon"><svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#34A853" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg></span>
+        <span class="insights-title">Google Rating Trend</span>
+        <span style="font-size:11px;color:#888;margin-left:8px;">(12 maanden)</span>
+      </div>
+      <div style="padding:16px;height:280px;">
+        <canvas id="ratingTrendChart"></canvas>
+      </div>
     </div>
 
     <!-- Reviews trend chart (Google only) -->
@@ -852,6 +881,177 @@ function setDays(days, btn) {
       scales: {
         x: { ticks: { color: '#9ca3af', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: '#2a2d3a' } },
         y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: '#2a2d3a' } }
+      }
+    }
+  });
+}
+
+let ratingTrendChartInstance = null;
+
+function renderRatingTrend(reviews) {
+  if (!reviews || !reviews.length) return;
+  const card = document.getElementById('ratingTrendCard');
+  if (!card) return;
+  card.style.display = '';
+  
+  // Group reviews by month (YYYY-MM)
+  const byMonth = {};
+  for (const r of reviews) {
+    if (!r.date || !r.stars) continue;
+    // Parse date — handle various formats
+    let dateStr = r.date;
+    // Try to normalize to YYYY-MM
+    let month = '';
+    if (/^\d{4}-\d{2}/.test(dateStr)) {
+      month = dateStr.substring(0, 7);
+    } else {
+      // Try parsing as natural language date
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        month = d.toISOString().substring(0, 7);
+      }
+    }
+    if (!month) continue;
+    if (!byMonth[month]) byMonth[month] = { total: 0, count: 0 };
+    byMonth[month].total += r.stars;
+    byMonth[month].count++;
+  }
+  
+  // Generate 12 months of labels
+  const months = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toISOString().substring(0, 7));
+  }
+  
+  // Monthly averages
+  const monthlyAvg = months.map(m => {
+    const data = byMonth[m];
+    return data && data.count > 0 ? +(data.total / data.count).toFixed(2) : null;
+  });
+  
+  // Moving average (3-month rolling)
+  const allMonthKeys = Object.keys(byMonth).sort();
+  const movingAvg = months.map((m, i) => {
+    // Take current + previous 2 months
+    const windowMonths = [];
+    for (let j = 0; j < 3; j++) {
+      const d = new Date(parseInt(m.split('-')[0]), parseInt(m.split('-')[1]) - 1 - j, 1);
+      windowMonths.push(d.toISOString().substring(0, 7));
+    }
+    let totalStars = 0, totalCount = 0;
+    for (const wm of windowMonths) {
+      if (byMonth[wm]) { totalStars += byMonth[wm].total; totalCount += byMonth[wm].count; }
+    }
+    return totalCount > 0 ? +(totalStars / totalCount).toFixed(2) : null;
+  });
+  
+  // L3M flat line (last 3 months average)
+  const l3mMonths = months.slice(-3);
+  let l3mTotal = 0, l3mCount = 0;
+  for (const m of l3mMonths) {
+    if (byMonth[m]) { l3mTotal += byMonth[m].total; l3mCount += byMonth[m].count; }
+  }
+  const l3mAvg = l3mCount > 0 ? +(l3mTotal / l3mCount).toFixed(2) : null;
+  const l3mLine = months.map(() => l3mAvg);
+  
+  // Labels
+  const labels = months.map(m => {
+    const d = new Date(m + '-01T12:00:00');
+    return d.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' });
+  });
+  
+  // Review count per month for bar chart
+  const monthlyCounts = months.map(m => byMonth[m]?.count || 0);
+  
+  if (ratingTrendChartInstance) ratingTrendChartInstance.destroy();
+  const ctx = document.getElementById('ratingTrendChart').getContext('2d');
+  ratingTrendChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Maandgemiddelde',
+          data: monthlyAvg,
+          borderColor: '#4285F4',
+          backgroundColor: 'rgba(66,133,244,0.1)',
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointBackgroundColor: '#4285F4',
+          tension: 0.2,
+          fill: false,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Voortschrijdend gem. (3M)',
+          data: movingAvg,
+          borderColor: '#FBBC05',
+          borderWidth: 2,
+          borderDash: [6, 3],
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+          yAxisID: 'y'
+        },
+        {
+          label: 'L3M gemiddelde (' + (l3mAvg || '—') + '★)',
+          data: l3mLine,
+          borderColor: '#34A853',
+          borderWidth: 2,
+          borderDash: [2, 4],
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Aantal reviews',
+          data: monthlyCounts,
+          type: 'bar',
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          borderColor: 'rgba(255,255,255,0.15)',
+          borderWidth: 1,
+          borderRadius: 4,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#9ca3af', font: { size: 11 }, usePointStyle: true, pointStyle: 'circle' }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.dataset.yAxisID === 'y1') return ctx.dataset.label + ': ' + ctx.raw + ' reviews';
+              return ctx.dataset.label + ': ' + (ctx.raw != null ? ctx.raw.toFixed(2) + '★' : '—');
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { color: '#2a2d3a' } },
+        y: {
+          position: 'left',
+          min: 3.5,
+          max: 5.0,
+          ticks: { color: '#4285F4', font: { size: 10 }, callback: v => v.toFixed(1) + '★' },
+          grid: { color: '#2a2d3a' },
+          title: { display: true, text: 'Rating', color: '#4285F4', font: { size: 11 } }
+        },
+        y1: {
+          position: 'right',
+          min: 0,
+          ticks: { color: '#888', font: { size: 10 } },
+          grid: { display: false },
+          title: { display: true, text: 'Aantal', color: '#888', font: { size: 11 } }
+        }
       }
     }
   });

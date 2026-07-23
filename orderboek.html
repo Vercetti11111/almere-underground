@@ -392,6 +392,7 @@ function renderCategoryDetail(comp, cat) {
 
   // Bookings table (current year)
   const activeBookings = cy.bookings.filter(b => !b._cancelled).sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''));
+  const cancelledBookings = cy.bookings.filter(b => b._cancelled).sort((a, b) => (a.eventDate || '').localeCompare(b.eventDate || ''));
   if (activeBookings.length > 0) {
     html += `<div class="section-title">Boekingen ${thisYear}</div>`;
     html += `<div class="card" style="overflow-x:auto;"><table class="ob-table">

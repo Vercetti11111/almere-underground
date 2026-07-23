@@ -257,7 +257,14 @@
     <!-- Mail modal -->
     <div id="mailModal" class="no-print" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:200;justify-content:center;align-items:center;" onclick="if(event.target===this)closeMailModal()">
       <div style="background:#1a1a2e;border-radius:16px;padding:24px;width:90%;max-width:420px;border:1px solid #2a2a3e;">
-        <h3 style="color:#00d4ff;margin-bottom:16px;font-size:1.1em;">📧 Reserveringen mailen</h3>
+        <h3 style="color:#00d4ff;margin-bottom:16px;font-size:1.1em;">📧 Rapport mailen</h3>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;margin-bottom:6px;font-size:0.9em;color:#888;">Type rapport</label>
+          <select id="mailReportType" onchange="onReportTypeChange()" style="width:100%;background:#0e0e10;border:1px solid #2a2a3e;color:#e0e0e0;padding:10px;border-radius:8px;font-size:0.95em;">
+            <option value="reserveringen">📋 Reserveringen (BF/FF)</option>
+            <option value="kinderfeestjes">🎈 Kinderfeestjes (KF/FF, 2 weken)</option>
+          </select>
+        </div>
         <div style="margin-bottom:12px;">
           <label style="display:block;margin-bottom:6px;font-size:0.9em;color:#888;">Mailinglijst</label>
           <select id="mailListSelect" style="width:100%;background:#0e0e10;border:1px solid #2a2a3e;color:#e0e0e0;padding:10px;border-radius:8px;font-size:0.95em;">
@@ -576,8 +583,8 @@ function applySorting(list) {
 // ── Filtering ─────────────────────────────────────────────────────────────────
 function getFilteredBookings() {
   if (activeTab === 'reservations') {
-    // 2a: BF + KF/FF bookings with all statuses (incl betaald, geannuleerd)
-    let list = allBookings.filter(b => b.isKF || b.isFF || b.isBF);
+    // 2a: BF + KF/FF bookings — cancelled excluded from default view
+    let list = allBookings.filter(b => (b.isKF || b.isFF || b.isBF) && b.leadCategory !== 'Geannuleerd');
     // Apply category sub-filter
     if (activeResCat === 'bf') list = list.filter(b => b.isBF);
     else if (activeResCat === 'kf') list = list.filter(b => b.isKF || b.isFF);
@@ -585,7 +592,7 @@ function getFilteredBookings() {
     return applyStatusFilter(list);
   } else if (activeTab === 'controle') {
     // 2c: VenueManager bookings WITHOUT BF/KF/FF/RR
-    return allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !b.isRR && !/^RR\b/i.test(b.name || ''));
+    return allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !b.isRR && !/^RR\b/i.test(b.name || '') && b.leadCategory !== 'Geannuleerd');
   } else {
     // 2b: Op te volgen — BF/KF/FF bookings with status Open or Offerte Akkoord only
     let leads = allBookings.filter(b => (b.isKF || b.isFF || b.isBF) && (b.leadCategory === 'Open' || b.leadCategory === 'Offerte Akkoord'));
@@ -617,14 +624,14 @@ function renderAll() {
   document.getElementById('countOpvolgen').textContent = opvolgen.length;
   document.getElementById('countOfferte').textContent = offerte.length;
   // Counts for reserveringen category tabs
-  const allRes = allBookings.filter(b => b.isKF || b.isFF || b.isBF);
+  const allRes = allBookings.filter(b => (b.isKF || b.isFF || b.isBF) && b.leadCategory !== 'Geannuleerd');
   const resBf = allRes.filter(b => b.isBF);
   const resKf = allRes.filter(b => b.isKF || b.isFF);
   document.getElementById('countResAll').textContent = allRes.length;
   document.getElementById('countResBf').textContent = resBf.length;
   document.getElementById('countResKf').textContent = resKf.length;
   // Controle count
-  const controleCount = allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !b.isRR && !/^RR\b/i.test(b.name || '')).length;
+  const controleCount = allBookings.filter(b => b.source === 'VenueManager' && !b.isKF && !b.isBF && !b.isFF && !b.isRR && !/^RR\b/i.test(b.name || '') && b.leadCategory !== 'Geannuleerd').length;
   document.getElementById('tabControle').textContent = '⚠️ Controle (' + controleCount + ')';
 
   // Update time
@@ -655,7 +662,7 @@ function renderStatusFilterButtons() {
     // Reserveringen: alle / open / offerte akkoord / deels betaald / betaald / geannuleerd
     const filters = [
       ['all', 'Alle'], ['Open', 'Open'], ['Offerte Akkoord', 'Offerte Akkoord'],
-      ['Deels betaald', 'Deels betaald'], ['Betaald', 'Betaald'], ['Geannuleerd', 'Geannuleerd']
+      ['Deels betaald', 'Deels betaald'], ['Betaald', 'Betaald']
     ];
     for (const [val, label] of filters) {
       btns += `<button class="status-filter-btn${activeStatusFilter === val ? ' active' : ''}" data-status="${val}" onclick="setStatusFilter('${val}')">${label}</button>`;
@@ -861,6 +868,7 @@ function getFilteredReserveringen() {
   // Only BF and FF (not KF)
   const filtered = allBookings.filter(b => {
     if (!b.isFF && !b.isBF) return false;
+    if (b.leadCategory === 'Geannuleerd') return false;
     const bd = (b.bookingDate || '').substring(0, 10);
     return bd >= from && bd <= to;
   });
@@ -909,7 +917,8 @@ function getBookingRow(b) {
 }
 
 async function copyReserveringen() {
-  const grouped = getFilteredReserveringen();
+  const reportType = document.getElementById('mailReportType').value;
+  const grouped = reportType === 'kinderfeestjes' ? getFilteredKinderfeestjes() : getFilteredReserveringen();
   if (!grouped) return;
 
   const cols = ['Tijd','Bedrijf','Klantnaam','Pax','Activiteit','Foods','Drinks','Begeleiding','Status'];
@@ -1116,6 +1125,46 @@ function closeMailModal() {
   document.getElementById('mailModal').style.display = 'none';
 }
 
+function onReportTypeChange() {
+  const type = document.getElementById('mailReportType').value;
+  const fromEl = document.getElementById('printFrom');
+  const toEl = document.getElementById('printTo');
+  if (type === 'kinderfeestjes') {
+    const today = new Date();
+    fromEl.value = today.toISOString().slice(0,10);
+    const twoWeeks = new Date(today); twoWeeks.setDate(twoWeeks.getDate() + 14);
+    toEl.value = twoWeeks.toISOString().slice(0,10);
+    document.getElementById('mailSubject').value = '🎈 Kinderfeestjes overzicht — ' + fmtPrintDate(fromEl.value) + ' t/m ' + fmtPrintDate(toEl.value);
+  } else {
+    document.getElementById('mailSubject').value = 'Reserveringen overzicht — ' + fmtPrintDate(fromEl.value) + ' t/m ' + fmtPrintDate(toEl.value);
+  }
+}
+
+function getFilteredKinderfeestjes() {
+  const from = document.getElementById('printFrom').value;
+  const to = document.getElementById('printTo').value;
+  if (!from || !to) { alert('Selecteer een datumrange'); return null; }
+  const filtered = allBookings.filter(b => {
+    if (!b.isKF && !b.isFF) return false;
+    if (b.leadCategory === 'Geannuleerd') return false;
+    const bd = (b.bookingDate || '').substring(0, 10);
+    return bd >= from && bd <= to;
+  });
+  filtered.sort((a, b) => {
+    const da = (a.bookingDate || '').substring(0, 10);
+    const db = (b.bookingDate || '').substring(0, 10);
+    if (da !== db) return da.localeCompare(db);
+    return (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
+  });
+  const grouped = {};
+  for (const b of filtered) {
+    const d = (b.bookingDate || '').substring(0, 10);
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(b);
+  }
+  return grouped;
+}
+
 async function sendMail() {
   const listId = document.getElementById('mailListSelect').value;
   const subject = document.getElementById('mailSubject').value.trim();
@@ -1147,13 +1196,19 @@ async function sendMail() {
   html += '<div style="max-width:1050px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;">';
   // Header
   html += '<div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:24px 30px;color:#fff;">';
-  html += '<h1 style="margin:0;font-size:20px;font-weight:700;">📋 Reserveringen Overzicht</h1>';
-  html += '<p style="margin:6px 0 0;opacity:0.8;font-size:13px;">' + fromStr + ' t/m ' + toStr + ' · ' + totalCount + ' reserveringen</p>';
+  const isKF = reportType === 'kinderfeestjes';
+  const titleEmoji = isKF ? '🎈' : '📋';
+  const titleText = isKF ? 'Kinderfeestjes Overzicht' : 'Reserveringen Overzicht';
+  const greeting = isKF 
+    ? 'Goedemorgen allen,<br><br>Zie bijgevoegd het overzicht van de aankomende kinderfeestjes voor de komende 2 weken (' + totalCount + ' feestjes).'
+    : 'Goedemorgen allen,<br><br>Zie bijgevoegd het overzicht van de aankomende reserveringen (' + totalCount + ' reserveringen).';
+  html += '<h1 style="margin:0;font-size:20px;font-weight:700;">' + titleEmoji + ' ' + titleText + '</h1>';
+  html += '<p style="margin:6px 0 0;opacity:0.8;font-size:13px;">' + fromStr + ' t/m ' + toStr + ' · ' + totalCount + (isKF ? ' feestjes' : ' reserveringen') + '</p>';
   html += '</div>';
   // Body
   html += '<div style="padding:20px 24px;">';
   // Greeting
-  html += '<div style="font-size:14px;color:#334155;margin-bottom:20px;line-height:1.6;">Goedemorgen allen,<br><br>Zie bijgevoegd het overzicht van de aankomende reserveringen (' + totalCount + ' reserveringen).</div>';
+  html += '<div style="font-size:14px;color:#334155;margin-bottom:20px;line-height:1.6;">' + greeting + '</div>';
 
   for (const [dateStr, bookings] of Object.entries(grouped)) {
     html += '<div style="font-weight:700;font-size:14px;color:#1e293b;margin:18px 0 6px;padding-bottom:4px;border-bottom:2px solid #e2e8f0;">' + fmtPrintDate(dateStr) + '</div>';
