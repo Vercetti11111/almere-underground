@@ -1295,7 +1295,7 @@ async function downloadRunsheetPDF(date) {
             { content: infoLines, styles: { fontSize: 8, textColor: [100,100,100], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: rightCell, styles: { fontStyle: 'bold', fontSize: 10, textColor: [60,60,60], cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
             { content: badgePdf, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', valign: 'middle', textColor: isPaid ? [21,87,36] : [133,100,0], fillColor: isPaid ? [212,237,218] : [255,243,205], cellPadding: { top: 4, bottom: 3, left: 3, right: 3 } } },
-            { content: 'Tafel: ' + getTafelsStr(bkAssign), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
+            { content: 'Tafel: ' + getTafelsStr(bkAssign) + '\nBegeleider: ' + shortN(bkAssign.begeleider || '—'), colSpan: 2, styles: { fontStyle: 'bold', fontSize: 10, halign: 'left', valign: 'middle', cellPadding: { top: 4, bottom: 3, left: padL, right: 2 } } },
           ]);
           // Column headers
           const hdrRow = [];
