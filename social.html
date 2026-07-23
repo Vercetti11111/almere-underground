@@ -216,13 +216,15 @@
 
     /* ── Desktop / View Mode ────────────────────────── */
     body.desktop-mode .cards,
-    body.force-desktop .cards { max-width:900px; grid-template-columns: repeat(4, 1fr); }
+    body.force-desktop .cards { max-width:1920px; grid-template-columns: repeat(4, 1fr); }
     body.desktop-mode .section-title,
-    body.force-desktop .section-title { max-width:900px; }
+    body.force-desktop .section-title { max-width:1920px; }
     body.desktop-mode .header,
-    body.force-desktop .header { max-width:900px; }
+    body.force-desktop .header { max-width:1920px; }
     body.desktop-mode .chart-container,
-    body.force-desktop .chart-container { max-width:900px; }
+    body.force-desktop .chart-container { max-width:1920px; }
+    body.desktop-mode .google-insights-card,
+    body.force-desktop .google-insights-card { max-width:1920px; margin-left:auto; margin-right:auto; }
 
     body.force-mobile .cards { max-width:400px !important; grid-template-columns: 1fr !important; }
     body.force-mobile .section-title,
@@ -240,6 +242,9 @@
     border-radius: 16px;
     padding: 20px 24px;
     margin-bottom: 20px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
   }
   .insights-header {
     display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
