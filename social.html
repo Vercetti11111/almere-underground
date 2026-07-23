@@ -421,21 +421,16 @@ function renderGoogleInsights() {
   `;
 
   // Sentiment column — Google-only, last 3 months
-  // Compute 3-month sentiment from individual reviews
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-  const threeMonthStr = threeMonthsAgo.toISOString().slice(0, 10);
-  
-  const allGoogleReviews = window._allReviewData?.google?.reviews || gd.reviews || [];
-  const recent3m = allGoogleReviews.filter(r => (r.date || '') >= threeMonthStr);
-  const neg3m = recent3m.filter(r => r.stars && r.stars <= 3);
+  // Use server-computed 3-month data
+  const r3m = gd.recent_3m || { count: 0, avg: 0, negative_count: 0 };
+  const neg3m = gd.negative_reviews || [];
   
   // Use Google-only sentiment (not combined)
   const posThemes = (gd.positive_themes || []).slice(0, 6);
   const negThemes = (gd.negative_themes || []).slice(0, 6);
   
   // Tendency based on 3-month data
-  const recent3mAvg = recent3m.length > 0 ? recent3m.reduce((s, r) => s + (r.stars || 0), 0) / recent3m.length : 0;
+  const recent3mAvg = r3m.avg || 0;
   const tendencyBadge = recent3mAvg >= 4.5 ? '<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">✅ Goed</span>'
     : recent3mAvg >= 3.5 ? '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">⚠️ Gemengd</span>'
     : recent3mAvg > 0 ? '<span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">🔴 Verbeterbaar</span>'
@@ -446,7 +441,7 @@ function renderGoogleInsights() {
   
   document.getElementById('insightsSentiment').innerHTML = `
     <div class="insights-label">💬 Google sentiment <span style="font-size:10px;color:#888;">(afgelopen 3 maanden)</span> ${tendencyBadge}</div>
-    <div class="insights-sub" style="margin-bottom:8px;">${recent3m.length} reviews · gemiddeld ${recent3mAvg ? recent3mAvg.toFixed(2) : '—'}★ · ${neg3m.length} negatief (≤3★)</div>
+    <div class="insights-sub" style="margin-bottom:8px;">${r3m.count} reviews · gemiddeld ${r3m.avg ? r3m.avg.toFixed(2) : '—'}★ · ${r3m.negative_count} negatief (≤3★)</div>
     <div class="sentiment-section">
       <div class="sentiment-row-label">Goed:</div>
       <div class="sentiment-tags">${posHtml || '<span style="color:#888;font-size:12px;">—</span>'}</div>
@@ -479,7 +474,7 @@ function renderGoogleInsights() {
   }
   
   // ===== Rating trend chart (monthly, 12 months, moving avg, L3M) =====
-  renderRatingTrend(allGoogleReviews);
+  renderRatingTrend(gd.monthly_ratings || {});
 }
 
 function renderExtraReviews() {
@@ -888,34 +883,11 @@ function setDays(days, btn) {
 
 let ratingTrendChartInstance = null;
 
-function renderRatingTrend(reviews) {
-  if (!reviews || !reviews.length) return;
+function renderRatingTrend(byMonth) {
+  if (!byMonth || !Object.keys(byMonth).length) return;
   const card = document.getElementById('ratingTrendCard');
   if (!card) return;
   card.style.display = '';
-  
-  // Group reviews by month (YYYY-MM)
-  const byMonth = {};
-  for (const r of reviews) {
-    if (!r.date || !r.stars) continue;
-    // Parse date — handle various formats
-    let dateStr = r.date;
-    // Try to normalize to YYYY-MM
-    let month = '';
-    if (/^\d{4}-\d{2}/.test(dateStr)) {
-      month = dateStr.substring(0, 7);
-    } else {
-      // Try parsing as natural language date
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
-        month = d.toISOString().substring(0, 7);
-      }
-    }
-    if (!month) continue;
-    if (!byMonth[month]) byMonth[month] = { total: 0, count: 0 };
-    byMonth[month].total += r.stars;
-    byMonth[month].count++;
-  }
   
   // Generate 12 months of labels
   const months = [];
@@ -925,16 +897,14 @@ function renderRatingTrend(reviews) {
     months.push(d.toISOString().substring(0, 7));
   }
   
-  // Monthly averages
+  // Monthly averages from server data
   const monthlyAvg = months.map(m => {
     const data = byMonth[m];
     return data && data.count > 0 ? +(data.total / data.count).toFixed(2) : null;
   });
   
   // Moving average (3-month rolling)
-  const allMonthKeys = Object.keys(byMonth).sort();
   const movingAvg = months.map((m, i) => {
-    // Take current + previous 2 months
     const windowMonths = [];
     for (let j = 0; j < 3; j++) {
       const d = new Date(parseInt(m.split('-')[0]), parseInt(m.split('-')[1]) - 1 - j, 1);
@@ -947,7 +917,7 @@ function renderRatingTrend(reviews) {
     return totalCount > 0 ? +(totalStars / totalCount).toFixed(2) : null;
   });
   
-  // L3M flat line (last 3 months average)
+  // L3M flat line
   const l3mMonths = months.slice(-3);
   let l3mTotal = 0, l3mCount = 0;
   for (const m of l3mMonths) {
@@ -956,13 +926,11 @@ function renderRatingTrend(reviews) {
   const l3mAvg = l3mCount > 0 ? +(l3mTotal / l3mCount).toFixed(2) : null;
   const l3mLine = months.map(() => l3mAvg);
   
-  // Labels
   const labels = months.map(m => {
     const d = new Date(m + '-01T12:00:00');
     return d.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' });
   });
   
-  // Review count per month for bar chart
   const monthlyCounts = months.map(m => byMonth[m]?.count || 0);
   
   if (ratingTrendChartInstance) ratingTrendChartInstance.destroy();
