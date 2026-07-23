@@ -474,7 +474,7 @@ function renderGoogleInsights() {
   }
   
   // ===== Rating trend chart (monthly, 12 months, moving avg, L3M) =====
-  renderRatingTrend(gd.monthly_ratings || {});
+  renderRatingTrend(gd.monthly_ratings || {}, gd.avg_rating || null);
 }
 
 function renderExtraReviews() {
@@ -883,7 +883,7 @@ function setDays(days, btn) {
 
 let ratingTrendChartInstance = null;
 
-function renderRatingTrend(byMonth) {
+function renderRatingTrend(byMonth, allTimeAvg) {
   if (!byMonth || !Object.keys(byMonth).length) return;
   const card = document.getElementById('ratingTrendCard');
   if (!card) return;
@@ -917,14 +917,9 @@ function renderRatingTrend(byMonth) {
     return totalCount > 0 ? +(totalStars / totalCount).toFixed(2) : null;
   });
   
-  // L3M flat line
-  const l3mMonths = months.slice(-3);
-  let l3mTotal = 0, l3mCount = 0;
-  for (const m of l3mMonths) {
-    if (byMonth[m]) { l3mTotal += byMonth[m].total; l3mCount += byMonth[m].count; }
-  }
-  const l3mAvg = l3mCount > 0 ? +(l3mTotal / l3mCount).toFixed(2) : null;
-  const l3mLine = months.map(() => l3mAvg);
+  // All-time average flat line
+  const allTimeAvgVal = allTimeAvg ? +allTimeAvg.toFixed(2) : null;
+  const allTimeLine = months.map(() => allTimeAvgVal);
   
   const labels = months.map(m => {
     const d = new Date(m + '-01T12:00:00');
@@ -964,8 +959,8 @@ function renderRatingTrend(byMonth) {
           yAxisID: 'y'
         },
         {
-          label: 'L3M gemiddelde (' + (l3mAvg || '—') + '★)',
-          data: l3mLine,
+          label: 'All-time gemiddelde (' + (allTimeAvgVal || '—') + '★)',
+          data: allTimeLine,
           borderColor: '#34A853',
           borderWidth: 2,
           borderDash: [2, 4],
