@@ -215,26 +215,38 @@
   }
 
     /* ── Desktop / View Mode ────────────────────────── */
-    body.desktop-mode .cards,
+    /* Desktop (auto ≥900px) */
+    @media (min-width: 900px) {
+      .cards { max-width:1920px; grid-template-columns: repeat(4, 1fr); }
+      .section-title, .header, .chart-container, .google-insights-card { max-width:1920px; }
+    }
+    /* Forced desktop */
     body.force-desktop .cards { max-width:1920px; grid-template-columns: repeat(4, 1fr); }
-    body.desktop-mode .section-title,
-    body.force-desktop .section-title { max-width:1920px; }
-    body.desktop-mode .header,
-    body.force-desktop .header { max-width:1920px; }
-    body.desktop-mode .chart-container,
-    body.force-desktop .chart-container { max-width:1920px; }
-    body.desktop-mode .google-insights-card,
+    body.force-desktop .section-title,
+    body.force-desktop .header,
+    body.force-desktop .chart-container,
     body.force-desktop .google-insights-card { max-width:1920px; margin-left:auto; margin-right:auto; }
 
+    /* Forced mobile */
     body.force-mobile .cards { max-width:400px !important; grid-template-columns: 1fr !important; }
     body.force-mobile .section-title,
     body.force-mobile .chart-container,
-    body.force-mobile .header { max-width:400px !important; }
+    body.force-mobile .header,
+    body.force-mobile .google-insights-card { max-width:400px !important; }
 
     /* View toggle */
     .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
     .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
 
+
+  .card-link {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 6px;
+    background: rgba(255,255,255,0.06); color: #888;
+    text-decoration: none; font-size: 12px; margin-left: auto;
+    transition: all 0.2s;
+  }
+  .card-link:hover { background: rgba(255,255,255,0.15); color: #fff; }
   /* Google Reviews Insights (wide card) */
   .google-insights-card {
     background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
@@ -292,6 +304,13 @@
   .neg-review-text { color: #ccc; margin-top: 6px; font-size: 12px; line-height: 1.6; }
   .replied-badge { font-size: 11px; color: #22c55e; margin-left: 6px; font-weight: 600; }
   .unreplied-badge { font-size: 11px; color: #ef4444; margin-left: 6px; font-weight: 600; }
+
+  .star-dist { margin-top: 12px; }
+  .star-dist-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .star-dist-label { font-size: 12px; color: #aaa; width: 16px; text-align: right; font-weight: 600; }
+  .star-dist-bar-bg { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+  .star-dist-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .star-dist-count { font-size: 11px; color: #888; width: 28px; text-align: right; }
   /* Mobile: stack columns */
   @media (max-width: 768px) {
     .insights-body { flex-direction: column; gap: 16px; }
@@ -370,12 +389,30 @@ function renderGoogleInsights() {
   const pct = total ? Math.round(answered / total * 100) : 0;
   const uColor = unanswered > 20 ? '#ef4444' : unanswered > 5 ? '#f59e0b' : '#22c55e';
 
+  // Star distribution
+  const dist = gd.star_distribution || {};
+  const maxCount = Math.max(...Object.values(dist), 1);
+  const starColors = {5:'#22c55e',4:'#84cc16',3:'#eab308',2:'#f97316',1:'#ef4444'};
+  let starHtml = '<div class="star-dist">';
+  for (let s = 5; s >= 1; s--) {
+    const cnt = dist[s] || 0;
+    const w = maxCount ? Math.round(cnt / maxCount * 100) : 0;
+    starHtml += `<div class="star-dist-row">
+      <span class="star-dist-label">${s}★</span>
+      <div class="star-dist-bar-bg"><div class="star-dist-bar" style="width:${w}%;background:${starColors[s]};"></div></div>
+      <span class="star-dist-count">${cnt}</span>
+    </div>`;
+  }
+  starHtml += '</div>';
+
   // Unanswered column
   document.getElementById('insightsUnanswered').innerHTML = `
     <div class="insights-label">📩 Onbeantwoorde reviews</div>
     <div class="insights-big" style="color:${uColor};">${unanswered}</div>
     <div class="insights-sub">van ${total} reviews · ${pct}% beantwoord</div>
     <div class="insights-bar"><div class="insights-bar-fill" style="width:${pct}%;background:${uColor};"></div></div>
+    <div class="insights-label" style="margin-top:14px;">📊 Sterren verdeling</div>
+    ${starHtml}
   `;
 
   // Sentiment column
@@ -527,6 +564,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">📸</span>
           <div class="card-title">Instagram<small>@almereunderground</small></div>
+          <a href="https://www.instagram.com/almereunderground/" target="_blank" class="card-link" title="Open Instagram">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${fmt(ig.followers)}</span>
@@ -541,6 +579,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">🎵</span>
           <div class="card-title">TikTok<small>@almereunderground</small></div>
+          <a href="https://www.tiktok.com/@almereunderground" target="_blank" class="card-link" title="Open TikTok">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${fmt(tt.followers)}</span>
@@ -555,6 +594,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">👍</span>
           <div class="card-title">Facebook<small>Almere Underground</small></div>
+          <a href="https://www.facebook.com/almereunderground" target="_blank" class="card-link" title="Open Facebook">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${fmt(fb.followers)}</span>
@@ -568,6 +608,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">▶️</span>
           <div class="card-title">YouTube<small>@AlmereUnderground</small></div>
+          <a href="https://www.youtube.com/@AlmereUnderground" target="_blank" class="card-link" title="Open YouTube">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${fmt(yt.subscribers)}</span>
@@ -598,6 +639,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">⭐</span>
           <div class="card-title">Google Reviews<small>Maps & Zoeken</small></div>
+          <a href="https://www.google.com/maps/place/Almere+Underground/" target="_blank" class="card-link" title="Open Google Reviews">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${gr.rating || '—'}</span>
@@ -612,6 +654,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">🟢</span>
           <div class="card-title">Trustpilot<small>almereunderground.nl</small></div>
+          <a href="https://nl.trustpilot.com/review/almereunderground.nl" target="_blank" class="card-link" title="Open Trustpilot">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${tp.rating || '—'}</span>
@@ -626,6 +669,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">🦉</span>
           <div class="card-title">TripAdvisor<small>Family Entertainment Center</small></div>
+          <a href="https://www.tripadvisor.nl/Attraction_Review-g806327-d27998048-Reviews-Almere_Underground_Family_Entertainment_Center-Almere_Flevoland_Province.html" target="_blank" class="card-link" title="Open TripAdvisor">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${ta.rating || '—'}</span>
@@ -640,6 +684,7 @@ function render(data) {
         <div class="card-header">
           <span class="card-icon">🎡</span>
           <div class="card-title">Dagjeweg.nl<small>Uitjes & Reviews</small></div>
+          <a href="https://www.dagjeweg.nl/tip/13748/Almere-Underground" target="_blank" class="card-link" title="Open Dagjeweg">↗</a>
         </div>
         <div class="main-metric">
           <span class="main-value">${dw.rating || '—'}</span>
