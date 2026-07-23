@@ -475,7 +475,7 @@ async function renderRunsheet(forceRefresh = false) {
               <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
             </div>
             <div class="rs-booking-right">
-              <span class="pay-badge ${payClass}">${payLabel}</span>
+              ${isWideView() ? `<span class="pay-badge ${payClass}">${payLabel}</span>` : ''}
               <div class="rs-tafel">Tafel:</div>
             </div>
           </div>
