@@ -462,7 +462,7 @@ async function renderRunsheet(forceRefresh = false) {
             <td>${act.mainActivity || '—'}</td>
             <td>${act.subtype || '—'}</td>
             <td>${fmtTime(act.startTime)}${act.endTime ? '–'+fmtTime(act.endTime) : ''}</td>
-            <td>${act.quantity || '—'}</td>
+            <td>${act.quantity != null ? act.quantity : '—'}</td>
             <td>${locs}</td>
           </tr>`;
       }
@@ -900,7 +900,7 @@ function showBookingOverlay(bid) {
     const locs = a.locations?.length ? a.locations.join(', ') : '—';
     const st = a.startTime ? (a.startTime.length <= 5 ? a.startTime : a.startTime.substring(11,16)) : '—';
     const et = a.endTime ? (a.endTime.length <= 5 ? a.endTime : a.endTime.substring(11,16)) : '';
-    actRows += `<tr><td>${a.mainActivity || '—'}</td><td>${a.subtype || '—'}</td><td>${st}${et ? '–'+et : ''}</td><td>${a.quantity || '—'}</td><td>${locs}</td></tr>`;
+    actRows += `<tr><td>${a.mainActivity || '—'}</td><td>${a.subtype || '—'}</td><td>${st}${et ? '–'+et : ''}</td><td>${a.quantity != null ? a.quantity : '—'}</td><td>${locs}</td></tr>`;
   }
 
   const notes = [b.bookingNotes, b.posNotes].filter(Boolean).join(' · ');
@@ -1261,7 +1261,7 @@ async function downloadRunsheetPDF(date) {
         a.mainActivity || a.name || '',
         a.subtype || '',
         (a.startTime || '').substring(0, 5),
-        String(a.quantity || ''),
+        String(a.quantity != null ? a.quantity : ''),
         (a.locations || []).join(', ') || '—'
       ]);
 
