@@ -420,13 +420,20 @@ function renderGoogleInsights() {
     ${starHtml}
   `;
 
-  // Sentiment column
-  const posThemes = (gd.positive_themes || []).slice(0, 5);
-  const negThemes = (gd.negative_themes || []).slice(0, 5);
+  // Sentiment column — use combined sentiment if available, fall back to Google-only
+  const cs = (window._allReviewData?.combined?.combined_sentiment) || {};
+  const posThemes = (cs.positive_themes || gd.positive_themes || []).slice(0, 6);
+  const negThemes = (cs.negative_themes || gd.negative_themes || []).slice(0, 6);
+  const tendency = cs.tendency || null;
+  const tendencyBadge = tendency === 'good' ? '<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">✅ Goed</span>'
+    : tendency === 'mixed' ? '<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">⚠️ Gemengd</span>'
+    : tendency === 'improvable' ? '<span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;">🔴 Verbeterbaar</span>'
+    : '';
   const posHtml = posThemes.map(t => `<span class="sentiment-tag pos">👍 ${t.theme} (${t.count})</span>`).join('');
   const negHtml = negThemes.map(t => `<span class="sentiment-tag neg">👎 ${t.theme} (${t.count})</span>`).join('');
+  const sentLabel = cs.positive_themes ? '💬 Gecombineerd sentiment (alle platforms)' : '💬 Sentiment (afgelopen 3 maanden)';
   document.getElementById('insightsSentiment').innerHTML = `
-    <div class="insights-label">💬 Sentiment (afgelopen 3 maanden)</div>
+    <div class="insights-label">${sentLabel} ${tendencyBadge}</div>
     <div class="sentiment-section">
       <div class="sentiment-row-label">Goed:</div>
       <div class="sentiment-tags">${posHtml || '<span style="color:#888;font-size:12px;">—</span>'}</div>
@@ -437,8 +444,8 @@ function renderGoogleInsights() {
     </div>
   `;
 
-  // Negative reviews expandable detail
-  const negReviews = gd.negative_reviews || [];
+  // Negative reviews expandable detail — use combined if available
+  const negReviews = cs.negative_reviews || gd.negative_reviews || [];
   if (negReviews.length) {
     document.getElementById('insightsNegDetail').innerHTML = `
       <div class="neg-reviews-toggle" onclick="const list=this.nextElementSibling;list.classList.toggle('open');this.textContent=list.classList.contains('open')?'▾ Verberg negatieve reviews':'▸ ${negReviews.length} negatieve reviews bekijken'">▸ ${negReviews.length} negatieve reviews bekijken</div>
@@ -448,9 +455,10 @@ function renderGoogleInsights() {
             <span class="neg-stars">${'⭐'.repeat(r.stars)}</span>
             <strong>${r.author}</strong>
             <span style="color:#888;font-size:11px;margin-left:6px;">${r.date}</span>
+            ${r.platform && r.platform !== 'google' ? '<span style="background:#333;color:#ccc;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px;">' + r.platform + '</span>' : ''}
             ${r.replied ? '<span class="replied-badge">✅ beantwoord</span>' : '<span class="unreplied-badge">⚠️ onbeantwoord</span>'}
           </div>
-          <div class="neg-review-text">${r.text.substring(0, 300)}${r.text.length > 300 ? '…' : ''}</div>
+          <div class="neg-review-text">${(r.text || '').substring(0, 300)}${(r.text || '').length > 300 ? '…' : ''}</div>
         </div>`).join('')}
       </div>
     `;
