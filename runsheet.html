@@ -475,7 +475,7 @@ async function renderRunsheet(forceRefresh = false) {
               <div class="rs-booking-id">${t('bookingNr')}${b.id}</div>
             </div>
             <div class="rs-booking-right">
-              ${isWideView() ? `<span class="pay-badge ${payClass}">${payLabel}</span>` : ''}
+              <span class="pay-badge ${payClass}">${payLabel}</span>
               <div class="rs-tafel">Tafel:</div>
             </div>
           </div>
@@ -653,7 +653,7 @@ async function renderOverview(forceRefresh = false) {
               </select>
             </td>
             <td style="text-align:center;">${timeStr}</td>
-            <td>${payText}</td>
+            <td class="ov-hide-mobile">${payText}</td>
           </tr>`;
       }).join('');
 
@@ -669,7 +669,7 @@ async function renderOverview(forceRefresh = false) {
               <th>Tafel</th>
               <th>Begeleider</th>
               <th>Begintijd</th>
-              <th>Betaald / Openstaand</th>
+              <th class="ov-hide-mobile">Betaald / Openstaand</th>
             </tr>
             ${rows}
           </table>
