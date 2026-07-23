@@ -474,7 +474,7 @@ function renderGoogleInsights() {
   }
   
   // ===== Rating trend chart (monthly, 12 months, moving avg, L3M) =====
-  renderRatingTrend(gd.monthly_ratings || {}, gd.avg_rating || null);
+  renderRatingTrend(gd.monthly_ratings || {}, gd.cumulative_avg || null);
 }
 
 function renderExtraReviews() {
@@ -917,9 +917,11 @@ function renderRatingTrend(byMonth, allTimeAvg) {
     return totalCount > 0 ? +(totalStars / totalCount).toFixed(2) : null;
   });
   
-  // All-time average flat line
-  const allTimeAvgVal = allTimeAvg ? +allTimeAvg.toFixed(2) : null;
-  const allTimeLine = months.map(() => allTimeAvgVal);
+  // All-time cumulative average (running avg up to each month)
+  const allTimeLine = months.map(m => {
+    if (!allTimeAvg || typeof allTimeAvg !== 'object') return null;
+    return allTimeAvg[m] != null ? +allTimeAvg[m].toFixed(2) : null;
+  });
   
   const labels = months.map(m => {
     const d = new Date(m + '-01T12:00:00');
@@ -959,7 +961,7 @@ function renderRatingTrend(byMonth, allTimeAvg) {
           yAxisID: 'y'
         },
         {
-          label: 'All-time gemiddelde (' + (allTimeAvgVal || '—') + '★)',
+          label: 'All-time gem. (voortschrijdend)',
           data: allTimeLine,
           borderColor: '#34A853',
           borderWidth: 2,
