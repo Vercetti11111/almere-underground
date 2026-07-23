@@ -97,6 +97,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
         <label id="freq-day-label">Verzenddag</label>
         <select id="edit-freq-day" style="width:100%;padding:8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;"></select>
       </div>
+      <div id="freq-time-picker" style="display:none;margin-top:8px;">
+        <label>Verzendtijdstip</label>
+        <select id="edit-freq-time" style="width:100%;padding:8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;"><option value="00:00">00:00</option><option value="01:00">01:00</option><option value="02:00">02:00</option><option value="03:00">03:00</option><option value="04:00">04:00</option><option value="05:00">05:00</option><option value="06:00" selected>06:00</option><option value="07:00">07:00</option><option value="08:00">08:00</option><option value="09:00">09:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option><option value="18:00">18:00</option><option value="19:00">19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option></select>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" onclick="closeModal()">Annuleren</button>
@@ -154,6 +158,7 @@ function renderLists() {
       </h3>
       <div class="emails">${(l.emails||[]).map(e => `<span class="email-tag">${escHtml(e)}</span>`).join('')}</div>
       ${(l.reports||[]).length > 0 ? `<div class="reports-label">Automatische rapportages:</div><div>${l.reports.map(r => `<span class="report-tag">${REPORT_LABELS[r] || r}</span>`).join('')}</div>` : ''}
+      ${l.schedule ? `<div class="reports-label" style="margin-top:4px;">⏰ ${l.schedule.frequency === 'daily' ? 'Dagelijks' : l.schedule.frequency === 'weekly' ? 'Wekelijks (' + ['','Ma','Di','Wo','Do','Vr','Za','Zo'][l.schedule.day||1] + ')' : 'Maandelijks (dag ' + (l.schedule.day||1) + ')'} om ${l.schedule.time || '06:00'}</div>` : ''}
       <div class="actions">
         <button class="btn btn-sm btn-outline" onclick="editList('${l.id}')">✏️ Bewerken</button>
         <button class="btn btn-sm btn-danger" onclick="deleteList('${l.id}', '${escHtml(l.name)}')">🗑️ Verwijderen</button>
@@ -175,6 +180,11 @@ function openModal(list) {
   freqSel.dispatchEvent(new Event('change'));
   if (list && list.schedule && list.schedule.day) {
     setTimeout(() => { document.getElementById('edit-freq-day').value = list.schedule.day; }, 50);
+  }
+  if (list && list.schedule && list.schedule.time) {
+    setTimeout(() => { document.getElementById('edit-freq-time').value = list.schedule.time; }, 50);
+  } else {
+    setTimeout(() => { document.getElementById('edit-freq-time').value = '06:00'; }, 50);
   }
   // Set checkboxes
   document.querySelectorAll('.checkbox-group input').forEach(cb => {
@@ -203,6 +213,9 @@ async function saveList() {
   const schedule = freq ? { frequency: freq } : null;
   if (freq === 'weekly' || freq === 'monthly') {
     schedule.day = parseInt(document.getElementById('edit-freq-day').value) || 1;
+  }
+  if (freq) {
+    schedule.time = document.getElementById('edit-freq-time').value || '06:00';
   }
 
   if (!name) { showToast('Naam is verplicht', true); return; }
@@ -248,19 +261,26 @@ function showToast(msg, isError) {
 // ── Frequency picker logic ──
 document.getElementById('edit-freq').addEventListener('change', function() {
   const picker = document.getElementById('freq-day-picker');
+  const timePicker = document.getElementById('freq-time-picker');
   const sel = document.getElementById('edit-freq-day');
   const lbl = document.getElementById('freq-day-label');
   if (this.value === 'weekly') {
     picker.style.display = 'block';
+    timePicker.style.display = 'block';
     lbl.textContent = 'Verzenddag';
     sel.innerHTML = ['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag','Zondag']
       .map((d,i) => `<option value="${i+1}">${d}</option>`).join('');
   } else if (this.value === 'monthly') {
     picker.style.display = 'block';
+    timePicker.style.display = 'block';
     lbl.textContent = 'Dag van de maand';
     sel.innerHTML = Array.from({length:28}, (_,i) => `<option value="${i+1}">${i+1}</option>`).join('');
+  } else if (this.value === 'daily') {
+    picker.style.display = 'none';
+    timePicker.style.display = 'block';
   } else {
     picker.style.display = 'none';
+    timePicker.style.display = 'none';
   }
 });
 
