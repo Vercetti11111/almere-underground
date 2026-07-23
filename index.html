@@ -115,6 +115,27 @@
     .login-btn:disabled { opacity: 0.5; }
     
     .login-error { color: #ef4444; font-size: 13px; margin-top: 12px; min-height: 20px; }
+    .login-tabs {
+      display: flex; gap: 0; margin-bottom: 20px; border-radius: 10px; overflow: hidden;
+      border: 1px solid #2a2a38;
+    }
+    .login-tab {
+      flex: 1; padding: 10px; text-align: center; font-size: 13px; font-weight: 600;
+      background: #1a1a24; color: #888; cursor: pointer; border: none; transition: all 0.2s;
+    }
+    .login-tab.active { background: #6366f1; color: white; }
+    
+    .login-form { display: none; }
+    .login-form.active { display: block; }
+    
+    .login-input-email {
+      width: 100%; background: #1a1a24; border: 1px solid #2a2a38;
+      color: #f1f1f5; border-radius: 12px; padding: 14px 16px;
+      font-size: 15px; outline: none; margin-bottom: 10px;
+    }
+    .login-input-email:focus { border-color: #6366f1; }
+    
+
     
     .hidden { display: none !important; }
   </style>
@@ -125,9 +146,24 @@
     <div class="login-box">
       <div class="logo">🎳</div>
       <div class="title">Almere Underground</div>
-      <div class="subtitle" id="login-subtitle">Voer je toegangscode in</div>
-      <input type="text" class="login-input" id="login-code" placeholder="••••••" autocomplete="off" autocapitalize="characters" />
-      <button class="login-btn" id="login-btn" onclick="doLogin()">Inloggen</button>
+      <div class="subtitle" id="login-subtitle">Log in om verder te gaan</div>
+      
+      <div class="login-tabs">
+        <button class="login-tab active" id="tab-code" onclick="switchLoginTab('code')">🔑 Toegangscode</button>
+        <button class="login-tab" id="tab-email" onclick="switchLoginTab('email')">📧 E-mail</button>
+      </div>
+      
+      <div class="login-form active" id="form-code">
+        <input type="text" class="login-input" id="login-code" placeholder="••••••" autocomplete="off" autocapitalize="characters" />
+        <button class="login-btn" id="login-btn-code" onclick="doLogin()">Inloggen</button>
+      </div>
+      
+      <div class="login-form" id="form-email">
+        <input type="email" class="login-input-email" id="login-email" placeholder="E-mailadres" autocomplete="email" />
+        <input type="password" class="login-input-email" id="login-password" placeholder="Wachtwoord" autocomplete="current-password" />
+        <button class="login-btn" id="login-btn-email" onclick="doLoginEmail()">Inloggen</button>
+      </div>
+      
       <div class="login-error" id="login-error"></div>
     </div>
   </div>
@@ -166,8 +202,12 @@ const WORKER = 'https://api.almereunderground.com';
 const TRANSLATIONS = {
   nl: {
     subtitle: 'Rapportages & Analytics',
-    loginSubtitle: 'Voer je toegangscode in',
+    loginSubtitle: 'Log in om verder te gaan',
     loginBtn: 'Inloggen',
+    loginTabCode: '🔑 Toegangscode',
+    loginTabEmail: '📧 E-mail',
+    loginPlaceholderEmail: 'E-mailadres',
+    loginPlaceholderPassword: 'Wachtwoord',
     logoutBtn: 'Uitloggen',
     dashTitle: 'Omzet Dashboard',
     dashDesc: 'Bezoek, Verkoop, Week & Controle',
@@ -195,8 +235,12 @@ const TRANSLATIONS = {
   },
   en: {
     subtitle: 'Reports & Analytics',
-    loginSubtitle: 'Enter your access code',
+    loginSubtitle: 'Log in to continue',
     loginBtn: 'Sign in',
+    loginTabCode: '🔑 Access code',
+    loginTabEmail: '📧 Email',
+    loginPlaceholderEmail: 'Email address',
+    loginPlaceholderPassword: 'Password',
     logoutBtn: 'Sign out',
     dashTitle: 'Revenue Dashboard',
     dashDesc: 'Visit, Sales, Week & Control',
@@ -238,7 +282,12 @@ function setLang(newLang) {
   document.getElementById('logout-btn').textContent = t('logoutBtn');
   // Update login screen text too
   document.getElementById('login-subtitle').textContent = t('loginSubtitle');
-  document.getElementById('login-btn').textContent = t('loginBtn');
+  document.getElementById('login-btn-code').textContent = t('loginBtn');
+  document.getElementById('login-btn-email').textContent = t('loginBtn');
+  document.getElementById('tab-code').textContent = t('loginTabCode');
+  document.getElementById('tab-email').textContent = t('loginTabEmail');
+  document.getElementById('login-email').placeholder = t('loginPlaceholderEmail');
+  document.getElementById('login-password').placeholder = t('loginPlaceholderPassword');
 }
 
 const PAGES = [
@@ -281,10 +330,18 @@ function renderMenu() {
     </a>`).join('');
 }
 
+function switchLoginTab(tab) {
+  document.getElementById('tab-code').classList.toggle('active', tab === 'code');
+  document.getElementById('tab-email').classList.toggle('active', tab === 'email');
+  document.getElementById('form-code').classList.toggle('active', tab === 'code');
+  document.getElementById('form-email').classList.toggle('active', tab === 'email');
+  document.getElementById('login-error').textContent = '';
+}
+
 async function doLogin() {
   const input = document.getElementById('login-code');
   const errorEl = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
+  const btn = document.getElementById('login-btn-code');
   const code = input.value.trim().toUpperCase();
   
   if (!code) { input.classList.add('error'); setTimeout(() => input.classList.remove('error'), 400); return; }
@@ -316,13 +373,54 @@ async function doLogin() {
   }
 }
 
+async function doLoginEmail() {
+  const emailInput = document.getElementById('login-email');
+  const passInput = document.getElementById('login-password');
+  const errorEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn-email');
+  const email = emailInput.value.trim();
+  const password = passInput.value;
+  
+  if (!email || !password) { 
+    errorEl.textContent = 'Vul e-mail en wachtwoord in';
+    return; 
+  }
+  
+  btn.disabled = true;
+  btn.textContent = '...';
+  errorEl.textContent = '';
+  
+  try {
+    const r = await fetch(`${WORKER}/api/login-user`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    const data = await r.json();
+    
+    if (data.error) {
+      errorEl.textContent = data.error;
+      btn.disabled = false;
+      btn.textContent = t('loginBtn');
+      return;
+    }
+    
+    session = data;
+    localStorage.setItem('au_session', JSON.stringify(session));
+    showMain();
+  } catch (e) {
+    errorEl.textContent = 'Verbindingsfout';
+    btn.disabled = false;
+    btn.textContent = t('loginBtn');
+  }
+}
+
 function doLogout() {
   session = null;
   localStorage.removeItem('au_session');
   document.getElementById('main-content').classList.add('hidden');
   document.getElementById('login-overlay').classList.remove('hidden');
   document.getElementById('login-code').value = '';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
   document.getElementById('login-error').textContent = '';
+  switchLoginTab('code');
 }
 
 function showMain() {

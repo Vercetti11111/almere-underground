@@ -179,9 +179,19 @@
     
 
     
+    <!-- Section: Access Codes -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:16px;font-weight:700;">🔑 Toegangscodes</div>
+    </div>
     <div id="roles-list"></div>
+    <button class="add-btn" id="add-btn" onclick="openModal()">+ Nieuwe code</button>
     
-    <button class="add-btn" id="add-btn" onclick="openModal()">+ Nieuwe gebruiker</button>
+    <!-- Section: Email Users -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:28px 0 12px;">
+      <div style="font-size:16px;font-weight:700;">📧 E-mail gebruikers</div>
+    </div>
+    <div id="users-list"></div>
+    <button class="add-btn" id="add-user-btn" onclick="openUserModal()">+ Nieuwe e-mail gebruiker</button>
   </div>
 
   <!-- Add/Edit Modal -->
@@ -228,6 +238,60 @@
       <div class="modal-actions">
         <button class="modal-btn cancel" onclick="closeModal()" id="btn-cancel">Annuleren</button>
         <button class="modal-btn save" onclick="saveRole()" id="btn-save">Opslaan</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- User Add/Edit Modal -->
+  <div class="modal-overlay hidden" id="user-modal" onclick="if(event.target===this)closeUserModal()">
+    <div class="modal">
+      <div class="modal-title" id="user-modal-title">Nieuwe e-mail gebruiker</div>
+      
+      <div class="form-group">
+        <label class="form-label">Naam</label>
+        <input class="form-input" id="user-inp-name" placeholder="bijv. Jan de Vries" />
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">E-mailadres</label>
+        <input class="form-input" id="user-inp-email" type="email" placeholder="jan@example.com" style="text-transform:none;letter-spacing:0;" />
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" id="user-lbl-password">Wachtwoord</label>
+        <input class="form-input" id="user-inp-password" type="password" placeholder="Min. 6 tekens" style="text-transform:none;letter-spacing:0;" />
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Rol</label>
+        <select class="form-select" id="user-inp-role">
+          <option value="admin">Admin</option>
+          <option value="manager">Manager</option>
+          <option value="operations">Operations</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">Paginatoegang</label>
+        <div class="checkbox-group" id="user-pages-checkboxes">
+          <label class="checkbox-item"><input type="checkbox" value="dashboard" /> 📊 Omzet Dashboard</label>
+          <label class="checkbox-item"><input type="checkbox" value="personeel" /> 👥 Personeelsplanning</label>
+          <label class="checkbox-item"><input type="checkbox" value="kpi" /> 📈 KPI Dashboard</label>
+          <label class="checkbox-item"><input type="checkbox" value="social" /> 📱 Social Stats</label>
+          <label class="checkbox-item"><input type="checkbox" value="keuken" /> 🍰 Keuken</label>
+          <label class="checkbox-item"><input type="checkbox" value="runsheet" /> 📋 Run Sheet</label>
+          <label class="checkbox-item"><input type="checkbox" value="openstaand" /> 💰 Openstaande Posten</label>
+          <label class="checkbox-item"><input type="checkbox" value="leads" /> 🎯 Leads & Reserveringen</label>
+          <label class="checkbox-item"><input type="checkbox" value="orderboek" /> 📒 Orderboek</label>
+          <label class="checkbox-item"><input type="checkbox" value="mailinglijst" /> 📧 Mailinglijst</label>
+          <label class="checkbox-item"><input type="checkbox" value="rechten" /> 🔐 Gebruikersrechten</label>
+        </div>
+      </div>
+      
+      <div class="modal-actions">
+        <button class="modal-btn cancel" onclick="closeUserModal()">Annuleren</button>
+        <button class="modal-btn save" onclick="saveUser()">Opslaan</button>
       </div>
     </div>
   </div>
@@ -480,6 +544,137 @@ function showToast(msg) {
   setTimeout(() => toast.remove(), 2500);
 }
 
+
+// ══════ E-mail Users Management ══════
+let users = [];
+let editingEmail = null;
+
+function renderUsers() {
+  const container = document.getElementById('users-list');
+  if (users.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="padding:20px;color:#555;font-size:14px;">Nog geen e-mail gebruikers. Klik op \'+ Nieuwe e-mail gebruiker\' om er een aan te maken.</div>';
+    return;
+  }
+  
+  container.innerHTML = users.map(u => `
+    <div class="role-card">
+      <div class="role-header">
+        <span class="role-name">${escHtml(u.name)}</span>
+        <span class="role-badge ${u.role}" style="text-transform:capitalize">${u.role}</span>
+      </div>
+      <div class="role-code">📧 <code style="letter-spacing:0">${escHtml(u.email)}</code></div>
+      <div class="role-pages">
+        ${u.pages.map(p => `<span class="page-tag">${PAGE_LABELS[p] ? PAGE_LABELS[p]() : p}</span>`).join('')}
+      </div>
+      <div class="role-actions">
+        <button class="btn-sm" onclick="openUserModal('${escAttr(u.email)}')">${t('edit')}</button>
+        <button class="btn-sm danger" onclick="deleteUser('${escAttr(u.email)}')">${t('delete')}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openUserModal(email) {
+  editingEmail = email || null;
+  const modal = document.getElementById('user-modal');
+  document.getElementById('user-modal-title').textContent = email ? 'E-mail gebruiker bewerken' : 'Nieuwe e-mail gebruiker';
+  document.getElementById('user-lbl-password').textContent = email ? 'Nieuw wachtwoord' : 'Wachtwoord';
+  
+  const checkboxes = document.querySelectorAll('#user-pages-checkboxes input[type=checkbox]');
+  checkboxes.forEach(cb => cb.checked = false);
+  
+  if (email) {
+    const u = users.find(x => x.email === email);
+    if (u) {
+      document.getElementById('user-inp-name').value = u.name;
+      document.getElementById('user-inp-email').value = u.email;
+      document.getElementById('user-inp-email').readOnly = true;
+      document.getElementById('user-inp-email').style.opacity = '0.5';
+      document.getElementById('user-inp-password').value = '';
+      document.getElementById('user-inp-password').placeholder = 'Laat leeg om niet te wijzigen';
+      document.getElementById('user-inp-role').value = u.role;
+      const pageIds = ['dashboard','personeel','kpi','social','keuken','runsheet','openstaand','leads','orderboek','mailinglijst','rechten'];
+      checkboxes.forEach((cb, i) => { cb.checked = u.pages.includes(pageIds[i]); });
+    }
+  } else {
+    document.getElementById('user-inp-name').value = '';
+    document.getElementById('user-inp-email').value = '';
+    document.getElementById('user-inp-email').readOnly = false;
+    document.getElementById('user-inp-email').style.opacity = '1';
+    document.getElementById('user-inp-password').value = '';
+    document.getElementById('user-inp-password').placeholder = 'Min. 6 tekens';
+    document.getElementById('user-inp-role').value = 'operations';
+  }
+  
+  modal.classList.remove('hidden');
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').classList.add('hidden');
+  editingEmail = null;
+}
+
+async function saveUser() {
+  const name = document.getElementById('user-inp-name').value.trim();
+  const email = document.getElementById('user-inp-email').value.trim().toLowerCase();
+  const password = document.getElementById('user-inp-password').value;
+  const role = document.getElementById('user-inp-role').value;
+  const checkboxes = document.querySelectorAll('#user-pages-checkboxes input[type=checkbox]');
+  const pages = [];
+  checkboxes.forEach(cb => { if (cb.checked) pages.push(cb.value); });
+  
+  if (!name || !email || pages.length === 0) { alert('Vul alle velden in'); return; }
+  if (!editingEmail && (!password || password.length < 6)) { alert('Wachtwoord moet minimaal 6 tekens zijn'); return; }
+  
+  // For updates without password change, send a dummy password (backend will handle)
+  const body = { email, name, password: password || 'unchanged', role, pages };
+  if (editingEmail) body.action = 'update';
+  
+  try {
+    const r = await fetch(`${WORKER}/api/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Code': authCode },
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (data.error) { alert(data.error); return; }
+    
+    closeUserModal();
+    showToast(editingEmail ? '✅ Gebruiker bijgewerkt' : '✅ Gebruiker aangemaakt');
+    await loadUsers();
+  } catch (e) { alert('Fout: ' + e.message); }
+}
+
+async function deleteUser(email) {
+  if (!confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')) return;
+  
+  try {
+    const r = await fetch(`${WORKER}/api/users?email=${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+      headers: { 'X-Access-Code': authCode }
+    });
+    const data = await r.json();
+    if (data.error) { alert(data.error); return; }
+    
+    showToast('🗑️ Gebruiker verwijderd');
+    await loadUsers();
+  } catch (e) { alert('Fout: ' + e.message); }
+}
+
+async function loadUsers() {
+  try {
+    const r = await fetch(`${WORKER}/api/users`, {
+      headers: { 'X-Access-Code': authCode }
+    });
+    const data = await r.json();
+    if (data.users) {
+      users = data.users;
+      renderUsers();
+    }
+  } catch {}
+}
+
+
 // SSO Auth (via landing page) — admin only
 const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
 if (!_session || !_session.code || (_session.expiresAt && Date.now() > _session.expiresAt) || _session.role !== 'admin') {
@@ -488,6 +683,7 @@ if (!_session || !_session.code || (_session.expiresAt && Date.now() > _session.
 } else {
   authCode = _session.code;
   loadRoles();
+  loadUsers();
 }
 
 document.getElementById('lang-select').value = lang;
