@@ -233,23 +233,66 @@
     .view-toggle { background:#1a1a24; border:1px solid #2a2a38; color:#aaa; border-radius:8px; padding:5px 8px; font-size:13px; cursor:pointer; }
     .view-toggle:hover { border-color:#7c3aed; color:#e0e0f0; }
 
-  /* Google Reviews badges */
-  .google-badges { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
-  .google-badge { background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px 14px; }
-  .badge-label { font-size: 11px; color: #aaa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .badge-value { font-size: 28px; font-weight: 800; }
-  .badge-sub { font-size: 11px; color: #888; }
-  .sentiment-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-  .sentiment-tag { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+  /* Google Reviews Insights (wide card) */
+  .google-insights-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .insights-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .insights-icon { font-size: 22px; }
+  .insights-title { font-size: 16px; font-weight: 700; color: #fff; }
+  .insights-body {
+    display: flex; gap: 24px; align-items: flex-start;
+  }
+  .insights-col { flex: 1; min-width: 0; }
+  .insights-divider {
+    width: 1px; background: rgba(255,255,255,0.08); align-self: stretch; min-height: 60px; flex-shrink: 0;
+  }
+  .unanswered-col { max-width: 220px; flex: 0 0 220px; }
+  .insights-label {
+    font-size: 11px; color: #aaa; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .insights-big { font-size: 36px; font-weight: 800; line-height: 1.1; }
+  .insights-sub { font-size: 12px; color: #888; margin-top: 4px; }
+  .insights-bar {
+    margin-top: 8px; height: 6px; background: rgba(255,255,255,0.06);
+    border-radius: 3px; overflow: hidden;
+  }
+  .insights-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .sentiment-section { margin-top: 4px; }
+  .sentiment-row-label { font-size: 12px; color: #999; font-weight: 600; margin-bottom: 4px; }
+  .sentiment-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sentiment-tag { font-size: 12px; padding: 5px 12px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
   .sentiment-tag.pos { background: rgba(34,197,94,0.15); color: #22c55e; }
   .sentiment-tag.neg { background: rgba(239,68,68,0.15); color: #ef4444; }
-  .neg-reviews-toggle { margin-top: 10px; font-size: 12px; color: #f59e0b; cursor: pointer; font-weight: 600; }
+  .insights-neg-detail { margin-top: 0; }
+  .neg-reviews-toggle {
+    margin-top: 14px; font-size: 13px; color: #f59e0b; cursor: pointer;
+    font-weight: 600; padding: 8px 0;
+  }
   .neg-reviews-list { display: none; margin-top: 8px; }
   .neg-reviews-list.open { display: block; }
-  .neg-review-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px; line-height: 1.5; }
-  .neg-review-text { color: #ccc; margin-top: 4px; font-size: 11px; }
-  .replied-badge { font-size: 10px; color: #22c55e; margin-left: 6px; }
-  .unreplied-badge { font-size: 10px; color: #ef4444; margin-left: 6px; }
+  .neg-review-item {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 8px;
+  }
+  .neg-review-header { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 13px; }
+  .neg-review-text { color: #ccc; margin-top: 6px; font-size: 12px; line-height: 1.6; }
+  .replied-badge { font-size: 11px; color: #22c55e; margin-left: 6px; font-weight: 600; }
+  .unreplied-badge { font-size: 11px; color: #ef4444; margin-left: 6px; font-weight: 600; }
+  /* Mobile: stack columns */
+  @media (max-width: 768px) {
+    .insights-body { flex-direction: column; gap: 16px; }
+    .unanswered-col { max-width: 100%; flex: 1; }
+    .insights-divider { width: 100%; height: 1px; min-height: 0; }
+  }
   </style>
 </head>
 <body>
@@ -310,47 +353,61 @@ applyViewMode();
 
 const API = 'https://api.almereunderground.com';
 
-function renderGoogleBadges() {
+function renderGoogleInsights() {
   const gd = window._googleReviewData;
-  if (!gd) return '';
-  const unanswered = gd.unanswered_count || 0;
-  const posThemes = (gd.positive_themes || []).slice(0, 3);
-  const negThemes = (gd.negative_themes || []).slice(0, 3);
-  const negReviews = gd.negative_reviews || [];
+  if (!gd) return;
+  const card = document.getElementById('googleInsightsCard');
+  card.style.display = '';
 
-  // Unanswered badge color
+  const unanswered = gd.unanswered_count || 0;
+  const total = gd.total_reviews || 0;
+  const answered = total - unanswered;
+  const pct = total ? Math.round(answered / total * 100) : 0;
   const uColor = unanswered > 20 ? '#ef4444' : unanswered > 5 ? '#f59e0b' : '#22c55e';
 
-  // Sentiment summary
+  // Unanswered column
+  document.getElementById('insightsUnanswered').innerHTML = `
+    <div class="insights-label">📩 Onbeantwoorde reviews</div>
+    <div class="insights-big" style="color:${uColor};">${unanswered}</div>
+    <div class="insights-sub">van ${total} reviews · ${pct}% beantwoord</div>
+    <div class="insights-bar"><div class="insights-bar-fill" style="width:${pct}%;background:${uColor};"></div></div>
+  `;
+
+  // Sentiment column
+  const posThemes = (gd.positive_themes || []).slice(0, 5);
+  const negThemes = (gd.negative_themes || []).slice(0, 5);
   const posHtml = posThemes.map(t => `<span class="sentiment-tag pos">👍 ${t.theme} (${t.count})</span>`).join('');
   const negHtml = negThemes.map(t => `<span class="sentiment-tag neg">👎 ${t.theme} (${t.count})</span>`).join('');
-
-  // Negative reviews detail
-  const negDetailHtml = negReviews.length ? `
-    <div class="neg-reviews-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.textContent.includes('▸')?'▾ Verberg':'▸ ${negReviews.length} negatieve reviews'">▸ ${negReviews.length} negatieve reviews</div>
-    <div class="neg-reviews-list">
-      ${negReviews.map(r => `<div class="neg-review-item">
-        <span class="neg-stars">${'⭐'.repeat(r.stars)}</span> <strong>${r.author}</strong> <span style="color:#888;font-size:11px;">${r.date}</span>
-        ${r.replied ? '<span class="replied-badge">✅ beantwoord</span>' : '<span class="unreplied-badge">⚠️ onbeantwoord</span>'}
-        <div class="neg-review-text">${r.text.substring(0, 200)}${r.text.length > 200 ? '…' : ''}</div>
-      </div>`).join('')}
+  document.getElementById('insightsSentiment').innerHTML = `
+    <div class="insights-label">💬 Sentiment (afgelopen 3 maanden)</div>
+    <div class="sentiment-section">
+      <div class="sentiment-row-label">Goed:</div>
+      <div class="sentiment-tags">${posHtml || '<span style="color:#888;font-size:12px;">—</span>'}</div>
     </div>
-  ` : '';
-
-  return `
-    <div class="google-badges">
-      <div class="google-badge" style="border-left: 3px solid ${uColor};">
-        <div class="badge-label">📩 Onbeantwoord</div>
-        <div class="badge-value" style="color:${uColor};">${unanswered}</div>
-        <div class="badge-sub">van ${gd.total_reviews} reviews</div>
-      </div>
-      <div class="google-badge sentiment-badge">
-        <div class="badge-label">💬 Sentiment (3 maanden)</div>
-        <div class="sentiment-tags">${posHtml}${negHtml}</div>
-        ${negDetailHtml}
-      </div>
+    <div class="sentiment-section" style="margin-top:8px;">
+      <div class="sentiment-row-label">Verbeterpunten:</div>
+      <div class="sentiment-tags">${negHtml || '<span style="color:#888;font-size:12px;">—</span>'}</div>
     </div>
   `;
+
+  // Negative reviews expandable detail
+  const negReviews = gd.negative_reviews || [];
+  if (negReviews.length) {
+    document.getElementById('insightsNegDetail').innerHTML = `
+      <div class="neg-reviews-toggle" onclick="const list=this.nextElementSibling;list.classList.toggle('open');this.textContent=list.classList.contains('open')?'▾ Verberg negatieve reviews':'▸ ${negReviews.length} negatieve reviews bekijken'">▸ ${negReviews.length} negatieve reviews bekijken</div>
+      <div class="neg-reviews-list">
+        ${negReviews.map(r => `<div class="neg-review-item">
+          <div class="neg-review-header">
+            <span class="neg-stars">${'⭐'.repeat(r.stars)}</span>
+            <strong>${r.author}</strong>
+            <span style="color:#888;font-size:11px;margin-left:6px;">${r.date}</span>
+            ${r.replied ? '<span class="replied-badge">✅ beantwoord</span>' : '<span class="unreplied-badge">⚠️ onbeantwoord</span>'}
+          </div>
+          <div class="neg-review-text">${r.text.substring(0, 300)}${r.text.length > 300 ? '…' : ''}</div>
+        </div>`).join('')}
+      </div>
+    `;
+  }
 }
 
 function fmt(n) {
@@ -438,6 +495,7 @@ async function loadData() {
       return;
     }
     render(data);
+    renderGoogleInsights();
   } catch (e) {
     document.getElementById('app').innerHTML = `<div class="loading">Fout bij laden: ${e.message}</div>`;
   }
@@ -542,7 +600,6 @@ function render(data) {
         </div>
         <div class="secondary-metric"><span>${fmt(gr.review_count)}</span> reviews</div>
         ${growthRow(data, li, d => d.google_reviews?.review_count)}
-        ${renderGoogleBadges()}
       </div>
 
       <!-- Trustpilot -->
@@ -586,6 +643,20 @@ function render(data) {
         <div class="secondary-metric"><span>${fmt(dw.reviews)}</span> reviews</div>
         ${growthRow(data, li, d => d.dagjeweg?.reviews)}
       </div>
+    </div>
+
+    <!-- Google Reviews Insights (wide card) -->
+    <div class="google-insights-card" id="googleInsightsCard" style="display:none;">
+      <div class="insights-header">
+        <span class="insights-icon">⭐</span>
+        <span class="insights-title">Google Reviews Insights</span>
+      </div>
+      <div class="insights-body">
+        <div class="insights-col unanswered-col" id="insightsUnanswered"></div>
+        <div class="insights-divider"></div>
+        <div class="insights-col sentiment-col" id="insightsSentiment"></div>
+      </div>
+      <div class="insights-neg-detail" id="insightsNegDetail"></div>
     </div>
 
     <!-- Reviews trend chart (Google only) -->
