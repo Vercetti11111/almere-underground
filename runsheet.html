@@ -437,7 +437,11 @@ async function renderRunsheet(forceRefresh = false) {
     }
     function getBookingPax(b) {
       let max = 0;
-      for (const a of (b.activities || [])) { if ((a.quantity || 0) > max) max = a.quantity; }
+      for (const a of (b.activities || [])) {
+        const nm = (a.mainActivity || a.name || '').toLowerCase();
+        if (nm.includes('consumptiemunt')) continue;
+        if ((a.quantity || 0) > max) max = a.quantity;
+      }
       return max > 0 ? String(max) : '';
     }
 
@@ -572,10 +576,14 @@ async function renderOverview(forceRefresh = false) {
       return earliest;
     }
 
-    // PAX = highest quantity across activities
+    // PAX = highest quantity across activities (excl consumptiemunten)
     function getBookingPax(b) {
       let max = 0;
-      for (const a of (b.activities || [])) { if ((a.quantity || 0) > max) max = a.quantity; }
+      for (const a of (b.activities || [])) {
+        const nm = (a.mainActivity || a.name || '').toLowerCase();
+        if (nm.includes('consumptiemunt')) continue;
+        if ((a.quantity || 0) > max) max = a.quantity;
+      }
       return max > 0 ? String(max) : '';
     }
 
@@ -985,12 +993,16 @@ async function downloadRunsheetPDF(date) {
     return earliestStr || '';
   }
 
-  // Helper: PAX = highest quantity across all activities
+  // Helper: PAX = highest quantity across all activities (excl consumptiemunten)
   function getPax(b) {
     const acts = b.activities || [];
     if (!acts.length) return '';
     let max = 0;
-    for (const a of acts) { if ((a.quantity || 0) > max) max = a.quantity; }
+    for (const a of acts) {
+      const nm = (a.mainActivity || a.name || '').toLowerCase();
+      if (nm.includes('consumptiemunt')) continue;
+      if ((a.quantity || 0) > max) max = a.quantity;
+    }
     return max > 0 ? String(max) : '';
   }
 
@@ -1253,12 +1265,10 @@ async function downloadRunsheetPDF(date) {
         (a.locations || []).join(', ') || '—'
       ]);
 
-      // Payment badge
-      const totalPaid = (b.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
-      const totalPrice = b.totalPrice || 0;
-      const openAmt = Math.max(0, totalPrice - totalPaid);
-      const isPaid = openAmt <= 0;
-      const badgePdf = isPaid ? 'BETAALD' : ('Open: ' + fmtE(openAmt));
+      // Payment badge — use same fields as Overview for consistency
+      const isPaid = b.paymentStatus === 'paid' || (b.amountOwing || 0) <= 0;
+      const amtPaid = (b.total || 0) - (b.amountOwing || 0);
+      const badgePdf = isPaid ? 'BETAALD' : ('Open: ' + fmtE(b.amountOwing || 0));
 
       // Pax + begintijd
       const detailPax = getPax(b);
