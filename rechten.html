@@ -265,7 +265,7 @@
       
       <div class="form-group">
         <label class="form-label">Rol</label>
-        <select class="form-select" id="user-inp-role">
+        <select class="form-select" id="user-inp-role" onchange="applyRolePreset()">
           <option value="admin">Admin</option>
           <option value="manager">Manager</option>
           <option value="operations">Operations</option>
@@ -568,6 +568,7 @@ function renderUsers() {
       </div>
       <div class="role-actions">
         <button class="btn-sm" onclick="openUserModal('${escAttr(u.email)}')">${t('edit')}</button>
+        <button class="btn-sm" style="background:rgba(52,152,219,0.2);color:#3498db;" onclick="resetUserPassword('${escAttr(u.email)}')">🔑 Reset wachtwoord</button>
         <button class="btn-sm danger" onclick="deleteUser('${escAttr(u.email)}')">${t('delete')}</button>
       </div>
     </div>
@@ -604,6 +605,7 @@ function openUserModal(email) {
     document.getElementById('user-inp-password').value = '';
     document.getElementById('user-inp-password').placeholder = 'Min. 6 tekens';
     document.getElementById('user-inp-role').value = 'operations';
+    applyRolePreset();
   }
   
   modal.classList.remove('hidden');
@@ -659,6 +661,37 @@ async function deleteUser(email) {
     showToast('🗑️ Gebruiker verwijderd');
     await loadUsers();
   } catch (e) { alert('Fout: ' + e.message); }
+}
+
+async function resetUserPassword(email) {
+  if (!confirm('Weet je zeker dat je een reset link wilt sturen naar ' + email + '?')) return;
+  
+  try {
+    const r = await fetch(`${WORKER}/api/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Code': authCode },
+      body: JSON.stringify({ email })
+    });
+    const data = await r.json();
+    if (data.error) { alert(data.error); return; }
+    showToast('📧 Reset link verstuurd naar ' + email);
+  } catch (e) { alert('Fout: ' + e.message); }
+}
+
+// Role presets: when role changes, auto-check the matching pages
+const ROLE_PAGE_PRESETS = {
+  admin: ['dashboard','personeel','kpi','social','keuken','runsheet','openstaand','leads','orderboek','mailinglijst','rechten'],
+  manager: ['dashboard','personeel','kpi','social','keuken','runsheet','openstaand','leads','orderboek','mailinglijst'],
+  operations: ['dashboard','personeel','kpi','runsheet','openstaand']
+};
+
+function applyRolePreset() {
+  const role = document.getElementById('user-inp-role').value;
+  const preset = ROLE_PAGE_PRESETS[role] || [];
+  const checkboxes = document.querySelectorAll('#user-pages-checkboxes input[type=checkbox]');
+  checkboxes.forEach(cb => {
+    cb.checked = preset.includes(cb.value);
+  });
 }
 
 async function loadUsers() {
