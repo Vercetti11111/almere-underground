@@ -464,7 +464,7 @@ function renderExtraReviews() {
   // LaserMaxx
   if (rd.lasermaxx) {
     const el = document.getElementById('lmCount');
-    if (el) el.textContent = rd.lasermaxx.total || '—';
+    if (el) el.textContent = fmt(rd.lasermaxx.total);
     const latestEl = document.getElementById('lmLatest');
     if (latestEl && rd.lasermaxx.reviews && rd.lasermaxx.reviews.length) {
       latestEl.textContent = 'Laatste: ' + rd.lasermaxx.reviews[0].date;
@@ -472,23 +472,24 @@ function renderExtraReviews() {
   }
   
   // Roller GX
-  if (rd.roller_gx) {
+  if (rd.roller_gx && rd.roller_gx.total > 0) {
+    const avg = rd.roller_gx.avg_rating || rd.combined?.sources?.roller_gx?.avg_rating || 0;
     const avgEl = document.getElementById('gxAvg');
     const starsEl = document.getElementById('gxStars');
     const countEl = document.getElementById('gxCount');
     const fansEl = document.getElementById('gxFans');
-    if (avgEl && rd.roller_gx.total > 0) {
-      // Get avg from combined data
-      const avg = rd.combined?.sources?.roller_gx?.avg_rating || 4.67;
-      avgEl.textContent = avg.toFixed(1);
-      if (starsEl) starsEl.innerHTML = starsHtml(avg, 'stars');
-    }
-    if (countEl) countEl.textContent = rd.roller_gx.total || '—';
-    if (fansEl) {
-      const fans = rd.combined?.sources?.roller_gx?.distribution?.['5'] 
-        ? Object.values(rd.combined.sources.roller_gx.distribution).reduce((a,b) => a+b, 0)
-        : rd.roller_gx.total;
-      fansEl.textContent = fans;
+    if (avgEl) avgEl.textContent = avg ? avg.toFixed(1) : '—';
+    if (starsEl && avg) starsEl.innerHTML = starsHtml(avg, 'stars');
+    if (countEl) countEl.textContent = fmt(rd.roller_gx.total);
+    if (fansEl) fansEl.textContent = fmt(rd.roller_gx.total);
+  }
+
+  // Combined review total badge
+  if (rd.combined && rd.combined.total_reviews) {
+    const badge = document.getElementById('combinedBadge');
+    if (badge) {
+      badge.innerHTML = `<strong>${fmt(rd.combined.total_reviews)}</strong> reviews totaal · <strong>${rd.combined.weighted_avg_rating}★</strong> gewogen gemiddelde`;
+      badge.style.display = '';
     }
   }
 }
@@ -679,6 +680,7 @@ function render(data) {
 
     <!-- REVIEWS SECTION -->
     <div class="section-title">⭐ Reviews <span class="line"></span></div>
+    <div id="combinedBadge" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:10px 18px;margin-bottom:16px;text-align:center;color:#94a3b8;font-size:14px;"></div>
     <div class="cards">
       <!-- Google Reviews -->
       <div class="card google">
