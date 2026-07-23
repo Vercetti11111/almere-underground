@@ -311,6 +311,10 @@
   .star-dist-bar-bg { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
   .star-dist-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
   .star-dist-count { font-size: 11px; color: #888; width: 28px; text-align: right; }
+  /* Desktop: insights card full width */
+  @media (min-width: 900px) {
+    .google-insights-card { max-width: 1920px; }
+  }
   /* Mobile: stack columns */
   @media (max-width: 768px) {
     .insights-body { flex-direction: column; gap: 16px; }
