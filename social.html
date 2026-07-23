@@ -85,6 +85,8 @@
   .card.trustpilot::before { background: var(--tp-green); }
   .card.tripadvisor::before { background: var(--ta-green); }
   .card.dagjeweg::before { background: var(--dw-orange); }
+  .card.lasermaxx::before { background: #e60012; }
+  .card.roller-gx::before { background: #6366f1; }
 
   .card-header {
     display: flex;
@@ -410,9 +412,9 @@ function renderGoogleInsights() {
 
   // Unanswered column
   document.getElementById('insightsUnanswered').innerHTML = `
-    <div class="insights-label">📩 Onbeantwoorde reviews</div>
+    <div class="insights-label">📩 Onbeantwoorde reviews <span style="font-size:10px;color:#888;">(laatste 2 maanden)</span></div>
     <div class="insights-big" style="color:${uColor};">${unanswered}</div>
-    <div class="insights-sub">van ${total} reviews · ${pct}% beantwoord</div>
+    <div class="insights-sub">van ${total} reviews · ${pct}% beantwoord${gd.unanswered_total ? ' (totaal ' + gd.unanswered_total + ' onbeantwoord)' : ''}</div>
     <div class="insights-bar"><div class="insights-bar-fill" style="width:${pct}%;background:${uColor};"></div></div>
     <div class="insights-label" style="margin-top:14px;">📊 Sterren verdeling</div>
     ${starHtml}
@@ -452,6 +454,42 @@ function renderGoogleInsights() {
         </div>`).join('')}
       </div>
     `;
+  }
+}
+
+function renderExtraReviews() {
+  const rd = window._allReviewData;
+  if (!rd) return;
+  
+  // LaserMaxx
+  if (rd.lasermaxx) {
+    const el = document.getElementById('lmCount');
+    if (el) el.textContent = rd.lasermaxx.total || '—';
+    const latestEl = document.getElementById('lmLatest');
+    if (latestEl && rd.lasermaxx.reviews && rd.lasermaxx.reviews.length) {
+      latestEl.textContent = 'Laatste: ' + rd.lasermaxx.reviews[0].date;
+    }
+  }
+  
+  // Roller GX
+  if (rd.roller_gx) {
+    const avgEl = document.getElementById('gxAvg');
+    const starsEl = document.getElementById('gxStars');
+    const countEl = document.getElementById('gxCount');
+    const fansEl = document.getElementById('gxFans');
+    if (avgEl && rd.roller_gx.total > 0) {
+      // Get avg from combined data
+      const avg = rd.combined?.sources?.roller_gx?.avg_rating || 4.67;
+      avgEl.textContent = avg.toFixed(1);
+      if (starsEl) starsEl.innerHTML = starsHtml(avg, 'stars');
+    }
+    if (countEl) countEl.textContent = rd.roller_gx.total || '—';
+    if (fansEl) {
+      const fans = rd.combined?.sources?.roller_gx?.distribution?.['5'] 
+        ? Object.values(rd.combined.sources.roller_gx.distribution).reduce((a,b) => a+b, 0)
+        : rd.roller_gx.total;
+      fansEl.textContent = fans;
+    }
   }
 }
 
@@ -527,20 +565,25 @@ async function loadData() {
     const _session = JSON.parse(localStorage.getItem('au_session') || 'null');
     if (!_session || !_session.code) { window.location.href = 'index.html'; return; }
     const code = _session.code;
-    const [r, grRes] = await Promise.all([
+    const [r, grRes, allRevRes] = await Promise.all([
       fetch(`${API}/api/social-stats`, { headers: { 'X-Access-Code': code } }),
-      fetch(`${API}/api/google-reviews`, { headers: { 'X-Access-Code': code } }).catch(() => null)
+      fetch(`${API}/api/google-reviews`, { headers: { 'X-Access-Code': code } }).catch(() => null),
+      fetch(`${API}/api/reviews`, { headers: { 'X-Access-Code': code } }).catch(() => null)
     ]);
     const data = await r.json();
     let googleReviewData = null;
     try { if (grRes && grRes.ok) googleReviewData = await grRes.json(); } catch(e) {}
     window._googleReviewData = googleReviewData;
+    let allReviewData = null;
+    try { if (allRevRes && allRevRes.ok) allReviewData = await allRevRes.json(); } catch(e) {}
+    window._allReviewData = allReviewData;
     if (!Array.isArray(data) || data.length === 0) {
       document.getElementById('app').innerHTML = '<div class="loading">Nog geen data beschikbaar.</div>';
       return;
     }
     render(data);
     renderGoogleInsights();
+    renderExtraReviews();
   } catch (e) {
     document.getElementById('app').innerHTML = `<div class="loading">Fout bij laden: ${e.message}</div>`;
   }
@@ -696,13 +739,40 @@ function render(data) {
         <div class="secondary-metric"><span>${fmt(dw.reviews)}</span> reviews</div>
         ${growthRow(data, li, d => d.dagjeweg?.reviews)}
       </div>
+
+      <!-- LaserMaxx -->
+      <div class="card lasermaxx">
+        <div class="card-header">
+          <span class="card-icon">🔫</span>
+          <div class="card-title">LaserMaxx<small>Arena Reviews</small></div>
+          <a href="https://my.lasermaxx.com/arenas/reviews/almere-underground-events" target="_blank" class="card-link" title="Open LaserMaxx">↗</a>
+        </div>
+        <div class="main-metric">
+          <span class="main-value" id="lmCount">—</span>
+          <span class="main-label">reviews</span>
+        </div>
+        <div class="secondary-metric" id="lmLatest" style="font-size:11px;color:#888;">Laatst gescraped: —</div>
+      </div>
+
+      <!-- Roller GX Score -->
+      <div class="card roller-gx">
+        <div class="card-header">
+          <span class="card-icon">🎯</span>
+          <div class="card-title">Roller GX Score<small>Guest Experience</small></div>
+        </div>
+        <div class="main-metric">
+          <span class="main-value" id="gxAvg">—</span>
+          <span class="main-label" id="gxStars"></span>
+        </div>
+        <div class="secondary-metric"><span id="gxCount">—</span> responses · <span id="gxFans">—</span> fans</div>
+      </div>
     </div>
 
     <!-- Google Reviews Insights (wide card) -->
     <div class="google-insights-card" id="googleInsightsCard" style="display:none;">
       <div class="insights-header">
         <span class="insights-icon">⭐</span>
-        <span class="insights-title">Google Reviews Insights</span>
+        <span class="insights-title">Reviews Insights</span>
       </div>
       <div class="insights-body">
         <div class="insights-col unanswered-col" id="insightsUnanswered"></div>
