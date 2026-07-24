@@ -211,6 +211,13 @@
       <div class="subtab" id="subtabOfferte" onclick="switchSubTab('offerte')">Offerte Akkoord <span class="count" id="countOfferte">0</span></div>
     </div>
 
+    <!-- Controle actions bar -->
+    <div id="controleActions" style="display:none;padding:8px 16px;">
+      <button id="fullRefreshBtn" onclick="doFullRefresh()" style="background:#7c3aed;border:none;color:white;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        🔄 Roller data verversen
+      </button>
+    </div>
+
     <!-- Status filter -->
     <div id="statusFilter" style="display:none;padding:6px 16px;">
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
@@ -646,6 +653,7 @@ function renderAll() {
   document.getElementById('statusFilter').style.display = (activeTab === 'reservations' || activeTab === 'controle') ? 'block' : 'none';
   document.getElementById('sortBar').style.display = activeTab === 'leads' ? 'block' : 'none';
   document.getElementById('printControls').style.display = activeTab === 'reservations' ? 'block' : 'none';
+  document.getElementById('controleActions').style.display = activeTab === 'controle' ? 'block' : 'none';
 
   renderStatusFilterButtons();
   renderSummary();
@@ -824,6 +832,35 @@ function toggleDetail(id) {
 }
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
+async function doFullRefresh() {
+  const btn = document.getElementById('fullRefreshBtn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Roller data ophalen...';
+  try {
+    const r = await fetch(`${API}/api/leads/full-refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Access-Code': CODE },
+      body: JSON.stringify({ code: CODE })
+    });
+    if (r.ok) {
+      const data = await r.json();
+      allBookings = data.bookings || [];
+      generatedAt = data.generatedAt || '';
+      renderAll();
+      btn.innerHTML = '✅ Ververst!';
+      setTimeout(() => { btn.innerHTML = '🔄 Roller data verversen'; }, 2000);
+    } else {
+      const err = await r.json().catch(() => ({}));
+      alert('Refresh mislukt: ' + (err.error || r.status));
+    }
+  } catch (e) {
+    alert('Verbindingsfout: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    if (btn.innerHTML.includes('⏳')) btn.innerHTML = '🔄 Roller data verversen';
+  }
+}
+
 async function doRefresh() {
   const btn = document.getElementById('refresh-btn');
   btn.disabled = true;
