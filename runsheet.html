@@ -1256,7 +1256,7 @@ async function downloadRunsheetPDF(date) {
       infoLines += (infoLines ? '\n' : '') + bookingId;
 
       // Activities table
-      const colHeaders = ['Activiteit', 'Subtype', 'Begintijd', 'Personen', 'Locatie'];
+      const colHeaders = ['Activiteit', 'Subtype', 'Begintijd', 'Aantal', 'Locatie'];
       const tableBody = (b.activities || []).map(a => [
         a.mainActivity || a.name || '',
         a.subtype || '',
